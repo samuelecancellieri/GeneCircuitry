@@ -122,13 +122,7 @@ def create_oracle_object(
 
     # Load base GRN based on species (or use ATAC peaks if provided)
     base_GRN = None
-    if atac_peaks_pkl and os.path.exists(atac_peaks_pkl):
-        import pandas as pd
-
-        base_GRN = pd.read_pickle(atac_peaks_pkl)
-        print(f"Using custom base GRN from ATAC peaks: {atac_peaks_pkl}")
-        print(f"  TF info matrix shape: {base_GRN.shape}")
-    elif species == "human":
+    if species == "human":
         base_GRN = co.data.load_human_promoter_base_GRN()
     elif species == "mouse":
         base_GRN = co.data.load_mouse_promoter_base_GRN()
