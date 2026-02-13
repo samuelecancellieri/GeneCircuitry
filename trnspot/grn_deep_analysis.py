@@ -654,40 +654,30 @@ def plot_difference_cluster_scores(
                 colors[i] = "#fb3310"
 
             # Create scatter plot with colored points
-            ax.scatter(ranks, diff_df_sorted["Difference"], c=colors, alpha=0.7, s=20)
+            # Create scatter plot with colored points
+            ax.scatter(ranks, diff_df_sorted["Difference"], c=colors, alpha=0.7, s=30)
+            ax.invert_xaxis()
+            ax.set_xticklabels([])
 
             # Annotate top 5 positive differences
             texts = []
             for i, (gene, row) in enumerate(top_5_positive.iterrows()):
-                texts.append(
-                    ax.annotate(
-                        gene,
-                        (i, row["Difference"]),
-                        fontsize=8,
-                        bbox=dict(
-                            boxstyle="round,pad=0.2", facecolor="lightgreen", alpha=0.7
-                        ),
-                    )
-                )
+                texts.append(ax.annotate(gene, (i, row["Difference"]), fontsize=10))
 
             # Annotate top 5 negative differences
             for i, (gene, row) in enumerate(top_5_negative.iterrows()):
                 rank_pos = len(diff_df_sorted) - top_x + i
                 texts.append(
-                    ax.annotate(
-                        gene,
-                        (rank_pos, row["Difference"]),
-                        fontsize=8,
-                        bbox=dict(
-                            boxstyle="round,pad=0.2", facecolor="lightcoral", alpha=0.7
-                        ),
-                    )
+                    ax.annotate(gene, (rank_pos, row["Difference"]), fontsize=10)
                 )
 
+            # Adjust text positions to avoid overlap while keeping them in the plot frame
             adjust_text(
                 texts,
-                arrowprops=dict(arrowstyle="->", color="black", lw=0.5),
+                arrowprops=dict(arrowstyle="->", color="r"),
                 ax=ax,
+                pull_threshold=300,
+                iter_lim=100,
             )
 
             ax.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
@@ -702,7 +692,7 @@ def plot_difference_cluster_scores(
             fig.savefig(
                 output_path,
                 bbox_inches="tight",
-                dpi=300,
+                dpi=config.SAVE_DPI,
             )
             plt.close(fig)
 

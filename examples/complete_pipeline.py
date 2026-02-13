@@ -1395,6 +1395,11 @@ def grn_deep_analysis_pipeline(grn_score_path, grn_links_path):
         plot_difference_cluster_scores,
         plot_network_graph,
     )
+    from trnspot.plotting.grn_plots import (
+        generate_all_grn_plots,
+        plot_enriched_tf_network,
+        plot_tf_shared_target_network,
+    )
 
     print(f"\n{'='*70}")
     print("STEP 7: GRN Deep Analysis")
@@ -1407,6 +1412,8 @@ def grn_deep_analysis_pipeline(grn_score_path, grn_links_path):
     print("  ✓ Processed GRN score file")
     links_df = process_single_links_file(grn_links_path)
     print("  ✓ Processed GRN links file")
+
+    # --- Legacy individual plots ---
     plot_compare_cluster_scores(score_df)
     print("  ✓ Generated cluster comparison plots")
     plot_difference_cluster_scores(score_df)
@@ -1415,6 +1422,25 @@ def grn_deep_analysis_pipeline(grn_score_path, grn_links_path):
     print("  ✓ Generated scatter plots")
     plot_network_graph(score_df, links_df)
     print("  ✓ Generated GRN network graph")
+
+    # --- New plotting module: enriched TF network ---
+    log_step("GRNPlotting", "STARTED")
+    try:
+        results = generate_all_grn_plots(
+            score_df=score_df,
+            links_df=links_df,
+            skip_existing=True,
+        )
+        total = sum(results.values())
+        log_step(
+            "GRNPlotting",
+            "COMPLETED",
+            {"plots_generated": total, "details": results},
+        )
+        print(f"  ✓ Generated {total} GRN plots via plotting module")
+    except Exception as e:
+        log_error("GRNPlotting", e)
+        print(f"  ⚠ GRN plotting module failed: {e}")
 
 
 def main():

@@ -50,7 +50,7 @@ QC_MAX_COUNTS = None
 QC_PCT_MT_MAX = 20.0
 """Maximum percentage of mitochondrial counts"""
 
-QC_MIN_CELLS = 10
+QC_MIN_CELLS = 3
 """Minimum number of cells expressing a gene"""
 
 

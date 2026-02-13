@@ -29,6 +29,8 @@ from .qc_plots import (
 
 from .grn_plots import (
     plot_network_graph,
+    plot_enriched_tf_network,
+    plot_tf_shared_target_network,
     plot_heatmap_scores,
     plot_scatter_scores,
     plot_difference_cluster_scores,
@@ -58,6 +60,8 @@ __all__ = [
     "generate_all_qc_plots",
     # GRN plots
     "plot_network_graph",
+    "plot_enriched_tf_network",
+    "plot_tf_shared_target_network",
     "plot_heatmap_scores",
     "plot_scatter_scores",
     "plot_difference_cluster_scores",
