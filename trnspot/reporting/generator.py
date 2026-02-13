@@ -1086,6 +1086,7 @@ def generate_report(
     adata=None,
     celloracle_result=None,
     hotspot_result=None,
+    merged_scores=None,
     log_file: Optional[str] = None,
     formats: List[str] = ["html", "pdf"],
     embed_images: bool = True,
@@ -1107,6 +1108,8 @@ def generate_report(
         CellOracle results (oracle, links)
     hotspot_result : Hotspot, optional
         Hotspot results
+    merged_scores : pd.DataFrame, optional
+        Merged GRN scores from cross-stratification analysis
     log_file : str, optional
         Path to pipeline log file
     formats : list
@@ -1130,6 +1133,7 @@ def generate_report(
         create_hotspot_section,
         create_operations_log_section,
         create_plot_gallery_section,
+        create_grn_deep_analysis_section,
     )
 
     generator = ReportGenerator(output_dir=output_dir, title=title, subtitle=subtitle)
@@ -1150,6 +1154,25 @@ def generate_report(
 
     if hotspot_result is not None:
         generator.add_section(create_hotspot_section(hotspot_result, output_dir))
+
+    # Add GRN deep analysis section if merged scores or heatmap figures exist
+    merged_csv = os.path.join(output_dir, "celloracle", "total_merged_scores.csv")
+    grn_heatmaps_exist = (
+        any(
+            "grn_heatmap_" in f
+            for f in glob.glob(
+                os.path.join(output_dir, "figures", "grn", "**", "*.png"),
+                recursive=True,
+            )
+        )
+        if os.path.exists(os.path.join(output_dir, "figures", "grn"))
+        else False
+    )
+
+    if merged_scores is not None or os.path.exists(merged_csv) or grn_heatmaps_exist:
+        generator.add_section(
+            create_grn_deep_analysis_section(output_dir, merged_scores)
+        )
 
     if log_file and os.path.exists(log_file):
         generator.add_section(create_operations_log_section(log_file))

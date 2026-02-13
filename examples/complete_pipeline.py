@@ -381,14 +381,15 @@ class PipelineController:
             if log_dir is None:
                 log_dir = self.log_dir
 
-            # Determine ATAC peaks PKL path (if available)
-            atac_pkl = None
+            # Determine TF dictionary: ATAC peaks PKL takes
+            # priority over --tf-dictionary CLI argument
+            tf_dictionary = self.args.tf_dictionary
             if hasattr(self, "atac_peaks_pkl") and self.atac_peaks_pkl:
-                atac_pkl = self.atac_peaks_pkl
+                tf_dictionary = self.atac_peaks_pkl
                 log_step(
                     "Controller.CellOracle",
-                    "USING_ATAC_PEAKS",
-                    {"atac_peaks_pkl": atac_pkl},
+                    "USING_ATAC_PEAKS_AS_TF_DICT",
+                    {"tf_dictionary": tf_dictionary},
                 )
 
             result = celloracle_pipeline(
@@ -397,8 +398,7 @@ class PipelineController:
                 species=self.args.species,
                 raw_count_layer=self.args.raw_count_layer,
                 embedding_name=self.args.embedding_grn,
-                TG_to_TF_dictionary=self.args.tf_dictionary,
-                atac_peaks_pkl=atac_pkl,
+                TG_to_TF_dictionary=tf_dictionary,
                 skip_celloracle=self.args.skip_celloracle,
                 log_dir=log_dir,
             )
@@ -697,6 +697,10 @@ class PipelineController:
                 total_merged_scores = merge_scores(tracked_files_path)
                 plot_heatmap_scores(total_merged_scores)
                 print("  ✓ Generated overall GRN deep analysis heatmap")
+            else:
+                total_merged_scores = None
+        else:
+            total_merged_scores = None
 
         # Generate overall report for stratified analysis
         if self.adata_stratification_list:
@@ -706,6 +710,7 @@ class PipelineController:
                     title="TRNspot Analysis Report",
                     subtitle=f"{self.args.name} - Stratified Analysis ({len(self.adata_stratification_list)} stratifications)",
                     adata=self.adata_preprocessed,
+                    merged_scores=total_merged_scores,
                     log_file=os.path.join(self.args.output, "logs", "pipeline.log"),
                     formats=["html", "pdf"],
                 )
@@ -1005,7 +1010,6 @@ def celloracle_pipeline(
     embedding_name="X_draw_graph_fa",
     raw_count_layer="raw_counts",
     TG_to_TF_dictionary=None,
-    atac_peaks_pkl=None,
     skip_celloracle=False,
     log_dir=None,
 ):
@@ -1082,7 +1086,6 @@ def celloracle_pipeline(
                 raw_count_layer=raw_count_layer,
                 species=species,
                 TG_to_TF_dictionary=TG_to_TF_dictionary,
-                atac_peaks_pkl=atac_peaks_pkl,
             )
             print("  ✓ Oracle object created")
             log_step("CellOracle.CreateObject", "COMPLETED")

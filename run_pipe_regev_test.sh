@@ -15,7 +15,8 @@ python run_complete_analysis.py \
  --output regev_test_run \
  --species human \
  --cluster-key merged_response \
- --clusters "Ductal,Acinar,ADM,CAF" \
+ --clusters "Ductal,Acinar" \
  --cluster-key-stratification level_2_annotation \
  --raw-count-layer counts \
+ --atac-peaks /storage/sahuarea/samuele_cancellieri/helsinki_lab_cell-lines/cell_lines_counts/PANC1_ATAC_peaks_blacklisted_top1k.narrowPeak \
  --debug

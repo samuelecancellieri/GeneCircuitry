@@ -525,7 +525,7 @@ def plot_module_scores_violin(
 
     if not plot_exists(filepath2, skip_existing):
         # Make figure wider to accommodate all modules and clusters
-        fig_width = max(18, n_modules * 3.5)
+        fig_width = max(30, n_modules * 3.5)
         fig_height = 10
 
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))

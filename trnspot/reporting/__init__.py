@@ -23,6 +23,7 @@ from .sections import (
     create_hotspot_section,
     create_operations_log_section,
     create_plot_gallery_section,
+    create_grn_deep_analysis_section,
 )
 
 __all__ = [
@@ -41,4 +42,5 @@ __all__ = [
     "create_hotspot_section",
     "create_operations_log_section",
     "create_plot_gallery_section",
+    "create_grn_deep_analysis_section",
 ]

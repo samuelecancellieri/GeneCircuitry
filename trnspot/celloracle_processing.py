@@ -2,7 +2,6 @@
 CellOracle processing module for TRNspot
 """
 
-import os
 import scanpy as sc
 import celloracle as co
 import seaborn as sns
@@ -87,20 +86,22 @@ def create_oracle_object(
     species: str = "human",
     TG_to_TF_dictionary: Optional[str] = None,
     raw_count_layer: Optional[str] = None,
-    atac_peaks_pkl: Optional[str] = None,
 ):
     """
     Creates an Oracle object for CellOracle analysis.
 
     Parameters:
         adata (AnnData): Annotated data object containing gene expression data.
-        TG_to_TF_dictionary (str): Path to the file containing the dictionary mapping target genes to transcription factors.
-        cluster_column_name (str): Name of the column in `adata.obs` that contains cluster information.
-        embedding_name (str): Name of the embedding to be used for analysis.
-        raw_count_layer (str, optional): Name of the layer in `adata.layers` that contains raw count data. Defaults to None.
-        atac_peaks_pkl (str, optional): Path to enriched ATAC peaks pickle file (from process_atac_peaks).
-            When provided, this TF info matrix is used as the base GRN instead of the default
-            promoter-based one. Defaults to None.
+        TG_to_TF_dictionary (str): Path to a pickle file containing either:
+            - A dictionary mapping target genes to transcription factors, or
+            - An enriched ATAC peaks DataFrame (from process_atac_peaks).
+            The file is loaded and added via oracle.addTFinfo_dictionary().
+        cluster_column_name (str): Name of the column in `adata.obs`
+            that contains cluster information.
+        embedding_name (str): Name of the embedding to be used.
+        raw_count_layer (str, optional): Name of the layer in
+            `adata.layers` that contains raw count data.
+            Defaults to None.
 
     Returns:
         oracle (Oracle): An instance of the Oracle class.
@@ -120,14 +121,14 @@ def create_oracle_object(
             .astype("category")
         )
 
-    # Load base GRN based on species (or use ATAC peaks if provided)
+    # Load base GRN based on species
     base_GRN = None
     if species == "human":
         base_GRN = co.data.load_human_promoter_base_GRN()
     elif species == "mouse":
         base_GRN = co.data.load_mouse_promoter_base_GRN()
     else:
-        print("if species is not human or mouse no base GRN is loaded")
+        print("if species is not human or mouse " "no base GRN is loaded")
 
     # Create Oracle object
     oracle = co.Oracle()
@@ -155,6 +156,7 @@ def create_oracle_object(
         oracle.import_TF_data(TF_info_matrix=base_GRN)
 
     if TG_to_TF_dictionary:
+        print(f"Loading TG to TF dictionary from: {TG_to_TF_dictionary}")
         # Load the TG to TF dictionary
         TG_to_TF_dictionary = pickle.load(
             open(

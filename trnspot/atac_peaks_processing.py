@@ -237,11 +237,11 @@ def process_atac_peaks(
 
     # Scan for motifs
     print(f"  Scanning peaks for TF motifs (FPR={fpr})...")
-    tfi.scan(fpr=fpr, motifs=motifs, verbose=False)
+    tfi.scan(fpr=fpr, motifs=motifs, verbose=False, n_cpus=config.N_JOBS)
     print("  ✓ Motif scanning complete")
 
     # Save TFinfo object as HDF5
-    tfi_path = os.path.join(atac_output_dir, "motif_enriched_tfi.hdf5")
+    tfi_path = os.path.join(atac_output_dir, "motif_enriched_tfi.celloracle.tfinfo")
     tfi.to_hdf5(file_path=tfi_path)
     print(f"  ✓ TFinfo object saved to: {tfi_path}")
 

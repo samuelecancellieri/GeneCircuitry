@@ -63,6 +63,7 @@ ipython_config.py
 venv/
 env/
 ENV/
+.venv/
 env.bak/
 venv.bak/
 
@@ -100,3 +101,4 @@ data/*
 *report.pdf
 *.json
 *.zip
+*.tfinfo

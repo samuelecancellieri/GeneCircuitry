@@ -245,7 +245,7 @@ LOG_FILE = os.path.join(LOG_PATH, "trnspot_log.txt")
 # Advanced Settings
 # ============================================================================
 
-N_JOBS = -1
+N_JOBS = 8
 """Number of parallel jobs for computation (-1 = all cores)"""
 
 CHUNK_SIZE = 1000
