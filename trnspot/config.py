@@ -191,6 +191,17 @@ HOTSPOT_TOP_GENES = 3000
 
 
 # ============================================================================
+# ATAC Peaks Processing Configuration
+# ============================================================================
+
+ATAC_MOTIF_SCAN_FPR = 0.02
+"""False positive rate for motif scanning in ATAC peak analysis"""
+
+ATAC_MOTIF_SCORE_THRESHOLD = 10
+"""Minimum motif score threshold for filtering enriched motifs"""
+
+
+# ============================================================================
 # File I/O Configuration
 # ============================================================================
 
@@ -362,6 +373,9 @@ def get_config():
         "GRN_N_JOBS": GRN_N_JOBS,
         "GRN_MIN_TARGETS": GRN_MIN_TARGETS,
         "GRN_CONFIDENCE_THRESHOLD": GRN_CONFIDENCE_THRESHOLD,
+        # ATAC Peaks
+        "ATAC_MOTIF_SCAN_FPR": ATAC_MOTIF_SCAN_FPR,
+        "ATAC_MOTIF_SCORE_THRESHOLD": ATAC_MOTIF_SCORE_THRESHOLD,
         # File I/O
         "OUTPUT_DIR": OUTPUT_DIR,
         "CACHE_DIR": CACHE_DIR,

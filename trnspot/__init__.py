@@ -25,6 +25,7 @@ from . import preprocessing
 from . import celloracle_processing
 from . import hotspot_processing
 from . import grn_deep_analysis
+from . import atac_peaks_processing
 from . import config
 from . import reporting
 from . import plotting

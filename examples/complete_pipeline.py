@@ -216,6 +216,7 @@ class PipelineController:
         self.adata_preprocessed = None
         self.adata_list = []
         self.adata_stratification_list = []
+        self.atac_peaks_pkl = None
 
         log_step(
             "PipelineController",
@@ -296,12 +297,99 @@ class PipelineController:
             log_error("Controller.Clustering", e)
             raise
 
+    def run_step_atac_peaks(self, log_dir=None):
+        """Execute ATAC Peaks Processing step.
+
+        Processes a BED file with pre-called ATAC peaks through CellOracle
+        motif analysis to generate an enriched TF info matrix (PKL). The
+        resulting PKL path is stored so CellOracle can use it as a custom
+        base GRN instead of the default promoter-based one.
+        """
+        log_step("Controller.ATACPeaks", "STARTED")
+        try:
+            if log_dir is None:
+                log_dir = self.log_dir
+
+            bed_path = self.args.atac_peaks
+            if not bed_path:
+                log_step("Controller.ATACPeaks", "SKIPPED", {"reason": "no BED file"})
+                return None
+
+            print(f"\n{'='*70}")
+            print("STEP 3.5: ATAC Peaks Processing")
+            print(f"{'='*70}")
+            print(f"  BED file: {bed_path}")
+            print(f"  Species: {self.args.species}")
+
+            # Check checkpoint
+            step_hash = compute_input_hash(
+                bed_path,
+                species=self.args.species,
+                fpr=config.ATAC_MOTIF_SCAN_FPR,
+                threshold=config.ATAC_MOTIF_SCORE_THRESHOLD,
+            )
+
+            pkl_path = os.path.join(
+                config.OUTPUT_DIR, "celloracle", "enriched_atac_peaks.pkl"
+            )
+            if (
+                log_dir
+                and check_checkpoint(log_dir, "atac_peaks", step_hash)
+                and os.path.exists(pkl_path)
+            ):
+                log_step(
+                    "Controller.ATACPeaks",
+                    "LOADED_FROM_CHECKPOINT",
+                    {"pkl_path": pkl_path},
+                )
+                self.atac_peaks_pkl = pkl_path
+                return pkl_path
+
+            from trnspot.atac_peaks_processing import process_atac_peaks
+
+            pkl_path = process_atac_peaks(
+                bed_path=bed_path,
+                species=self.args.species,
+                output_dir=config.OUTPUT_DIR,
+            )
+
+            # Save checkpoint
+            if log_dir:
+                write_checkpoint(
+                    log_dir,
+                    "atac_peaks",
+                    step_hash,
+                    bed_path=bed_path,
+                    pkl_path=pkl_path,
+                )
+
+            self.atac_peaks_pkl = pkl_path
+            log_step(
+                "Controller.ATACPeaks",
+                "COMPLETED",
+                {"pkl_path": pkl_path},
+            )
+            return pkl_path
+        except Exception as e:
+            log_error("Controller.ATACPeaks", e)
+            raise
+
     def run_step_celloracle(self, adata, log_dir=None):
         """Execute Step 4: CellOracle."""
         log_step("Controller.CellOracle", "STARTED")
         try:
             if log_dir is None:
                 log_dir = self.log_dir
+
+            # Determine ATAC peaks PKL path (if available)
+            atac_pkl = None
+            if hasattr(self, "atac_peaks_pkl") and self.atac_peaks_pkl:
+                atac_pkl = self.atac_peaks_pkl
+                log_step(
+                    "Controller.CellOracle",
+                    "USING_ATAC_PEAKS",
+                    {"atac_peaks_pkl": atac_pkl},
+                )
 
             result = celloracle_pipeline(
                 adata,
@@ -310,6 +398,7 @@ class PipelineController:
                 raw_count_layer=self.args.raw_count_layer,
                 embedding_name=self.args.embedding_grn,
                 TG_to_TF_dictionary=self.args.tf_dictionary,
+                atac_peaks_pkl=atac_pkl,
                 skip_celloracle=self.args.skip_celloracle,
                 log_dir=log_dir,
             )
@@ -484,7 +573,8 @@ class PipelineController:
         steps : list of str, optional
             Specific steps to run. Options:
             'load', 'preprocessing', 'stratification', 'clustering',
-            'celloracle', 'hotspot', 'grn_analysis', 'report', 'summary'
+            'atac_peaks', 'celloracle', 'hotspot', 'grn_analysis',
+            'report', 'summary'
             If None, runs all steps.
         """
         if steps is None:
@@ -493,6 +583,7 @@ class PipelineController:
                 "preprocessing",
                 "stratification",
                 "clustering",
+                "atac_peaks",
                 "celloracle",
                 "hotspot",
                 "grn_analysis",
@@ -511,6 +602,10 @@ class PipelineController:
         # Step 2.5: Stratification
         if "stratification" in steps:
             self.run_step_stratification()
+
+        # Process ATAC peaks (before CellOracle, applies to all modes)
+        if "atac_peaks" in steps and self.args.atac_peaks:
+            self.run_step_atac_peaks()
 
         # Process stratified or non-stratified
         if self.args.cluster_key_stratification and self.adata_list:
@@ -910,6 +1005,7 @@ def celloracle_pipeline(
     embedding_name="X_draw_graph_fa",
     raw_count_layer="raw_counts",
     TG_to_TF_dictionary=None,
+    atac_peaks_pkl=None,
     skip_celloracle=False,
     log_dir=None,
 ):
@@ -986,6 +1082,7 @@ def celloracle_pipeline(
                 raw_count_layer=raw_count_layer,
                 species=species,
                 TG_to_TF_dictionary=TG_to_TF_dictionary,
+                atac_peaks_pkl=atac_peaks_pkl,
             )
             print("  ✓ Oracle object created")
             log_step("CellOracle.CreateObject", "COMPLETED")
@@ -1423,6 +1520,14 @@ Examples:
         default=None,
         help="Path to TF to target gene dictionary pickle file (default: None)",
     )
+    parser.add_argument(
+        "--atac-peaks",
+        type=str,
+        default=None,
+        help="Path to BED file with pre-called ATAC peaks. "
+        "When provided, peaks are processed through CellOracle motif analysis "
+        "to generate an enriched TF info matrix used as custom base GRN.",
+    )
 
     # Quality control parameters
     parser.add_argument(
@@ -1482,8 +1587,8 @@ Examples:
         nargs="+",
         default=None,
         help="Specific pipeline steps to run (space-separated): "
-        "load preprocessing stratification clustering celloracle "
-        "hotspot grn_analysis summary",
+        "load preprocessing stratification clustering atac_peaks "
+        "celloracle hotspot grn_analysis summary",
     )
 
     args = parser.parse_args()
