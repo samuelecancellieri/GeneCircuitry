@@ -1,12 +1,11 @@
 numpy<=1.26
-celloracle==0.18.0
+celloracle-lite
+hotspotsc
 pandas
-scanpy
-anndata
 matplotlib
 seaborn
 scipy
 adjustText
-networkx
-hotspotsc
 gseapy
+fa2-modified
+leidenalg

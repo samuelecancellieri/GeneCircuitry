@@ -38,10 +38,10 @@ def set_random_seed(seed: int = RANDOM_SEED):
 # Quality Control Default Parameters
 # ============================================================================
 
-QC_MIN_GENES = 200
+QC_MIN_GENES = 100
 """Minimum number of genes expressed per cell"""
 
-QC_MIN_COUNTS = 500
+QC_MIN_COUNTS = 200
 """Minimum total counts per cell"""
 
 QC_MAX_COUNTS = None
