@@ -38,7 +38,7 @@ from trnspot.preprocessing import (
     perform_dimensionality_reduction_clustering,
     ensure_categorical_obs,
 )
-from trnspot.reporting import generate_report
+from trnspot.reporting import generate_report, generate_stratified_report
 
 
 # Global logger instances
@@ -217,6 +217,7 @@ class PipelineController:
         self.adata_preprocessed = None
         self.adata_list = []
         self.adata_stratification_list = []
+        self.stratification_results = []
         self.atac_peaks_pkl = None
 
         log_step(
@@ -541,14 +542,15 @@ class PipelineController:
         if os.path.exists(grn_score_file) and os.path.exists(grn_links_file):
             grn_deep_analysis_pipeline(grn_score_file, grn_links_file)
 
-        # Generate report for this stratification
-        self.run_step_report(
-            output_dir=stratified_output_dir,
-            adata=adata_clustered,
-            celloracle_result=celloracle_result,
-            hotspot_result=hotspot_result,
-            title="TRNspot Analysis Report",
-            subtitle=f"Stratification: {stratification_name}",
+        # Collect results for unified tabbed report
+        self.stratification_results.append(
+            {
+                "name": str(stratification_name),
+                "output_dir": stratified_output_dir,
+                "adata": adata_clustered,
+                "celloracle_result": celloracle_result,
+                "hotspot_result": hotspot_result,
+            }
         )
 
         return stratified_output_dir
@@ -703,24 +705,33 @@ class PipelineController:
         else:
             total_merged_scores = None
 
-        # Generate overall report for stratified analysis
-        if self.adata_stratification_list:
+        # Generate unified report with stratification tabs
+        if self.adata_stratification_list and self.stratification_results:
             try:
-                outputs = generate_report(
+                log_file = os.path.join(self.args.output, "logs", "pipeline.log")
+                if not os.path.exists(log_file):
+                    log_file = None
+
+                outputs = generate_stratified_report(
                     output_dir=self.args.output,
                     title="TRNspot Analysis Report",
-                    subtitle=f"{self.args.name} - Stratified Analysis ({len(self.adata_stratification_list)} stratifications)",
-                    adata=self.adata_preprocessed,
+                    subtitle=(
+                        f"{self.args.name} - Stratified Analysis "
+                        f"({len(self.stratification_results)} stratifications)"
+                    ),
+                    adata_preprocessed=self.adata_preprocessed,
+                    stratification_results=self.stratification_results,
                     merged_scores=total_merged_scores,
-                    log_file=os.path.join(self.args.output, "logs", "pipeline.log"),
+                    log_file=log_file,
                     formats=["html", "pdf"],
                 )
                 if outputs.get("html"):
-                    print(f"  ✓ Generated overall HTML report: {outputs['html']}")
+                    print(f"  ✓ Generated unified HTML report: {outputs['html']}")
                 if outputs.get("pdf"):
-                    print(f"  ✓ Generated overall PDF report: {outputs['pdf']}")
+                    print(f"  ✓ Generated unified PDF report: {outputs['pdf']}")
             except Exception as e:
-                print(f"  ⚠ Overall report generation failed: {e}")
+                log_error("Controller.StratifiedReport", e)
+                print(f"  ⚠ Unified report generation failed: {e}")
 
 
 def setup_directories(output_dir, figures_dir, debug=False):

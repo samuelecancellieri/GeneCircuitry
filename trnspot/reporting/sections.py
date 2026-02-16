@@ -84,6 +84,12 @@ def _find_embedding_figures(
     return sorted(set(figures))[:max_figures]
 
 
+def _safe_id(name: str) -> str:
+    """Convert a name to a safe HTML ID."""
+    safe = re.sub(r"[^a-z0-9]+", "-", str(name).lower()).strip("-")
+    return safe or "unnamed"
+
+
 def _format_number(value) -> str:
     """Format a number for display."""
     if isinstance(value, float):
@@ -1033,6 +1039,278 @@ def create_grn_deep_analysis_section(
     return ReportSection(
         title="GRN Deep Analysis (Merged Scores)",
         section_id="grn-deep-analysis",
+        content=content,
+        metrics=metrics,
+        subsections=subsections,
+    )
+
+
+def create_stratified_clustering_section(
+    stratification_results: List[Dict],
+) -> ReportSection:
+    """
+    Create Clustering & Visualization section with tabs per stratification.
+
+    Parameters
+    ----------
+    stratification_results : list of dict
+        Each dict has keys: 'name', 'output_dir', 'adata', etc.
+    """
+    content = """
+    <p>Dimensionality reduction and clustering were performed independently for each
+    stratified subset of the data.</p>
+
+    <h3>Methods</h3>
+    <ol>
+        <li><strong>PCA:</strong> Principal Component Analysis for dimensionality reduction</li>
+        <li><strong>Neighbor Graph:</strong> K-nearest neighbor graph construction</li>
+        <li><strong>UMAP:</strong> Uniform Manifold Approximation and Projection for visualization</li>
+        <li><strong>Leiden Clustering:</strong> Graph-based community detection</li>
+    </ol>
+    """
+
+    all_metrics = {"Stratifications": len(stratification_results)}
+    subsections = []
+
+    for result in stratification_results:
+        name = result["name"]
+        adata = result.get("adata")
+        output_dir = result["output_dir"]
+
+        sub_metrics = {}
+        tables = []
+        figures = []
+
+        if adata is not None:
+            sub_metrics["Cells"] = adata.n_obs
+            sub_metrics["Genes"] = adata.n_vars
+
+            cluster_key = None
+            if "leiden" in adata.obs.columns:
+                cluster_key = "leiden"
+            elif "louvain" in adata.obs.columns:
+                cluster_key = "louvain"
+
+            if cluster_key:
+                n_clusters = len(adata.obs[cluster_key].unique())
+                sub_metrics["Clusters"] = n_clusters
+
+                cluster_counts = adata.obs[cluster_key].value_counts().sort_index()
+                rows = [
+                    [str(c), count, f"{100 * count / adata.n_obs:.1f}%"]
+                    for c, count in cluster_counts.items()
+                ]
+                tables.append(
+                    {
+                        "title": f"Cluster Sizes ({cluster_key.title()})",
+                        "headers": ["Cluster", "Cell Count", "Percentage"],
+                        "rows": rows,
+                    }
+                )
+
+            if "X_pca" in adata.obsm:
+                sub_metrics["PCA Components"] = adata.obsm["X_pca"].shape[1]
+            if "X_umap" in adata.obsm:
+                sub_metrics["UMAP"] = "Yes"
+
+            figures = _find_embedding_figures(output_dir, max_figures=10)
+
+        subsections.append(
+            ReportSection(
+                title=str(name),
+                section_id=f"clustering-{_safe_id(name)}",
+                content="",
+                figures=figures,
+                metrics=sub_metrics,
+                tables=tables,
+            )
+        )
+
+    return ReportSection(
+        title="Clustering & Visualization",
+        section_id="clustering",
+        content=content,
+        metrics=all_metrics,
+        subsections=subsections,
+    )
+
+
+def create_stratified_celloracle_section(
+    stratification_results: List[Dict],
+) -> ReportSection:
+    """
+    Create CellOracle GRN Analysis section with tabs per stratification.
+
+    Parameters
+    ----------
+    stratification_results : list of dict
+        Each dict has keys: 'name', 'output_dir', 'celloracle_result', etc.
+    """
+    metrics = {"Stratifications": len(stratification_results)}
+
+    content = """
+    <p>Gene Regulatory Network (GRN) inference was performed using CellOracle independently
+    for each stratified subset.</p>
+
+    <h3>Analysis Pipeline</h3>
+    <ol>
+        <li><strong>Preprocessing:</strong> Diffusion map and PAGA graph construction</li>
+        <li><strong>Oracle Initialization:</strong> Integration with base GRN</li>
+        <li><strong>Network Inference:</strong> Ridge regression-based GRN per cluster</li>
+        <li><strong>Centrality Analysis:</strong> Network centrality score computation</li>
+    </ol>
+
+    <h3>Network Scores Computed</h3>
+    <ul>
+        <li><strong>Degree centrality:</strong> Number of connections (in/out/all)</li>
+        <li><strong>Betweenness centrality:</strong> How often a TF lies on shortest paths</li>
+        <li><strong>Eigenvector centrality:</strong> Influence based on connections to influential nodes</li>
+    </ul>
+    """
+
+    subsections = []
+
+    for result in stratification_results:
+        name = result["name"]
+        celloracle_result = result.get("celloracle_result")
+        output_dir = result["output_dir"]
+
+        sub_metrics = {}
+
+        if celloracle_result is not None:
+            oracle, links = celloracle_result
+            if hasattr(links, "merged_score") and links.merged_score is not None:
+                merged_scores = links.merged_score
+                if "cluster" in merged_scores.columns:
+                    sub_metrics["Clusters Analyzed"] = len(
+                        merged_scores["cluster"].unique()
+                    )
+                if hasattr(merged_scores, "index"):
+                    sub_metrics["Transcription Factors"] = len(
+                        merged_scores.index.unique()
+                    )
+            if hasattr(links, "filtered_links") and links.filtered_links is not None:
+                if isinstance(links.filtered_links, dict):
+                    total_links = sum(
+                        len(v)
+                        for v in links.filtered_links.values()
+                        if hasattr(v, "__len__")
+                    )
+                    sub_metrics["Regulatory Links"] = total_links
+            sub_content = (
+                f"<p>CellOracle GRN analysis completed for stratification "
+                f"<strong>{name}</strong>.</p>"
+            )
+        else:
+            sub_content = (
+                f"<p>CellOracle analysis was skipped or not available for "
+                f"<strong>{name}</strong>.</p>"
+            )
+
+        figures = _find_figures(
+            output_dir,
+            ["figures/grn", "figures/grn/grn_deep_analysis", "grn_deep_analysis"],
+            max_figures=50,
+        )
+
+        subsections.append(
+            ReportSection(
+                title=str(name),
+                section_id=f"celloracle-{_safe_id(name)}",
+                content=sub_content,
+                figures=figures,
+                metrics=sub_metrics,
+            )
+        )
+
+    return ReportSection(
+        title="CellOracle GRN Analysis",
+        section_id="celloracle",
+        content=content,
+        metrics=metrics,
+        subsections=subsections,
+    )
+
+
+def create_stratified_hotspot_section(
+    stratification_results: List[Dict],
+) -> ReportSection:
+    """
+    Create Hotspot Gene Modules section with tabs per stratification.
+
+    Parameters
+    ----------
+    stratification_results : list of dict
+        Each dict has keys: 'name', 'output_dir', 'hotspot_result', etc.
+    """
+    metrics = {"Stratifications": len(stratification_results)}
+
+    content = """
+    <p>Hotspot analysis was performed independently for each stratified subset
+    to identify spatially coordinated gene expression patterns.</p>
+
+    <h3>Analysis Steps</h3>
+    <ol>
+        <li><strong>KNN Graph:</strong> Cell similarity graph from PCA space</li>
+        <li><strong>Autocorrelation:</strong> Gene-level local autocorrelation testing</li>
+        <li><strong>Local Correlations:</strong> Pairwise gene correlations</li>
+        <li><strong>Module Detection:</strong> Hierarchical clustering of gene modules</li>
+    </ol>
+    """
+
+    subsections = []
+
+    for result in stratification_results:
+        name = result["name"]
+        hotspot_result = result.get("hotspot_result")
+        output_dir = result["output_dir"]
+
+        sub_metrics = {}
+
+        if hotspot_result is not None:
+            if (
+                hasattr(hotspot_result, "results")
+                and hotspot_result.results is not None
+            ):
+                n_tested = len(hotspot_result.results)
+                n_significant = (hotspot_result.results["FDR"] < 0.05).sum()
+                sub_metrics["Genes Tested"] = n_tested
+                sub_metrics["Significant Genes"] = int(n_significant)
+            if (
+                hasattr(hotspot_result, "modules")
+                and hotspot_result.modules is not None
+            ):
+                n_modules = len([m for m in hotspot_result.modules.unique() if m != -1])
+                sub_metrics["Gene Modules"] = n_modules
+            sub_content = (
+                f"<p>Hotspot module analysis completed for stratification "
+                f"<strong>{name}</strong>.</p>"
+            )
+        else:
+            sub_content = (
+                f"<p>Hotspot analysis was skipped or not available for "
+                f"<strong>{name}</strong>.</p>"
+            )
+
+        figures = _find_figures(
+            output_dir,
+            ["figures/hotspot", "hotspot"],
+            max_figures=50,
+        )
+
+        subsections.append(
+            ReportSection(
+                title=str(name),
+                section_id=f"hotspot-{_safe_id(name)}",
+                content=sub_content,
+                figures=figures,
+                metrics=sub_metrics,
+            )
+        )
+
+    return ReportSection(
+        title="Hotspot Gene Modules",
+        section_id="hotspot",
         content=content,
         metrics=metrics,
         subsections=subsections,

@@ -1196,6 +1196,162 @@ def generate_report(
     return outputs
 
 
+def generate_stratified_report(
+    output_dir: str,
+    title: str = "TRNspot Analysis Report",
+    subtitle: str = "",
+    adata_preprocessed=None,
+    stratification_results: Optional[List[Dict[str, Any]]] = None,
+    merged_scores=None,
+    log_file: Optional[str] = None,
+    formats: List[str] = ["html", "pdf"],
+    embed_images: bool = True,
+) -> Dict[str, str]:
+    """
+    Generate a unified report with tabs for each stratification cluster.
+
+    Instead of creating separate reports per stratification, this builds a
+    single report where per-stratification analysis sections (Clustering,
+    CellOracle, Hotspot) are rendered with tab navigation – one tab per
+    stratification cluster.
+
+    Parameters
+    ----------
+    output_dir : str
+        Main output directory
+    title : str
+        Report title
+    subtitle : str
+        Report subtitle
+    adata_preprocessed : AnnData, optional
+        Pre-stratification AnnData (used for shared sections)
+    stratification_results : list of dict, optional
+        Per-stratification results. Each dict should contain:
+        - 'name' : str – stratification label
+        - 'output_dir' : str – output directory for this stratification
+        - 'adata' : AnnData – clustered AnnData (optional)
+        - 'celloracle_result' : tuple (oracle, links) (optional)
+        - 'hotspot_result' : Hotspot object (optional)
+    merged_scores : pd.DataFrame, optional
+        Cross-stratification merged GRN scores
+    log_file : str, optional
+        Path to pipeline log file
+    formats : list
+        Output formats ('html', 'pdf')
+    embed_images : bool
+        If True, embed images as base64 (self-contained).
+
+    Returns
+    -------
+    dict
+        Paths to generated report files
+    """
+    from .sections import (
+        create_data_summary_section,
+        create_settings_section,
+        create_qc_section,
+        create_preprocessing_section,
+        create_stratified_clustering_section,
+        create_stratified_celloracle_section,
+        create_stratified_hotspot_section,
+        create_grn_deep_analysis_section,
+        create_operations_log_section,
+        create_plot_gallery_section,
+        create_stratification_summary_section,
+    )
+
+    if stratification_results is None:
+        stratification_results = []
+
+    generator = ReportGenerator(output_dir=output_dir, title=title, subtitle=subtitle)
+
+    # ── Shared sections (pre-stratification data) ──
+    if adata_preprocessed is not None:
+        generator.add_section(
+            create_data_summary_section(adata_preprocessed, output_dir)
+        )
+
+    generator.add_section(create_settings_section())
+
+    if adata_preprocessed is not None:
+        generator.add_section(create_qc_section(adata_preprocessed, output_dir))
+        generator.add_section(
+            create_preprocessing_section(adata_preprocessed, output_dir)
+        )
+
+    # ── Stratification overview ──
+    strat_names = [str(r["name"]) for r in stratification_results]
+    if strat_names:
+        generator.add_section(
+            create_stratification_summary_section(strat_names, output_dir)
+        )
+
+    # ── Per-stratification sections (tabs) ──
+    if stratification_results:
+        has_clustering = any(r.get("adata") is not None for r in stratification_results)
+        has_celloracle = any(
+            r.get("celloracle_result") is not None for r in stratification_results
+        )
+        has_hotspot = any(
+            r.get("hotspot_result") is not None for r in stratification_results
+        )
+
+        if has_clustering:
+            generator.add_section(
+                create_stratified_clustering_section(stratification_results)
+            )
+        if has_celloracle:
+            generator.add_section(
+                create_stratified_celloracle_section(stratification_results)
+            )
+        if has_hotspot:
+            generator.add_section(
+                create_stratified_hotspot_section(stratification_results)
+            )
+
+    # ── Cross-stratification GRN deep analysis ──
+    merged_csv = os.path.join(output_dir, "celloracle", "total_merged_scores.csv")
+    grn_heatmaps_exist = (
+        any(
+            "grn_heatmap_" in f
+            for f in glob.glob(
+                os.path.join(output_dir, "figures", "grn", "**", "*.png"),
+                recursive=True,
+            )
+        )
+        if os.path.exists(os.path.join(output_dir, "figures", "grn"))
+        else False
+    )
+
+    if merged_scores is not None or os.path.exists(merged_csv) or grn_heatmaps_exist:
+        generator.add_section(
+            create_grn_deep_analysis_section(output_dir, merged_scores)
+        )
+
+    # ── Operations log ──
+    if log_file and os.path.exists(log_file):
+        generator.add_section(create_operations_log_section(log_file))
+
+    # ── Plot summary ──
+    generator.add_section(create_plot_gallery_section(output_dir))
+
+    # ── Generate outputs ──
+    outputs = {}
+
+    if "html" in formats:
+        html_path = os.path.join(output_dir, "report.html")
+        generator.generate_html(html_path, embed_images=embed_images)
+        outputs["html"] = html_path
+
+    if "pdf" in formats:
+        pdf_path = os.path.join(output_dir, "report.pdf")
+        result = generator.generate_pdf(pdf_path)
+        if result:
+            outputs["pdf"] = pdf_path
+
+    return outputs
+
+
 def generate_html_report(output_dir: str, embed_images: bool = True, **kwargs) -> str:
     """Convenience function to generate HTML report only."""
     outputs = generate_report(
