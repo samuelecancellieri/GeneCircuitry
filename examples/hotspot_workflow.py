@@ -196,6 +196,7 @@ try:
     print(f"  ✓ Autocorrelation results saved to: {results_path}")
 
     # Save significant genes
+    significant_genes = results_df[results_df.FDR < config.HOTSPOT_FDR_THRESHOLD]
     significant_path = f"{config.OUTPUT_DIR}/hotspot/significant_genes.csv"
     significant_genes.to_csv(significant_path)
     print(f"  ✓ Significant genes saved to: {significant_path}")
