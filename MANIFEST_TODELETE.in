@@ -1,6 +1,0 @@
-# TO REMOVE: Only needed for setup.py-based sdist builds. With pyproject.toml, use
-# [tool.setuptools.packages.find] instead. Also references nonexistent LICENSE file.
-include README.md
-include LICENSE
-include requirements.txt
-recursive-include trnspot *.py

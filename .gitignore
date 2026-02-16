@@ -89,7 +89,6 @@ dmypy.json
 data/*
 *.png
 *.pkl
-*.txt
 *.tsv
 *.csv
 *.oracle
