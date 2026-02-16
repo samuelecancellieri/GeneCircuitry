@@ -104,3 +104,4 @@ data/*
 
 # Output / results directories
 results/
+nohup.out
