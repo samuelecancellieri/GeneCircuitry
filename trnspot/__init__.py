@@ -9,26 +9,48 @@ Hotspot into a modular, checkpoint-enabled pipeline.
 Modules
 -------
 - preprocessing: Scanpy wrappers for QC and normalization
-- celloracle_processing: GRN inference with CellOracle
-- hotspot_processing: Gene module analysis with Hotspot
+- celloracle_processing: GRN inference with CellOracle (optional dep)
+- hotspot_processing: Gene module analysis with Hotspot (optional dep)
 - grn_deep_analysis: Network visualization and analysis
 - reporting: HTML and PDF report generation
 - plotting: Centralized plot generation with logging
+- pipeline: Pipeline orchestration (PipelineController)
 - config: Central configuration and parameters
 """
 
 __version__ = "0.1.0"
 __author__ = "Samuele Cancellieri"
 
-# Import main modules
+# Import core modules (always available)
 from . import preprocessing
-from . import celloracle_processing
-from . import hotspot_processing
 from . import grn_deep_analysis
 from . import atac_peaks_processing
 from . import config
 from . import reporting
 from . import plotting
+
+# Lazy import for pipeline module (avoids circular import since
+# controller.py imports from trnspot.config and trnspot.preprocessing)
+import importlib as _importlib
+
+
+def __getattr__(name):
+    if name == "pipeline":
+        return _importlib.import_module(".pipeline", __name__)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# Lazy imports for optional dependencies (CellOracle, Hotspot)
+# These will only fail when actually accessed, not on `import trnspot`
+try:
+    from . import celloracle_processing
+except ImportError:
+    celloracle_processing = None  # type: ignore[assignment]
+
+try:
+    from . import hotspot_processing
+except ImportError:
+    hotspot_processing = None  # type: ignore[assignment]
 
 # Import commonly used functions
 from .config import set_random_seed, set_scanpy_settings, get_config, print_config
@@ -58,6 +80,7 @@ __all__ = [
     "config",
     "reporting",
     "plotting",
+    "pipeline",
     # Config functions
     "set_random_seed",
     "set_scanpy_settings",

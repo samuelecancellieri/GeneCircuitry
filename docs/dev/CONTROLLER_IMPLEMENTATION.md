@@ -1,3 +1,5 @@
+<!-- TO REMOVE (from root): Dev notes — move to docs/dev/CONTROLLER_IMPLEMENTATION.md -->
+
 # Pipeline Controller Implementation Summary
 
 ## What Was Implemented
@@ -83,6 +85,7 @@ controller.run_stratified_pipeline_parallel(n_jobs=8)
 ## Files Modified/Created
 
 ### Modified
+
 - `examples/complete_pipeline.py`
   - Added `PipelineController` class (270+ lines)
   - Added parallel execution support
@@ -90,6 +93,7 @@ controller.run_stratified_pipeline_parallel(n_jobs=8)
   - Refactored main() to use controller
 
 ### Created
+
 - `examples/controller_usage_examples.py` (340+ lines)
   - 5 comprehensive usage examples
   - Production-ready code samples
@@ -109,6 +113,7 @@ controller.run_stratified_pipeline_parallel(n_jobs=8)
   - Checks all components
 
 ### Updated
+
 - `README.md`
   - Added modular execution section
   - Added parallel processing examples
@@ -121,13 +126,13 @@ controller.run_stratified_pipeline_parallel(n_jobs=8)
 ```python
 class PipelineController:
     """Controller for managing TRNspot pipeline execution."""
-    
+
     # Data management
     adata: AnnData
     adata_preprocessed: AnnData
     adata_list: List[AnnData]
     adata_stratification_list: List[str]
-    
+
     # Step methods
     run_step_load() -> AnnData
     run_step_preprocessing() -> AnnData
@@ -136,7 +141,7 @@ class PipelineController:
     run_step_celloracle(adata) -> Tuple
     run_step_hotspot(adata) -> object
     run_step_grn_analysis(path) -> None
-    
+
     # Execution methods
     run_complete_pipeline(steps=None, parallel=False)
     run_stratified_pipeline_sequential() -> List
@@ -171,6 +176,7 @@ class PipelineController:
 ### Parallel Speedup
 
 For N stratifications with M workers:
+
 - Sequential time: N × T (where T = time per stratification)
 - Parallel time: ⌈N/M⌉ × T
 - Speedup: ~M× (ideal case)
@@ -212,6 +218,7 @@ python verify_controller.py
 ```
 
 Expected output:
+
 ```
 ✓ Class Implementation: PASS
 ✓ Method Implementation: PASS
@@ -230,6 +237,7 @@ Expected output:
 ## Support
 
 For questions or issues:
+
 - See documentation in `docs/`
 - Check examples in `examples/`
 - Review this implementation summary

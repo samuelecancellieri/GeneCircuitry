@@ -1,0 +1,150 @@
+Metadata-Version: 2.4
+Name: trnspot
+Version: 0.1.0
+Summary: A package for transcriptional regulatory network analysis
+Home-page: https://github.com/yourusername/trnspot
+Author: Samuele Cancellieri
+Author-email: Samuele Cancellieri <samuelc@uio.no>
+License: MIT
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Bio-Informatics
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.20.0
+Requires-Dist: pandas>=1.3.0
+Requires-Dist: scanpy>=1.9.0
+Requires-Dist: anndata>=0.8.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-cov>=3.0.0; extra == "dev"
+Requires-Dist: black>=22.0.0; extra == "dev"
+Requires-Dist: flake8>=4.0.0; extra == "dev"
+Requires-Dist: mypy>=0.950; extra == "dev"
+Dynamic: author
+Dynamic: home-page
+Dynamic: requires-python
+
+# TRNspot
+
+A modular Python package for transcriptional regulatory network (TRN) analysis using single-cell RNA-seq data. Integrates Scanpy, CellOracle, and Hotspot into a checkpoint-enabled pipeline.
+
+## Installation
+
+```bash
+git clone https://github.com/yourusername/trnspot.git
+cd trnspot
+pip install -e ".[dev]"
+```
+
+## Quick Start
+
+```bash
+# Run full pipeline
+python run_pipeline.py --input data/pbmc3k_raw.h5ad --output results/
+
+# Run specific steps
+python run_pipeline.py --steps preprocessing clustering
+
+# Custom parameters
+python run_pipeline.py --cluster-key leiden --species human --resolution 1.0
+
+# Resume from checkpoints
+python run_pipeline.py --resume
+```
+
+## Package Structure
+
+```
+trnspot/
+├── core/           # Data types and utilities
+├── preprocessing/  # QC, normalization, clustering, embedding
+├── computation/    # CellOracle GRN and Hotspot analysis
+├── pipeline/       # Pipeline orchestration and checkpoints
+├── plotting/       # Plot generation utilities
+├── reporting/      # HTML/PDF report generation
+└── config.py       # Central configuration
+```
+
+## Usage
+
+### Configuration
+
+```python
+from trnspot import set_random_seed, config
+
+set_random_seed(42)
+config.print_config()
+config.update_config(QC_MIN_GENES=300, PLOT_DPI=600)
+```
+
+### Preprocessing
+
+```python
+from trnspot.preprocessing import perform_qc, normalize_and_transform, cluster_cells
+import scanpy as sc
+
+adata = sc.read_h5ad('data.h5ad')
+adata, qc_result = perform_qc(adata)
+adata, norm_result = normalize_and_transform(adata)
+adata, cluster_result = cluster_cells(adata)
+```
+
+### GRN Analysis
+
+```python
+from trnspot.computation import run_celloracle_analysis, run_hotspot_analysis
+
+# CellOracle GRN inference
+adata, grn_result = run_celloracle_analysis(adata, cluster_key='leiden', species='human')
+
+# Hotspot module analysis
+adata, hotspot_result = run_hotspot_analysis(adata)
+```
+
+### Pipeline API
+
+```python
+from trnspot.pipeline import PipelineRunner, PipelineConfig
+
+config = PipelineConfig(output_dir='results/', use_checkpoints=True)
+runner = PipelineRunner(config)
+result = runner.run(adata, steps=['preprocessing', 'clustering', 'celloracle'])
+```
+
+## Output Structure
+
+```
+results/
+├── preprocessed_adata.h5ad
+├── report.html
+├── logs/
+│   └── pipeline.log
+├── figures/
+│   ├── qc/
+│   ├── grn/
+│   └── hotspot/
+├── celloracle/
+│   └── grn_scores.csv
+└── hotspot/
+    └── gene_modules.csv
+```
+
+## Testing
+
+```bash
+pytest tests/ -v
+pytest tests/ --cov=trnspot --cov-report=html
+```
+
+## License
+
+MIT License
+
+## Author
+
+Samuele Cancellieri

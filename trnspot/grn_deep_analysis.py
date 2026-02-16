@@ -18,7 +18,6 @@ from adjustText import adjust_text
 # from statannotations.Annotator import Annotator
 import networkx as nx
 import pandas as pd
-import marsilea as ma
 
 from itertools import combinations
 import numpy as np

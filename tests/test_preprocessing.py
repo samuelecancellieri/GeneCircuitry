@@ -6,7 +6,7 @@ import pytest
 import numpy as np
 import scanpy as sc
 from anndata import AnnData
-from trnspot.preprocessing import perform_qc, plot_qc_violin, plot_qc_scatter
+from trnspot.preprocessing import perform_qc
 
 
 @pytest.fixture
@@ -109,18 +109,22 @@ def test_perform_qc_with_plots(sample_adata, tmp_path):
 
 
 def test_plot_qc_violin(sample_adata):
-    """Test violin plot generation"""
+    """Test violin plot generation via plotting subpackage"""
+    from trnspot.plotting.qc_plots import plot_qc_violin_pre_filter
+
     # First perform QC to get metrics
     adata_qc = perform_qc(sample_adata, plot=False)
 
-    # Test without groupby
-    plot_qc_violin(adata_qc)
+    # Test violin plot
+    plot_qc_violin_pre_filter(adata_qc, skip_existing=False)
 
 
 def test_plot_qc_scatter(sample_adata):
-    """Test scatter plot generation"""
+    """Test scatter plot generation via plotting subpackage"""
+    from trnspot.plotting.qc_plots import plot_qc_scatter_pre_filter
+
     # First perform QC to get metrics
     adata_qc = perform_qc(sample_adata, plot=False)
 
-    # Test scatter plots
-    plot_qc_scatter(adata_qc, color_by="pct_counts_mt")
+    # Test scatter plot
+    plot_qc_scatter_pre_filter(adata_qc, skip_existing=False)

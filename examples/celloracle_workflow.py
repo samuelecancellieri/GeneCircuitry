@@ -8,6 +8,8 @@ from trnspot import set_random_seed, set_scanpy_settings, config
 from trnspot.preprocessing import (
     perform_qc,
     perform_normalization,
+)
+from trnspot.celloracle_processing import (
     perform_grn_pre_processing,
 )
 

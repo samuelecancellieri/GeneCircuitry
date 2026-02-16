@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# TO REMOVE: Broken script — imports perform_grn_pre_processing from trnspot.preprocessing
+# but it's defined in trnspot.celloracle_processing. Also uses nonexistent plot=False parameter.
+# This is not a proper test (not pytest-based). Remove this file.
 """
 Quick test to verify preprocessing with config integration
 """

@@ -28,11 +28,8 @@ Usage:
 import sys
 import os
 
-# Add examples directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "examples"))
-
-# Import and run the complete pipeline
-from complete_pipeline import main
+# Import and run the complete pipeline from its proper package location
+from trnspot.pipeline.controller import main
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -1,3 +1,5 @@
+<!-- TO REMOVE (from root): Dev notes — move to docs/dev/PARALLEL_PROCESSING_FIX.md -->
+
 # Parallel Processing Fix - multiprocess Integration
 
 ## Problem Solved
@@ -9,6 +11,7 @@
 ## Solution
 
 Refactored parallel processing to use:
+
 1. **Module-level worker function** - Fully picklable
 2. **multiprocess library** - Better serialization with dill
 3. **Dictionary-based work items** - Cleaner data passing
@@ -38,7 +41,7 @@ def _process_stratification_worker(work_data):
     stratification_name = work_data['stratification_name']
     args = work_data['args']
     start_time = work_data['start_time']
-    
+
     # Process stratification...
     return stratified_output_dir
 ```
@@ -59,11 +62,11 @@ def run_stratified_pipeline_parallel(self, n_jobs=None):
             'args': self.args,
             'start_time': self.start_time
         })
-    
+
     # Use module-level worker function
     with Pool(n_jobs) as pool:
         results = pool.map(_process_stratification_worker, work_items)
-    
+
     return results
 ```
 
@@ -83,13 +86,13 @@ pip install -r requirements.txt
 
 ## Why multiprocess?
 
-| Feature | multiprocessing | multiprocess |
-|---------|----------------|--------------|
-| Serialization | pickle | dill (more powerful) |
-| Complex objects | Limited | Better support |
-| Lambdas/closures | ❌ | ✅ |
-| Nested functions | ❌ | ✅ (with dill) |
-| AnnData objects | ✓ | ✓ |
+| Feature          | multiprocessing | multiprocess         |
+| ---------------- | --------------- | -------------------- |
+| Serialization    | pickle          | dill (more powerful) |
+| Complex objects  | Limited         | Better support       |
+| Lambdas/closures | ❌              | ✅                   |
+| Nested functions | ❌              | ✅ (with dill)       |
+| AnnData objects  | ✓               | ✓                    |
 
 **Note:** Even with standard multiprocessing, the new module-level worker function works correctly. multiprocess just provides additional robustness.
 
@@ -141,6 +144,7 @@ work_item = {
 ## Backward Compatibility
 
 ✅ **Fully backward compatible**
+
 - Same CLI interface
 - Same API methods
 - Same output structure

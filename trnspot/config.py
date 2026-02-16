@@ -82,6 +82,9 @@ PLOT_FIGSIZE_MEDIUM = (10, 7)
 PLOT_FIGSIZE_LARGE = (20, 15)
 """Large figure size"""
 
+PLOT_FIGSIZE_WIDE = (20, 8)
+"""Wide figure size (landscape layout)"""
+
 PLOT_COLOR_PALETTE = "viridis"
 """Default color palette for plots"""
 
@@ -348,6 +351,7 @@ def get_config():
         "PLOT_FIGSIZE_SMALL": PLOT_FIGSIZE_SMALL,
         "PLOT_FIGSIZE_MEDIUM": PLOT_FIGSIZE_MEDIUM,
         "PLOT_FIGSIZE_LARGE": PLOT_FIGSIZE_LARGE,
+        "PLOT_FIGSIZE_WIDE": PLOT_FIGSIZE_WIDE,
         "PLOT_COLOR_PALETTE": PLOT_COLOR_PALETTE,
         # Preprocessing
         "NORMALIZE_TARGET_SUM": NORMALIZE_TARGET_SUM,

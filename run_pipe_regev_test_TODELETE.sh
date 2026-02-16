@@ -1,4 +1,5 @@
 #!/bin/bash
+# TO REMOVE: Lab-specific script with hardcoded paths. Not portable. Remove or move to personal scripts.
 
 # RUN SMALL TEST ON REGEV DATASET
 python run_complete_analysis.py \

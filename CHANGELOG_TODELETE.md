@@ -1,3 +1,6 @@
+<!-- TO REMOVE: This file is mislabeled — it's not a changelog, it documents preprocessing config integration.
+     Its content duplicates docs/PREPROCESSING_CONFIG_UPDATE.md. Remove this file. -->
+
 # Preprocessing Module - Config Integration Summary
 
 ## What Changed

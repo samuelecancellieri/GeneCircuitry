@@ -1,3 +1,5 @@
+<!-- TO REMOVE (from root): Dev notes — move to docs/dev/LOGGING_SYSTEM.md -->
+
 # TRNspot Logging System
 
 ## Overview

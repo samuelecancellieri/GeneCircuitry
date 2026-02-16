@@ -1,3 +1,4 @@
+# TO REMOVE: Redundant — fully superseded by pyproject.toml. Remove this file.
 from setuptools import setup, find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:

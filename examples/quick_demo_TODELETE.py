@@ -1,3 +1,5 @@
+# TO REMOVE: Broken script — imports plot_qc_violin/plot_qc_scatter from trnspot.preprocessing
+# which don't exist. Also uses nonexistent plot=True parameter. Remove this file.
 """
 Quick demo of TRNspot QC functions
 Run this in an interactive Python session or Jupyter notebook

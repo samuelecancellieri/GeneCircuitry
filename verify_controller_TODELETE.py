@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# TO REMOVE: One-time dev verification script. No longer needed post-implementation. Remove this file.
 """
 Verification script for PipelineController implementation
 ==========================================================

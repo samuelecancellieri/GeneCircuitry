@@ -102,3 +102,8 @@ data/*
 *.json
 *.zip
 *.tfinfo
+
+# Output / results directories
+results/
+regev_test_run/
+output/

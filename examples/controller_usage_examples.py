@@ -12,9 +12,8 @@ import os
 from argparse import Namespace
 from datetime import datetime
 
-# Import the controller (adjust path as needed)
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from complete_pipeline import PipelineController, setup_directories
+# Import the controller from its proper package location
+from trnspot.pipeline import PipelineController, setup_directories
 from trnspot import set_random_seed, set_scanpy_settings, config
 
 
