@@ -55,7 +55,14 @@ class PlotLogger:
             try:
                 with open(self.log_file, "r") as f:
                     self.registry = json.load(f)
-            except (json.JSONDecodeError, IOError):
+            except (json.JSONDecodeError, IOError) as e:
+                import logging
+
+                logging.getLogger("error").error(
+                    f"[PlotLogger] Failed to load plot registry from "
+                    f"'{self.log_file}' ({type(e).__name__}): {e}",
+                    exc_info=True,
+                )
                 self.registry = {}
 
     def register_plot(

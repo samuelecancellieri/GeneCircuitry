@@ -71,7 +71,13 @@ def _enrich_tf_targets(
     """
     try:
         from .. import enrichment_analysis as ea
-    except ImportError:
+    except ImportError as e:
+        from ..logging_utils import log_warning
+
+        log_warning(
+            "GRNPlotting.Enrichment",
+            f"enrichment_analysis not available ({type(e).__name__}): {e}",
+        )
         return ""
 
     if len(targets) < 2:
@@ -93,8 +99,13 @@ def _enrich_tf_targets(
             if len(top_term) > 50:
                 top_term = top_term[:47] + "..."
             return top_term
-    except Exception:
-        pass
+    except Exception as e:
+        from ..logging_utils import log_warning
+
+        log_warning(
+            "GRNPlotting.Enrichment",
+            f"ORA enrichment failed for {len(targets)} targets ({type(e).__name__}): {e}",
+        )
     return ""
 
 

@@ -23,6 +23,7 @@ from itertools import combinations
 import numpy as np
 
 from . import config
+from .logging_utils import log_error, log_warning
 
 # Import from new plotting module for backward compatibility
 from .plotting import plot_exists as _plot_exists_new
@@ -161,6 +162,10 @@ def plot_network_graph(
 
             # Skip if no data for this cluster/score combination
             if cluster_scores.empty or cluster_scores[score].dropna().empty:
+                log_warning(
+                    "GRNAnalysis.NetworkGraph",
+                    f"No data for cluster '{cluster_str}' and score '{score}'",
+                )
                 print(
                     f"  Warning: No data for cluster '{cluster_str}' and score '{score}', skipping..."
                 )
@@ -191,6 +196,11 @@ def plot_network_graph(
 
         # Skip if no data collected
         if top_genes_by_cluster.empty or filtered_links_df.empty:
+            log_warning(
+                "GRNAnalysis.NetworkGraph",
+                f"No data to plot for score '{score}': "
+                f"genes={len(top_genes_by_cluster)}, links={len(filtered_links_df)}",
+            )
             print(f"  Warning: No data to plot for score '{score}', skipping...")
             continue
 
@@ -206,11 +216,19 @@ def plot_network_graph(
 
         # Skip if graph is empty
         if graph.number_of_nodes() == 0:
+            log_warning(
+                "GRNAnalysis.NetworkGraph",
+                f"Empty graph for score '{score}' (0 nodes)",
+            )
             print(f"  Warning: Empty graph for score '{score}', skipping...")
             continue
 
         components = list(nx.connected_components(graph))
         if not components:
+            log_warning(
+                "GRNAnalysis.NetworkGraph",
+                f"No connected components for score '{score}'",
+            )
             print(
                 f"  Warning: No connected components for score '{score}', skipping..."
             )

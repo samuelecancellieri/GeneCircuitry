@@ -808,11 +808,20 @@ def create_operations_log_section(
                         }
                     )
     except Exception as e:
+        import logging
+
+        logging.getLogger("error").error(
+            f"[Report.OperationsLog] Failed to read log file '{log_file}' "
+            f"({type(e).__name__}): {e}",
+            exc_info=True,
+        )
         log_entries = [
             {
                 "timestamp": "",
                 "level": "ERROR",
-                "message": f"Could not read log file: {e}",
+                "message": (
+                    f"Could not read log file '{log_file}': " f"{type(e).__name__}: {e}"
+                ),
             }
         ]
 
@@ -940,7 +949,14 @@ def create_grn_deep_analysis_section(
     if merged_scores is None and os.path.exists(merged_csv):
         try:
             merged_scores = pd.read_csv(merged_csv)
-        except Exception:
+        except Exception as e:
+            import logging
+
+            logging.getLogger("error").error(
+                f"[Report.GRNDeepAnalysis] Failed to load merged scores CSV "
+                f"'{merged_csv}' ({type(e).__name__}): {e}",
+                exc_info=True,
+            )
             merged_scores = None
 
     if merged_scores is not None and not merged_scores.empty:

@@ -28,6 +28,7 @@ from . import atac_peaks_processing
 from . import config
 from . import reporting
 from . import plotting
+from . import logging_utils
 
 # Lazy import for pipeline module (avoids circular import since
 # controller.py imports from trnspot.config and trnspot.preprocessing)

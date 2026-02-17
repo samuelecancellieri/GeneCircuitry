@@ -198,7 +198,8 @@ def check_checkpoint(log_dir, step_name, input_hash):
             print(f"     (completed at {checkpoint_data.get('timestamp')})")
             return True
     except Exception as e:
-        print(f"  ⚠ Error reading checkpoint: {e}")
+        log_error(f"Checkpoint.Read({step_name})", e)
+        print(f"  ⚠ Error reading checkpoint for '{step_name}': {e}")
 
     return False
 
@@ -480,12 +481,50 @@ class PipelineController:
             return outputs
         except Exception as e:
             log_error("Controller.Report", e)
+            log_step(
+                "Controller.Report",
+                "FAILED",
+                {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "output_dir": output_dir,
+                },
+            )
             # Don't raise - report generation failure shouldn't stop pipeline
-            print(f"  ⚠ Report generation failed: {e}")
+            print(f"  ⚠ Report generation failed ({type(e).__name__}): {e}")
             return {}
 
     def process_single_stratification(self, adata_cluster, stratification_name):
         """Process a single stratified dataset."""
+        log_step(
+            "Controller.Stratification.Process",
+            "STARTED",
+            {"stratification": stratification_name, "n_cells": adata_cluster.n_obs},
+        )
+        try:
+            return self._process_single_stratification_impl(
+                adata_cluster, stratification_name
+            )
+        except Exception as e:
+            log_error(f"Controller.Stratification.Process({stratification_name})", e)
+            log_step(
+                "Controller.Stratification.Process",
+                "FAILED",
+                {
+                    "stratification": stratification_name,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            )
+            print(
+                f"\n⚠ Stratification '{stratification_name}' failed "
+                f"({type(e).__name__}): {e}"
+            )
+            print("  Continuing with remaining stratifications...")
+            return None
+
+    def _process_single_stratification_impl(self, adata_cluster, stratification_name):
+        """Internal implementation for processing a single stratified dataset."""
         # Create stratified folder INSIDE the main output directory
         stratified_output_dir = os.path.join(
             self.args.output, "stratified_analysis", str(stratification_name)
@@ -553,18 +592,53 @@ class PipelineController:
             }
         )
 
+        log_step(
+            "Controller.Stratification.Process",
+            "COMPLETED",
+            {"stratification": stratification_name},
+        )
         return stratified_output_dir
 
     def run_stratified_pipeline_sequential(self):
         """Run stratified pipeline sequentially."""
+        log_step(
+            "Controller.StratifiedPipeline",
+            "STARTED",
+            {"n_stratifications": len(self.adata_list)},
+        )
         results = []
+        failed = []
         for adata_cluster, stratification_name in zip(
             self.adata_list, self.adata_stratification_list
         ):
             result = self.process_single_stratification(
                 adata_cluster, stratification_name
             )
-            results.append(result)
+            if result is not None:
+                results.append(result)
+            else:
+                failed.append(stratification_name)
+
+        if failed:
+            log_step(
+                "Controller.StratifiedPipeline",
+                "COMPLETED_WITH_FAILURES",
+                {
+                    "succeeded": len(results),
+                    "failed": len(failed),
+                    "failed_names": ", ".join(failed),
+                },
+            )
+            print(
+                f"\n⚠ {len(failed)}/{len(self.adata_list)} stratifications failed: "
+                f"{', '.join(failed)}"
+            )
+        else:
+            log_step(
+                "Controller.StratifiedPipeline",
+                "COMPLETED",
+                {"n_succeeded": len(results)},
+            )
         return results
 
     def run_complete_pipeline(self, steps=None):
@@ -697,9 +771,22 @@ class PipelineController:
 
             tracked_files_path = os.path.join(self.args.output, "tracked_files.txt")
             if os.path.exists(tracked_files_path):
-                total_merged_scores = merge_scores(tracked_files_path)
-                plot_heatmap_scores(total_merged_scores)
-                print("  ✓ Generated overall GRN deep analysis heatmap")
+                try:
+                    total_merged_scores = merge_scores(tracked_files_path)
+                    plot_heatmap_scores(total_merged_scores)
+                    print("  ✓ Generated overall GRN deep analysis heatmap")
+                except Exception as e:
+                    log_error("Controller.MergeScores", e)
+                    log_step(
+                        "Controller.MergeScores",
+                        "FAILED",
+                        {"error": str(e), "error_type": type(e).__name__},
+                    )
+                    print(
+                        f"  ⚠ GRN score merging/heatmap failed "
+                        f"({type(e).__name__}): {e}"
+                    )
+                    total_merged_scores = None
             else:
                 total_merged_scores = None
         else:
@@ -731,7 +818,15 @@ class PipelineController:
                     print(f"  ✓ Generated unified PDF report: {outputs['pdf']}")
             except Exception as e:
                 log_error("Controller.StratifiedReport", e)
-                print(f"  ⚠ Unified report generation failed: {e}")
+                log_step(
+                    "Controller.StratifiedReport",
+                    "FAILED",
+                    {"error": str(e), "error_type": type(e).__name__},
+                )
+                print(
+                    f"  ⚠ Unified report generation failed "
+                    f"({type(e).__name__}): {e}"
+                )
 
 
 def setup_directories(output_dir, figures_dir, debug=False):
@@ -1146,17 +1241,23 @@ def celloracle_pipeline(
             return oracle, links
 
         except ImportError as ie:
-            log_step("CellOracle", "SKIPPED", {"reason": "CellOracle not installed"})
+            log_error("CellOracle.Import", ie)
+            log_step(
+                "CellOracle",
+                "SKIPPED",
+                {"reason": "CellOracle not installed", "error": str(ie)},
+            )
             print("\n⚠ CellOracle not installed. Skipping GRN inference.")
             print("  To install: pip install celloracle")
-        return None
-    except Exception as e:
-        print(f"\n⚠ Error during CellOracle analysis: {e}")
-        print("  Continuing with remaining analysis...")
-        return None
+            return None
     except Exception as e:
         log_error("CellOracle", e)
-        raise
+        log_step(
+            "CellOracle", "FAILED", {"error": str(e), "error_type": type(e).__name__}
+        )
+        print(f"\n⚠ CellOracle analysis failed ({type(e).__name__}): {e}")
+        print("  Continuing with remaining analysis...")
+        return None
 
 
 def hotspot_pipeline(
@@ -1281,14 +1382,20 @@ def hotspot_pipeline(
             )
             return hotspot_obj
 
-        except ImportError:
-            log_step("Hotspot", "SKIPPED", {"reason": "Hotspot not installed"})
+        except ImportError as ie:
+            log_error("Hotspot.Import", ie)
+            log_step(
+                "Hotspot",
+                "SKIPPED",
+                {"reason": "Hotspot not installed", "error": str(ie)},
+            )
             print("\n⚠ Hotspot not installed. Skipping module identification.")
             print("  To install: pip install hotspot-sc")
             return None
     except Exception as e:
         log_error("Hotspot", e)
-        print(f"\n⚠ Error during Hotspot analysis: {e}")
+        log_step("Hotspot", "FAILED", {"error": str(e), "error_type": type(e).__name__})
+        print(f"\n⚠ Hotspot analysis failed ({type(e).__name__}): {e}")
         print("  Continuing with remaining analysis...")
         return None
 
@@ -1378,7 +1485,12 @@ def generate_summary(adata, celloracle_result, hotspot_result, start_time, outpu
         return summary_text
     except Exception as e:
         log_error("GenerateSummary", e)
-        raise
+        log_step(
+            "GenerateSummary",
+            "FAILED",
+            {"error": str(e), "error_type": type(e).__name__},
+        )
+        print(f"\n⚠ Summary generation failed ({type(e).__name__}): {e}")
 
 
 def track_files(output_dir):
@@ -1401,60 +1513,84 @@ def track_files(output_dir):
 
 def grn_deep_analysis_pipeline(grn_score_path, grn_links_path):
     """Run GRN deep analysis using tracked output files."""
-    from trnspot.grn_deep_analysis import (
-        process_single_score_file,
-        process_single_links_file,
-        plot_scatter_scores,
-        plot_compare_cluster_scores,
-        plot_difference_cluster_scores,
-        plot_network_graph,
-    )
-    from trnspot.plotting.grn_plots import (
-        generate_all_grn_plots,
-        plot_enriched_tf_network,
-        plot_tf_shared_target_network,
+    log_step(
+        "GRNDeepAnalysis",
+        "STARTED",
+        {"score_path": grn_score_path, "links_path": grn_links_path},
     )
 
-    print(f"\n{'='*70}")
-    print("STEP 7: GRN Deep Analysis")
-    print(f"{'='*70}")
-
-    os.makedirs(f"{config.OUTPUT_DIR}/grn_deep_analysis", exist_ok=True)
-    os.makedirs(f"{config.FIGURES_DIR_GRN}/grn_deep_analysis", exist_ok=True)
-
-    score_df = process_single_score_file(grn_score_path)
-    print("  ✓ Processed GRN score file")
-    links_df = process_single_links_file(grn_links_path)
-    print("  ✓ Processed GRN links file")
-
-    # --- Legacy individual plots ---
-    plot_compare_cluster_scores(score_df)
-    print("  ✓ Generated cluster comparison plots")
-    plot_difference_cluster_scores(score_df)
-    print("  ✓ Generated cluster difference plots")
-    plot_scatter_scores(score_df)
-    print("  ✓ Generated scatter plots")
-    plot_network_graph(score_df, links_df)
-    print("  ✓ Generated GRN network graph")
-
-    # --- New plotting module: enriched TF network ---
-    log_step("GRNPlotting", "STARTED")
     try:
-        results = generate_all_grn_plots(
-            score_df=score_df,
-            links_df=links_df,
-            skip_existing=True,
+        from trnspot.grn_deep_analysis import (
+            process_single_score_file,
+            process_single_links_file,
+            plot_scatter_scores,
+            plot_compare_cluster_scores,
+            plot_difference_cluster_scores,
+            plot_network_graph,
         )
-        total = sum(results.values())
-        log_step(
-            "GRNPlotting",
-            "COMPLETED",
-            {"plots_generated": total, "details": results},
+        from trnspot.plotting.grn_plots import (
+            generate_all_grn_plots,
+            plot_enriched_tf_network,
+            plot_tf_shared_target_network,
         )
-        print(f"  ✓ Generated {total} GRN plots via plotting module")
+
+        print(f"\n{'='*70}")
+        print("STEP 7: GRN Deep Analysis")
+        print(f"{'='*70}")
+
+        os.makedirs(f"{config.OUTPUT_DIR}/grn_deep_analysis", exist_ok=True)
+        os.makedirs(f"{config.FIGURES_DIR_GRN}/grn_deep_analysis", exist_ok=True)
+
+        score_df = process_single_score_file(grn_score_path)
+        print("  ✓ Processed GRN score file")
+        links_df = process_single_links_file(grn_links_path)
+        print("  ✓ Processed GRN links file")
+
+        # --- Legacy individual plots ---
+        plot_compare_cluster_scores(score_df)
+        print("  ✓ Generated cluster comparison plots")
+        plot_difference_cluster_scores(score_df)
+        print("  ✓ Generated cluster difference plots")
+        plot_scatter_scores(score_df)
+        print("  ✓ Generated scatter plots")
+        plot_network_graph(score_df, links_df)
+        print("  ✓ Generated GRN network graph")
+
+        # --- New plotting module: enriched TF network ---
+        log_step("GRNPlotting", "STARTED")
+        try:
+            results = generate_all_grn_plots(
+                score_df=score_df,
+                links_df=links_df,
+                skip_existing=True,
+            )
+            total = sum(results.values())
+            log_step(
+                "GRNPlotting",
+                "COMPLETED",
+                {"plots_generated": total, "details": results},
+            )
+            print(f"  ✓ Generated {total} GRN plots via plotting module")
+        except Exception as e:
+            log_error("GRNPlotting", e)
+            log_step(
+                "GRNPlotting",
+                "FAILED",
+                {"error": str(e), "error_type": type(e).__name__},
+            )
+            print(f"  ⚠ GRN plotting module failed ({type(e).__name__}): {e}")
+
+        log_step("GRNDeepAnalysis", "COMPLETED")
+
     except Exception as e:
-        log_error("GRNPlotting", e)
-        print(f"  ⚠ GRN plotting module failed: {e}")
+        log_error("GRNDeepAnalysis", e)
+        log_step(
+            "GRNDeepAnalysis",
+            "FAILED",
+            {"error": str(e), "error_type": type(e).__name__},
+        )
+        print(f"\n⚠ GRN deep analysis failed ({type(e).__name__}): {e}")
+        print("  Continuing with remaining pipeline steps...")
 
 
 def main():

@@ -1058,7 +1058,19 @@ class ReportGenerator:
         except ImportError:
             pass
         except Exception as e:
-            print(f"Warning: weasyprint PDF generation failed: {e}")
+            import logging
+
+            logging.getLogger("error").error(
+                f"[Report.PDF.weasyprint] {type(e).__name__}: {e}",
+                exc_info=True,
+            )
+            logging.getLogger("pipeline").warning(
+                f"[Report.PDF] weasyprint failed ({type(e).__name__}): {e}"
+            )
+            print(
+                f"Warning: weasyprint PDF generation failed "
+                f"({type(e).__name__}): {e}"
+            )
 
         # Try pdfkit as fallback
         try:
@@ -1070,7 +1082,18 @@ class ReportGenerator:
         except ImportError:
             pass
         except Exception as e:
-            print(f"Warning: pdfkit PDF generation failed: {e}")
+            import logging
+
+            logging.getLogger("error").error(
+                f"[Report.PDF.pdfkit] {type(e).__name__}: {e}",
+                exc_info=True,
+            )
+            logging.getLogger("pipeline").warning(
+                f"[Report.PDF] pdfkit failed ({type(e).__name__}): {e}"
+            )
+            print(
+                f"Warning: pdfkit PDF generation failed " f"({type(e).__name__}): {e}"
+            )
 
         print("⚠ PDF generation requires 'weasyprint' or 'pdfkit'. Install with:")
         print("  pip install weasyprint")

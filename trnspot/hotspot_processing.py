@@ -20,6 +20,7 @@ import seaborn as sns
 import marsilea as ma
 
 from . import config
+from .logging_utils import log_error, log_warning
 
 from . import enrichment_analysis as ea
 from matplotlib.patches import Patch
@@ -73,7 +74,11 @@ def plot_hotspot_annotation(
                 df_module_enrichment["module"] = module
                 df_enrichment = pd.concat([df_enrichment, df_module_enrichment])
         except Exception as e:
-            print(f"  Warning: Enrichment analysis failed for module {module}: {e}")
+            log_error(f"Hotspot.Enrichment(module={module})", e)
+            print(
+                f"  Warning: Enrichment analysis failed for module {module} "
+                f"({type(e).__name__}): {e}"
+            )
             continue
 
     # Save enrichment results
@@ -347,7 +352,11 @@ def _get_module_enrichment_labels(
                     module_labels[module] = f"Module {module}"
             return module_labels
         except Exception as e:
-            print(f"  Warning: Could not load enrichment file: {e}")
+            log_error("Hotspot.LoadEnrichmentFile", e)
+            print(
+                f"  Warning: Could not load enrichment file "
+                f"({type(e).__name__}): {e}"
+            )
 
     # If no file exists, compute enrichment on the fly
     for module in hotspot_obj.modules.unique():
@@ -371,7 +380,11 @@ def _get_module_enrichment_labels(
                 module_labels[module] = f"M{module}: {top_term}"
             else:
                 module_labels[module] = f"Module {module}"
-        except Exception:
+        except Exception as e:
+            log_warning(
+                f"Hotspot.ModuleEnrichment(module={module})",
+                f"Enrichment failed ({type(e).__name__}): {e}",
+            )
             module_labels[module] = f"Module {module}"
 
     return module_labels
@@ -468,17 +481,27 @@ def plot_module_scores_violin(
     module_scores = hotspot_obj.module_scores
 
     if module_scores is None or module_scores.empty:
+        log_warning("Hotspot.ViolinPlot", "No module scores available for violin plots")
         print("  Warning: No module scores available for violin plots")
         return
 
     # Get clusters from adata
     if cluster_key not in adata.obs.columns:
+        log_warning(
+            "Hotspot.ViolinPlot",
+            f"Cluster key '{cluster_key}' not found in adata.obs. "
+            f"Available columns: {list(adata.obs.columns)}",
+        )
         print(f"  Warning: Cluster key '{cluster_key}' not found in adata.obs")
         return
 
     # Align cell indices
     common_cells = module_scores.index.intersection(adata.obs.index)
     if len(common_cells) == 0:
+        log_warning(
+            "Hotspot.ViolinPlot",
+            f"No common cells between module scores ({len(module_scores)}) and adata ({adata.n_obs})",
+        )
         print("  Warning: No common cells between module scores and adata")
         return
 
@@ -492,6 +515,7 @@ def plot_module_scores_violin(
     # Get unique modules (excluding -1 if present)
     modules = [col for col in module_scores.columns if col != -1]
     if not modules:
+        log_warning("Hotspot.ViolinPlot", "No valid modules found (all modules are -1)")
         print("  Warning: No valid modules found for violin plots")
         return
 
