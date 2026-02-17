@@ -142,7 +142,7 @@ def perform_qc(
         if save_plots:
             fig.savefig(
                 f"{config.FIGURES_DIR_QC}/violin_pre_filter_{save_plots}.png",
-                dpi=300,
+                dpi=config.SAVE_DPI,
                 bbox_inches="tight",
             )
 
@@ -164,7 +164,7 @@ def perform_qc(
         if save_plots:
             fig.savefig(
                 f"{config.FIGURES_DIR_QC}/scatter_pre_filter_{save_plots}.png",
-                dpi=300,
+                dpi=config.SAVE_DPI,
                 bbox_inches="tight",
             )
 
@@ -224,7 +224,7 @@ def perform_qc(
         if save_plots:
             fig.savefig(
                 f"{config.FIGURES_DIR_QC}/violin_post_filter_{save_plots}.png",
-                dpi=300,
+                dpi=config.SAVE_DPI,
                 bbox_inches="tight",
             )
 
@@ -245,7 +245,7 @@ def perform_qc(
         if save_plots:
             fig.savefig(
                 f"{config.FIGURES_DIR_QC}/scatter_post_filter_{save_plots}.png",
-                dpi=300,
+                dpi=config.SAVE_DPI,
                 bbox_inches="tight",
             )
 
@@ -363,7 +363,12 @@ def perform_dimensionality_reduction_clustering(
     )
 
     # UMAP
-    sc.tl.umap(adata_cc)
+    sc.tl.umap(
+        adata_cc,
+        min_dist=config.UMAP_MIN_DIST,
+        spread=config.UMAP_SPREAD,
+        n_components=config.UMAP_N_COMPONENTS,
+    )
     print("Computed UMAP embedding")
 
     # Clustering

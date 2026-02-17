@@ -1,4 +1,5 @@
-celloracle-lite==0.22.0
+numpy==1.26.4
+celloracle==0.18.0
 hotspotsc
 pandas
 matplotlib

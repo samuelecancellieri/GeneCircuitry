@@ -191,7 +191,7 @@ def plot_hotspot_annotation(
     # Save the figure
     plt.savefig(
         f"{config.FIGURES_DIR_HOTSPOT}/hotspot_local_correlation_heatmap_with_annotations.png",
-        dpi=300,
+        dpi=config.SAVE_DPI,
         bbox_inches="tight",
     )
     plt.close()
@@ -567,7 +567,7 @@ def plot_module_scores_violin(
     plt.tight_layout()
     plt.savefig(
         f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_per_cluster.png",
-        dpi=300,
+        dpi=config.SAVE_DPI,
         bbox_inches="tight",
     )
     plt.close()
@@ -603,7 +603,7 @@ def plot_module_scores_violin(
     plt.tight_layout()
     plt.savefig(
         f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_all_clusters.png",
-        dpi=300,
+        dpi=config.SAVE_DPI,
         bbox_inches="tight",
     )
     plt.close()

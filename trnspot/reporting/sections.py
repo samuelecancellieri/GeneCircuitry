@@ -232,14 +232,16 @@ def create_settings_section() -> ReportSection:
             "Confidence Threshold": cfg.get("GRN_CONFIDENCE_THRESHOLD"),
         },
         "Hotspot Analysis": {
-            "N Neighbors": cfg.get("HOTSPOT_N_NEIGHBORS", 30),
-            "FDR Threshold": cfg.get("HOTSPOT_FDR_THRESHOLD", 0.05),
-            "Top Genes": cfg.get("HOTSPOT_TOP_GENES", 3000),
+            "N Neighbors": cfg.get("HOTSPOT_N_NEIGHBORS"),
+            "FDR Threshold": cfg.get("HOTSPOT_FDR_THRESHOLD"),
+            "Min Genes per Module": cfg.get("HOTSPOT_MIN_GENES_PER_MODULE"),
+            "Top Genes": cfg.get("HOTSPOT_TOP_GENES"),
+            "N Jobs": cfg.get("HOTSPOT_N_JOBS"),
         },
         "Output": {
             "Output Directory": cfg.get("OUTPUT_DIR"),
             "Plot DPI": cfg.get("PLOT_DPI"),
-            "Save DPI": cfg.get("SAVE_DPI", 600),
+            "Save DPI": cfg.get("SAVE_DPI"),
             "Random Seed": cfg.get("RANDOM_SEED"),
         },
     }

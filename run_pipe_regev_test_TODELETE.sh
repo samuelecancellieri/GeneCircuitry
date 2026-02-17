@@ -10,4 +10,5 @@ python run_complete_analysis.py \
  --clusters "myCAF,CAF" \
  --cluster-key-stratification level_2_annotation \
  --raw-count-layer counts \
+ --skip-qc \
  --debug
