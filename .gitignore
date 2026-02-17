@@ -105,3 +105,4 @@ data/*
 # Output / results directories
 results/
 nohup.out
+run_pipe_regev_test_TODELETE.sh

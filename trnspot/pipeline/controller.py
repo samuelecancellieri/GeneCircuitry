@@ -1542,8 +1542,8 @@ Examples:
     parser.add_argument(
         "--embedding-hotspot",
         type=str,
-        default="X_pca",
-        help="Embedding name for Hotspot analysis (default: X_pca)",
+        default="X_umap",
+        help="Embedding name for Hotspot analysis (default: X_umap)",
     )
     parser.add_argument(
         "--normalization-key",
@@ -1576,14 +1576,14 @@ Examples:
     parser.add_argument(
         "--min-genes",
         type=int,
-        default=200,
-        help="Minimum genes per cell for QC (default: 200)",
+        default=config.QC_MIN_GENES,
+        help=f"Minimum genes per cell for QC (default: {config.QC_MIN_GENES})",
     )
     parser.add_argument(
         "--min-counts",
         type=int,
-        default=500,
-        help="Minimum counts per cell for QC (default: 500)",
+        default=config.QC_MIN_COUNTS,
+        help=f"Minimum counts per cell for QC (default: {config.QC_MIN_COUNTS})",
     )
 
     # Computational parameters
@@ -1596,8 +1596,8 @@ Examples:
     parser.add_argument(
         "--n-jobs",
         type=int,
-        default=8,
-        help="Number of parallel jobs (default: 8)",
+        default=config.N_JOBS,
+        help=f"Number of parallel jobs (default: {config.N_JOBS})",
     )
 
     # Pipeline control flags
