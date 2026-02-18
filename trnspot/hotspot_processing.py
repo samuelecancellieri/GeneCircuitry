@@ -17,7 +17,6 @@ from anndata import AnnData
 import pickle
 import pandas as pd
 import seaborn as sns
-import marsilea as ma
 
 from . import config
 from .logging_utils import log_error, log_warning

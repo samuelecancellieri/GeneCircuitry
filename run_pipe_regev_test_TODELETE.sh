@@ -22,5 +22,5 @@ python run_complete_analysis.py \
  --cluster-key level_2_annotation \
  --raw-count-layer counts \
  --tf-dictionary /storage/sahuarea/samuele_cancellieri/reference_data/TFs/TG_to_TF_dictionary.pkl \
- --skip-qc \
- --debug
+ --skip-qc
+#  --debug

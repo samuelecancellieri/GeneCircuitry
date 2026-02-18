@@ -48,7 +48,7 @@ atac = [
     "gimmemotifs",
 ]
 plotting = [
-    "marsilea",
+    "matplotlib",
 ]
 all = [
     "trnspot[grn,hotspot,enrichment,atac,plotting]",

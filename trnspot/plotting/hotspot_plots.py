@@ -486,6 +486,7 @@ def plot_module_scores_violin(
                     data=cluster_data,
                     x="Module",
                     y="Score",
+                    hue="Module",
                     palette=module_palette,
                     ax=ax,
                     inner="box",
@@ -521,12 +522,11 @@ def plot_module_scores_violin(
                 # Style spines
                 ax.spines["top"].set_visible(False)
                 ax.spines["right"].set_visible(False)
-            else:
-                ax.set_visible(False)
 
-        # Hide unused axes
-        for idx in range(n_clusters, len(axes)):
-            axes[idx].set_visible(False)
+        # Remove inactive axes from the final plot
+        for ax in axes:
+            if not ax.has_data():
+                ax.set_visible(False)
 
         plt.suptitle(
             "Hotspot Module Scores per Cluster",
@@ -612,6 +612,10 @@ def plot_module_scores_violin(
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
+        # Remove axis if inactive
+        if not ax.has_data():
+            ax.set_visible(False)
+
         plt.tight_layout()
 
         results["all_clusters"] = save_plot(
@@ -685,6 +689,10 @@ def plot_module_scores_violin(
         # Style spines
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
+
+        # Remove axis if inactive
+        if not ax.has_data():
+            ax.set_visible(False)
 
         plt.tight_layout()
 
