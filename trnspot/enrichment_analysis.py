@@ -7,13 +7,7 @@ from . import config
 
 def gseapy_ora_enrichment_analysis(
     gene_list: list,
-    gene_sets: list = [
-        "Reactome_Pathways_2024",
-        "KEGG_2021_Human",
-        "MSigDB_Hallmark_2020",
-        "GO_Biological_Process_2023",
-        "GO_Molecular_Function_2023",
-    ],
+    gene_sets: list = config.ENRICHMENT_GENE_SETS,
     pval_cutoff: float = 0.05,
     species: str = "human",
 ):

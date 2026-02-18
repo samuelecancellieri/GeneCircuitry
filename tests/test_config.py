@@ -144,6 +144,11 @@ def test_config_types():
     for param in bool_params:
         assert isinstance(cfg[param], bool), f"{param} should be boolean"
 
+    # List values
+    list_params = ["ENRICHMENT_GENE_SETS"]
+    for param in list_params:
+        assert isinstance(cfg[param], list), f"{param} should be list"
+
 
 def test_invalid_config_update():
     """Test updating with invalid parameter name"""
@@ -153,3 +158,29 @@ def test_invalid_config_update():
     # Check that invalid parameter wasn't added
     cfg = config.get_config()
     assert "INVALID_PARAM" not in cfg
+
+
+def test_enrichment_gene_sets_default():
+    """Test that ENRICHMENT_GENE_SETS has expected default"""
+    assert isinstance(config.ENRICHMENT_GENE_SETS, list)
+    assert len(config.ENRICHMENT_GENE_SETS) >= 1
+    assert "MSigDB_Hallmark_2020" in config.ENRICHMENT_GENE_SETS
+
+
+def test_enrichment_gene_sets_in_get_config():
+    """Test that ENRICHMENT_GENE_SETS is present in get_config()"""
+    cfg = config.get_config()
+    assert "ENRICHMENT_GENE_SETS" in cfg
+    assert cfg["ENRICHMENT_GENE_SETS"] == config.ENRICHMENT_GENE_SETS
+
+
+def test_enrichment_gene_sets_update():
+    """Test updating ENRICHMENT_GENE_SETS via update_config"""
+    original = list(config.ENRICHMENT_GENE_SETS)
+
+    new_sets = ["MSigDB_Hallmark_2020", "KEGG_2021_Human"]
+    config.update_config(ENRICHMENT_GENE_SETS=new_sets)
+    assert config.ENRICHMENT_GENE_SETS == new_sets
+
+    # Restore
+    config.update_config(ENRICHMENT_GENE_SETS=original)

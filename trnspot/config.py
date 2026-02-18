@@ -194,6 +194,19 @@ HOTSPOT_TOP_GENES = 3000
 
 
 # ============================================================================
+# Enrichment Analysis Configuration
+# ============================================================================
+
+ENRICHMENT_GENE_SETS = ["MSigDB_Hallmark_2020"]
+"""Gene set libraries for ORA enrichment analysis (e.g. gseapy enrichr).
+Users can extend this list with additional libraries such as:
+- "Reactome_Pathways_2024"
+- "KEGG_2021_Human"
+- "GO_Biological_Process_2023"
+- "GO_Molecular_Function_2023"
+"""
+
+# ============================================================================
 # ATAC Peaks Processing Configuration
 # ============================================================================
 
@@ -387,6 +400,8 @@ def get_config():
         "HOTSPOT_MIN_GENES_PER_MODULE": HOTSPOT_MIN_GENES_PER_MODULE,
         "HOTSPOT_CORE_ONLY": HOTSPOT_CORE_ONLY,
         "HOTSPOT_TOP_GENES": HOTSPOT_TOP_GENES,
+        # Enrichment
+        "ENRICHMENT_GENE_SETS": ENRICHMENT_GENE_SETS,
         # ATAC Peaks
         "ATAC_MOTIF_SCAN_FPR": ATAC_MOTIF_SCAN_FPR,
         "ATAC_MOTIF_SCORE_THRESHOLD": ATAC_MOTIF_SCORE_THRESHOLD,

@@ -47,7 +47,7 @@ def _scale_to_01(values: pd.Series) -> pd.Series:
 def _enrich_tf_targets(
     tf: str,
     targets: List[str],
-    gene_sets: Optional[List[str]] = ["MSigDB_Hallmark_2020"],
+    gene_sets: list = config.ENRICHMENT_GENE_SETS,
     pval_cutoff: float = 0.05,
 ) -> str:
     """
@@ -213,7 +213,7 @@ def plot_enriched_tf_network(
     score: str = "eigenvector_centrality",
     percentile_threshold: float = 90,
     top_n_links: int = 50,
-    gene_sets: Optional[List[str]] = ["MSigDB_Hallmark_2020"],
+    gene_sets: Optional[List[str]] = None,
     skip_existing: bool = True,
 ) -> int:
     """
@@ -244,7 +244,7 @@ def plot_enriched_tf_network(
     top_n_links : int
         Maximum number of links per cluster to include (by ``coef_abs``).
     gene_sets : list of str, optional
-        Gene-set libraries for enrichment. ``None`` uses defaults.
+        Gene-set libraries for enrichment. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     skip_existing : bool
         If True, skip if the output file already exists.
 
@@ -253,6 +253,9 @@ def plot_enriched_tf_network(
     int
         Number of plots generated.
     """
+    if gene_sets is None:
+        gene_sets = list(config.ENRICHMENT_GENE_SETS)
+
     os.makedirs(f"{config.FIGURES_DIR_GRN}/grn_deep_analysis", exist_ok=True)
 
     score_df = score_df.copy()
@@ -1257,6 +1260,7 @@ def generate_all_grn_plots(
     links_df: Optional[pd.DataFrame] = None,
     skip_existing: bool = True,
     scores: Optional[List[str]] = None,
+    gene_sets: Optional[List[str]] = None,
 ) -> Dict[str, int]:
     """
     Generate all GRN plots from score data.
@@ -1271,6 +1275,8 @@ def generate_all_grn_plots(
         If True, skip existing plots.
     scores : list, optional
         List of scores to plot.
+    gene_sets : list of str, optional
+        Gene-set libraries for enrichment. Defaults to ``config.ENRICHMENT_GENE_SETS``.
 
     Returns
     -------
@@ -1330,6 +1336,7 @@ def generate_all_grn_plots(
                 score_df,
                 links_df,
                 score=s,
+                gene_sets=gene_sets,
                 skip_existing=skip_existing,
             )
         results["enriched_network"] = enriched_count
@@ -1341,6 +1348,7 @@ def generate_all_grn_plots(
                 score_df,
                 links_df,
                 score=s,
+                gene_sets=gene_sets,
                 skip_existing=skip_existing,
             )
         results["tf_shared_target_network"] = shared_count
@@ -1400,7 +1408,7 @@ def plot_tf_shared_target_network(
         Number of top TFs per cluster.
     gene_sets : list of str, optional
         Gene-set libraries for enrichment.  Defaults to
-        ``["MSigDB_Hallmark_2020"]``.
+        ``config.ENRICHMENT_GENE_SETS``.
     min_targets : int
         Minimum number of targets required to run enrichment for
         a TF.
@@ -1415,7 +1423,7 @@ def plot_tf_shared_target_network(
     from matplotlib.patches import Patch
 
     if gene_sets is None:
-        gene_sets = ["MSigDB_Hallmark_2020"]
+        gene_sets = list(config.ENRICHMENT_GENE_SETS)
 
     os.makedirs(f"{config.FIGURES_DIR_GRN}/grn_deep_analysis", exist_ok=True)
 

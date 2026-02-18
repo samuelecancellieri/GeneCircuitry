@@ -35,7 +35,7 @@ from .plotting import (
 
 def plot_hotspot_annotation(
     hs_obj: hs.Hotspot,
-    gene_sets: list = ["MSigDB_Hallmark_2020"],
+    gene_sets: list = config.ENRICHMENT_GENE_SETS,
     top_n_annotations: int = 1,
 ):
     """
@@ -304,9 +304,11 @@ def create_hotspot_object(
 
 def _get_module_enrichment_labels(
     hotspot_obj: hs.Hotspot,
-    gene_sets: list = ["MSigDB_Hallmark_2020"],
+    gene_sets: list = None,
     max_label_length: int = 30,
 ) -> dict:
+    if gene_sets is None:
+        gene_sets = list(config.ENRICHMENT_GENE_SETS)
     """
     Get enrichment-based labels for each module.
 
@@ -459,8 +461,10 @@ def plot_module_scores_violin(
     adata: AnnData,
     cluster_key: str = "leiden",
     figsize_per_cluster: tuple = (12, 6),
-    gene_sets: list = ["MSigDB_Hallmark_2020"],
+    gene_sets: list = None,
 ):
+    if gene_sets is None:
+        gene_sets = list(config.ENRICHMENT_GENE_SETS)
     """
     Plot violin plots of module scores for each cluster.
 

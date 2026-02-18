@@ -67,7 +67,7 @@ def plot_hotspot_local_correlations(
 
 def _get_module_enrichment_labels(
     hotspot_obj,
-    gene_sets: List[str] = ["MSigDB_Hallmark_2020"],
+    gene_sets: list = config.ENRICHMENT_GENE_SETS,
     max_label_length: int = 30,
 ) -> Dict[int, str]:
     """
@@ -78,7 +78,7 @@ def _get_module_enrichment_labels(
     hotspot_obj : hotspot.Hotspot
         Hotspot object with modules.
     gene_sets : list
-        Gene sets for enrichment analysis.
+        Gene sets for enrichment analysis. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     max_label_length : int
         Maximum length of label text.
 
@@ -167,7 +167,7 @@ def _get_module_enrichment_labels(
 
 def plot_hotspot_annotation(
     hotspot_obj,
-    gene_sets: List[str] = ["MSigDB_Hallmark_2020"],
+    gene_sets: List[str] = None,
     top_n_annotations: int = 1,
     skip_existing: bool = True,
 ) -> bool:
@@ -179,7 +179,7 @@ def plot_hotspot_annotation(
     hotspot_obj : hotspot.Hotspot
         Hotspot object with analysis results.
     gene_sets : list
-        Gene sets for enrichment analysis.
+        Gene sets for enrichment analysis. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     top_n_annotations : int
         Number of top annotations per module.
     skip_existing : bool
@@ -190,6 +190,9 @@ def plot_hotspot_annotation(
     bool
         True if plot was generated, False if skipped.
     """
+    if gene_sets is None:
+        gene_sets = list(config.ENRICHMENT_GENE_SETS)
+
     filepath = (
         f"{config.FIGURES_DIR_HOTSPOT}/"
         "hotspot_local_correlation_heatmap_with_annotations.png"
@@ -350,7 +353,7 @@ def plot_module_scores_violin(
     hotspot_obj,
     adata: AnnData,
     cluster_key: str = "leiden",
-    gene_sets: List[str] = ["MSigDB_Hallmark_2020"],
+    gene_sets: List[str] = None,
     figsize_per_cluster: Tuple[int, int] = (16, 8),
     skip_existing: bool = True,
 ) -> Dict[str, bool]:
@@ -366,7 +369,7 @@ def plot_module_scores_violin(
     cluster_key : str
         Column name in adata.obs containing cluster assignments.
     gene_sets : list
-        Gene sets for enrichment annotation labels.
+        Gene sets for enrichment annotation labels. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     figsize_per_cluster : tuple
         Figure size for each cluster subplot.
     skip_existing : bool
@@ -377,6 +380,9 @@ def plot_module_scores_violin(
     dict
         Dictionary mapping plot names to generation status.
     """
+    if gene_sets is None:
+        gene_sets = list(config.ENRICHMENT_GENE_SETS)
+
     results = {}
 
     # Get module scores
@@ -716,7 +722,7 @@ def generate_all_hotspot_plots(
     hotspot_obj,
     adata: Optional[AnnData] = None,
     cluster_key: str = "leiden",
-    gene_sets: List[str] = ["MSigDB_Hallmark_2020"],
+    gene_sets: List[str] = None,
     skip_existing: bool = True,
 ) -> Dict[str, Any]:
     """
@@ -731,7 +737,7 @@ def generate_all_hotspot_plots(
     cluster_key : str
         Column name for cluster assignments.
     gene_sets : list
-        Gene sets for enrichment analysis.
+        Gene sets for enrichment analysis. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     skip_existing : bool
         If True, skip existing plots.
 
