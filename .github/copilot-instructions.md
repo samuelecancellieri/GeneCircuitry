@@ -1,6 +1,6 @@
-# TRNspot AI Coding Instructions
+# GeneCircuitry AI Coding Instructions
 
-**TRNspot** is a Python package for transcriptional regulatory network (TRN) analysis using single-cell data. It integrates Scanpy, CellOracle, and Hotspot into a modular, checkpoint-enabled pipeline.
+**GeneCircuitry** is a Python package for transcriptional regulatory network (TRN) analysis using single-cell data. It integrates Scanpy, CellOracle, and Hotspot into a modular, checkpoint-enabled pipeline.
 
 ## Architecture
 
@@ -10,16 +10,17 @@
 
 ### Key Components
 
-| File                               | Purpose                                           |
-| ---------------------------------- | ------------------------------------------------- |
-| `trnspot/config.py`                | **SINGLE SOURCE OF TRUTH** - all parameters       |
-| `examples/complete_pipeline.py`    | `PipelineController` class - central orchestrator |
-| `run_complete_analysis.py`         | Entry point wrapper                               |
-| `trnspot/preprocessing.py`         | Scanpy wrappers (QC, normalize, cluster)          |
-| `trnspot/celloracle_processing.py` | GRN inference with CellOracle                     |
-| `trnspot/hotspot_processing.py`    | Spatial autocorrelation modules                   |
-| `trnspot/grn_deep_analysis.py`     | Network visualization (NetworkX, Marsilea)        |
-| `trnspot/reporting/`               | HTML/PDF report generation module                 |
+| File                               | Purpose                                                         |
+| ---------------------------------- | --------------------------------------------------------------- |
+| `genecircuitry/config.py`                | **SINGLE SOURCE OF TRUTH** - all parameters                     |
+| `genecircuitry/pipeline/controller.py`   | `PipelineController` class - central orchestrator (~1900 lines) |
+| `run_complete_analysis.py`         | Entry point wrapper (calls `genecircuitry.pipeline.main`)             |
+| `genecircuitry/preprocessing.py`         | Scanpy wrappers (QC, normalize, cluster)                        |
+| `genecircuitry/celloracle_processing.py` | GRN inference with CellOracle (optional dep)                    |
+| `genecircuitry/hotspot_processing.py`    | Spatial autocorrelation modules (optional dep)                  |
+| `genecircuitry/grn_deep_analysis.py`     | Network visualization (NetworkX, Marsilea)                      |
+| `genecircuitry/plotting/`                | Canonical plot generation (`qc_plots.py`, `grn_plots.py`, etc.) |
+| `genecircuitry/reporting/`               | HTML/PDF report generation                                      |
 
 ## Critical Patterns
 
@@ -27,7 +28,7 @@
 
 ```python
 # ✅ CORRECT - use config
-from trnspot import config
+from genecircuitry import config
 sc.pp.filter_cells(adata, min_genes=config.QC_MIN_GENES)
 plt.figure(figsize=config.PLOT_FIGSIZE_MEDIUM)
 plt.savefig(f"{config.FIGURES_DIR_GRN}/plot.png", dpi=config.SAVE_DPI)
@@ -39,7 +40,7 @@ sc.pp.filter_cells(adata, min_genes=200)
 ### 2. Extend PipelineController for New Steps
 
 ```python
-# In examples/complete_pipeline.py - add new method:
+# In genecircuitry/pipeline/controller.py - add new method to PipelineController:
 def run_step_new_analysis(self, adata, log_dir=None):
     """Execute new analysis step."""
     log_step("Controller.NewAnalysis", "STARTED")
@@ -57,7 +58,7 @@ def run_step_new_analysis(self, adata, log_dir=None):
 ### 3. Logging Pattern
 
 ```python
-from examples.complete_pipeline import log_step, log_error
+from genecircuitry.pipeline import log_step, log_error
 
 log_step("MyStep", "STARTED", {"n_cells": adata.n_obs})
 log_step("MyStep", "COMPLETED", {"result_count": len(results)})
@@ -75,6 +76,14 @@ def my_function(
         param = config.MY_PARAM  # Fall back to config
 ```
 
+### 5. Optional Dependency Pattern
+
+`celloracle_processing` and `hotspot_processing` use optional dependencies. `genecircuitry/__init__.py` wraps them in `try/except`; access via `genecircuitry.celloracle_processing` (may be `None` if not installed). New optional-dep modules must follow the same pattern.
+
+### 6. Plotting — Use `genecircuitry/plotting/` Subpackage
+
+Canonical plotting lives in `genecircuitry/plotting/` (`qc_plots.py`, `grn_plots.py`, `hotspot_plots.py`). Legacy inline plotting in `grn_deep_analysis.py` and `hotspot_processing.py` is deprecated. Always add new plots to the `plotting/` subpackage.
+
 ## Developer Workflows
 
 ### Run Pipeline
@@ -87,11 +96,13 @@ python run_complete_analysis.py
 python run_complete_analysis.py --input data.h5ad --output results
 
 # Specific steps only (checkpoints auto-resume)
-python examples/complete_pipeline.py --steps load preprocessing clustering
+python -m genecircuitry.pipeline --steps load preprocessing clustering
 
 # Stratified parallel analysis (by cell type)
-python examples/complete_pipeline.py --cluster-key-stratification celltype --parallel --n-jobs 4
+python -m genecircuitry.pipeline --cluster-key-stratification celltype --parallel --n-jobs 4
 ```
+
+**Available step names:** `load`, `preprocessing`, `stratification`, `clustering`, `celloracle`, `hotspot`, `grn_analysis`, `summary`
 
 ### Testing
 
@@ -118,50 +129,20 @@ output/
 
 ## Reporting Module
 
-Generate comprehensive HTML/PDF reports with the `trnspot.reporting` module:
-
 ```python
-from trnspot.reporting import generate_report
+from genecircuitry.reporting import generate_report
 
-# Generate both HTML and PDF reports
 outputs = generate_report(
     output_dir="results/",
     title="My Analysis Report",
-    subtitle="Sample Dataset Analysis",
     adata=adata,
     celloracle_result=(oracle, links),
     hotspot_result=hs,
     log_file="results/logs/pipeline.log",
-)
-print(f"HTML: {outputs['html']}")
-print(f"PDF: {outputs.get('pdf', 'Not generated')}")
-
-# For smaller HTML file size (images as relative paths)
-outputs = generate_report(
-    output_dir="results/",
-    title="My Analysis Report",
-    embed_images=False,  # Use relative paths instead of base64
+    embed_images=True,   # False = use relative paths (smaller file)
+    formats=["html", "pdf"],
 )
 ```
-
-### Report Contents
-
-- **Input Data Summary**: Dataset dimensions, annotations, embeddings
-- **Configuration Settings**: All parameters used in the analysis
-- **QC Section**: Quality control metrics and filtering results
-- **Preprocessing**: Normalization and HVG selection details
-- **Clustering**: Cluster sizes and visualization
-- **CellOracle GRN**: Network analysis results and TF rankings
-- **Hotspot Modules**: Gene module analysis
-- **Operations Log**: Complete pipeline execution log
-- **Plot Gallery**: Interactive gallery with lightbox navigation
-
-### Report Options
-
-| Parameter      | Default           | Description                                                                                                   |
-| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------------- |
-| `embed_images` | `True`            | If `True`, embed images as base64 (self-contained but larger). If `False`, use relative paths (smaller file). |
-| `formats`      | `["html", "pdf"]` | List of output formats to generate                                                                            |
 
 ## AnnData Conventions
 
@@ -172,6 +153,10 @@ outputs = generate_report(
 
 ## Adding New Config Parameters
 
-1. Add to `trnspot/config.py` with docstring
+1. Add to `genecircuitry/config.py` with docstring
 2. Add to `get_config()` return dict in same file
 3. Add test in `tests/test_config.py`
+
+## Known Remaining Issues (see `RESTRUCTURING_PLAN.md`)
+
+- `pyproject.toml` optional-dep groups (`enrichment`, `atac`) are not pinned — `gseapy>=1.0.0`, `genomepy`, `gimmemotifs` are in optional extras only, not core deps

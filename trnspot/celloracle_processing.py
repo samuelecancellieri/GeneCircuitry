@@ -373,7 +373,7 @@ def perform_grn_pre_processing(
     Examples
     --------
     >>> import scanpy as sc
-    >>> from trnspot.preprocessing import perform_grn_pre_processing
+    >>> from trnspot.celloracle_processing import perform_grn_pre_processing
     >>> from trnspot import config
     >>>
     >>> # Use default config values

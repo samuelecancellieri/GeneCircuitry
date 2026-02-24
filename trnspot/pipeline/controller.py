@@ -10,10 +10,10 @@ This script runs the full analysis workflow:
 5. Gene module identification with Hotspot
 
 Usage:
-    python complete_pipeline.py --input data/paul15/paul15.h5 --output output --figures figures
+    python -m trnspot.pipeline --input data/paul15/paul15.h5 --output output
 
 Or with default paths:
-    python complete_pipeline.py
+    python -m trnspot.pipeline
 """
 
 import os
@@ -1601,22 +1601,22 @@ def main():
         epilog="""
 Examples:
   # Run with example dataset
-  python complete_pipeline.py
+  python -m trnspot.pipeline
   
   # Run with custom input
-  python complete_pipeline.py --input data/my_data.h5ad
+  python -m trnspot.pipeline --input data/my_data.h5ad
   
   # Skip specific analyses
-  python complete_pipeline.py --skip-celloracle --skip-hotspot
+  python -m trnspot.pipeline --skip-celloracle --skip-hotspot
   
   # Run stratified analysis
-  python complete_pipeline.py --cluster-key-stratification celltype
+  python -m trnspot.pipeline --cluster-key-stratification celltype
   
   # Run specific steps only
-  python complete_pipeline.py --steps load preprocessing clustering
+  python -m trnspot.pipeline --steps load preprocessing clustering
   
   # Custom configuration
-  python complete_pipeline.py --seed 123 --n-jobs 16
+  python -m trnspot.pipeline --seed 123 --n-jobs 16
         """,
     )
 
