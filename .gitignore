@@ -107,3 +107,5 @@ results/
 nohup.out
 run_pipe_regev_test_TODELETE.sh
 .requirements_backup.txt
+conda-recipe/meta.yaml
+copy_recipe.sh
