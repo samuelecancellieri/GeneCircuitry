@@ -77,7 +77,8 @@ jobs:
 
           echo ""
           echo "=== Validating [project.scripts] entry point ==="
-          pip show genecircuitry | grep -q "^Name: genecircuitry" \
+          # pip show exits with code 1 when the package is not found — no pipe needed
+          pip show genecircuitry > /dev/null 2>&1 \
             || { echo "ERROR: genecircuitry package not found"; exit 1; }
           # The console_scripts entry point file must exist in the env bin/
           SCRIPT_PATH="$(python -c "import sysconfig; print(sysconfig.get_path('scripts'))")/genecircuitry"
@@ -92,21 +93,24 @@ jobs:
             || { echo "ERROR: celloracle not installed (expected from requirements.txt)"; exit 1; }
           python -c "import celloracle" \
             || { echo "ERROR: celloracle import failed"; exit 1; }
-          echo "OK: celloracle installed and importable ($(pip show celloracle | grep ^Version))"
+          CO_VER=$(pip show celloracle 2>/dev/null | { grep "^Version" || true; })
+          echo "OK: celloracle installed and importable ($CO_VER)"
 
           # hotspot group -> hotspotsc (pinned in requirements.txt)
           pip show hotspotsc > /dev/null 2>&1 \
             || { echo "ERROR: hotspotsc not installed (expected from requirements.txt)"; exit 1; }
           python -c "import hotspot" \
             || { echo "ERROR: hotspotsc import failed"; exit 1; }
-          echo "OK: hotspotsc installed and importable ($(pip show hotspotsc | grep ^Version))"
+          HS_VER=$(pip show hotspotsc 2>/dev/null | { grep "^Version" || true; })
+          echo "OK: hotspotsc installed and importable ($HS_VER)"
 
           # enrichment group -> gseapy (pinned in requirements.txt)
           pip show gseapy > /dev/null 2>&1 \
             || { echo "ERROR: gseapy not installed (expected from requirements.txt)"; exit 1; }
           python -c "import gseapy" \
             || { echo "ERROR: gseapy import failed"; exit 1; }
-          echo "OK: gseapy installed and importable ($(pip show gseapy | grep ^Version))"
+          GS_VER=$(pip show gseapy 2>/dev/null | { grep "^Version" || true; })
+          echo "OK: gseapy installed and importable ($GS_VER)"
 
           echo ""
           echo "=== Checking for dependency conflicts ==="
