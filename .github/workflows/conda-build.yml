@@ -61,6 +61,60 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Install genecircuitry package and register CLI entry point
+        run: |
+          # All dependencies (including optional ones: celloracle, hotspotsc, gseapy)
+          # are already pinned and installed via requirements.txt above.
+          # --no-deps registers the package and writes the 'genecircuitry' console
+          # script into the conda env's bin/ without reinstalling or overwriting
+          # any already-installed package.
+          pip install -e . --no-deps
+
+      - name: Validate install against pyproject.toml definition
+        run: |
+          echo "=== pip show genecircuitry ==="
+          pip show genecircuitry
+
+          echo ""
+          echo "=== Validating [project.scripts] entry point ==="
+          pip show genecircuitry | grep -q "^Name: genecircuitry" \
+            || { echo "ERROR: genecircuitry package not found"; exit 1; }
+          # The console_scripts entry point file must exist in the env bin/
+          SCRIPT_PATH="$(python -c "import sysconfig; print(sysconfig.get_path('scripts'))")/genecircuitry"
+          test -f "$SCRIPT_PATH" \
+            || { echo "ERROR: console script not found at $SCRIPT_PATH"; exit 1; }
+          echo "OK: console script present at $SCRIPT_PATH"
+
+          echo ""
+          echo "=== Validating optional dependencies (installed via requirements.txt) ==="
+          # grn group -> celloracle (pinned in requirements.txt)
+          pip show celloracle > /dev/null 2>&1 \
+            || { echo "ERROR: celloracle not installed (expected from requirements.txt)"; exit 1; }
+          python -c "import celloracle" \
+            || { echo "ERROR: celloracle import failed"; exit 1; }
+          echo "OK: celloracle installed and importable ($(pip show celloracle | grep ^Version))"
+
+          # hotspot group -> hotspotsc (pinned in requirements.txt)
+          pip show hotspotsc > /dev/null 2>&1 \
+            || { echo "ERROR: hotspotsc not installed (expected from requirements.txt)"; exit 1; }
+          python -c "import hotspot" \
+            || { echo "ERROR: hotspotsc import failed"; exit 1; }
+          echo "OK: hotspotsc installed and importable ($(pip show hotspotsc | grep ^Version))"
+
+          # enrichment group -> gseapy (pinned in requirements.txt)
+          pip show gseapy > /dev/null 2>&1 \
+            || { echo "ERROR: gseapy not installed (expected from requirements.txt)"; exit 1; }
+          python -c "import gseapy" \
+            || { echo "ERROR: gseapy import failed"; exit 1; }
+          echo "OK: gseapy installed and importable ($(pip show gseapy | grep ^Version))"
+
+          echo ""
+          echo "=== Checking for dependency conflicts ==="
+          pip check
+
+          echo ""
+          echo "All pyproject.toml extras and entry points validated successfully."
+
       - name: Verify installation
         run: |
           python -c "import genecircuitry; print('genecircuitry imported successfully')"
@@ -68,14 +122,28 @@ jobs:
 
       - name: Verify CLI entry point is on PATH and callable
         run: |
-          # Confirm the wrapper command exists in the environment's bin directory
-          which genecircuitry
+          # Confirm the wrapper script was installed into the conda env's bin/
+          which genecircuitry || { echo "ERROR: genecircuitry not found on PATH"; exit 1; }
           echo "genecircuitry CLI found at: $(which genecircuitry)"
 
           # Run from a temp directory unrelated to the repo to prove it works standalone
           TMPDIR=$(mktemp -d)
           cd "$TMPDIR"
+          # argparse --help always exits 0; if imports fail we catch that here
           genecircuitry --help
           echo "genecircuitry CLI works as a standalone command"
           cd -
           rm -rf "$TMPDIR"
+
+      - name: Install test dependencies
+        run: |
+          # Install pytest and pytest-cov from the 'dev' extra declared in pyproject.toml.
+          pip install pytest pytest-cov
+
+      - name: Run tests with pytest
+        run: |
+          pytest tests/ \
+            --tb=short \
+            --cov=genecircuitry \
+            --cov-report=term-missing \
+            -v
