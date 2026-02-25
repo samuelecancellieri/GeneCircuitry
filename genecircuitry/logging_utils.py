@@ -1,7 +1,7 @@
 """
-Centralized logging utilities for TRNspot modules.
+Centralized logging utilities for GeneCircuitry modules.
 
-All TRNspot submodules should import `log_error` and `log_warning` from
+All GeneCircuitry submodules should import `log_error` and `log_warning` from
 here to ensure errors/warnings are recorded in the pipeline's error.log
 and pipeline.log files regardless of which module raises them.
 

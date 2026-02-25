@@ -1,5 +1,5 @@
 """
-Report Section Builders for TRNspot
+Report Section Builders for GeneCircuitry
 ===================================
 
 Functions to create individual report sections with detailed information.

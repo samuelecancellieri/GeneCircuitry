@@ -1,8 +1,8 @@
 """
-TRNspot - A package for transcriptional regulatory network analysis
+GeneCircuitry - A package for transcriptional regulatory network analysis
 ===================================================================
 
-TRNspot is a Python package for transcriptional regulatory network (TRN)
+GeneCircuitry is a Python package for transcriptional regulatory network (TRN)
 analysis using single-cell data. It integrates Scanpy, CellOracle, and
 Hotspot into a modular, checkpoint-enabled pipeline.
 

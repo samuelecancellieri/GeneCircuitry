@@ -1,5 +1,5 @@
 """
-ATAC Peaks Processing Module for TRNspot
+ATAC Peaks Processing Module for GeneCircuitry
 ==========================================
 
 Processes ATAC-seq peak BED files through CellOracle's motif analysis
@@ -15,7 +15,7 @@ Typical workflow:
     6. Filter motifs by score
     7. Export enriched motif matrix as a PKL file
 
-Usage within TRNspot pipeline:
+Usage within GeneCircuitry pipeline:
     from trnspot.atac_peaks_processing import process_atac_peaks
     tf_info_path = process_atac_peaks("peaks.bed", species="human")
 """
@@ -25,7 +25,7 @@ from typing import Optional
 
 import pandas as pd
 
-from trnspot import config
+from genecircuitry import config
 
 
 def _get_ref_genome(species: str) -> str:

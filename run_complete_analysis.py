@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-TRNspot Complete Analysis - Quick Runner
+GeneCircuitry Complete Analysis - Quick Runner
 =========================================
-Convenient wrapper to run the complete TRNspot pipeline.
+Convenient wrapper to run the complete GeneCircuitry pipeline.
 
 This script provides an easy way to run the full analysis including:
 - Data preprocessing and QC
@@ -29,7 +29,7 @@ import sys
 import os
 
 # Import and run the complete pipeline from its proper package location
-from trnspot.pipeline.controller import main
+from genecircuitry.pipeline.controller import main
 
 if __name__ == "__main__":
     sys.exit(main())

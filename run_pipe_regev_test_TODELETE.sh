@@ -8,7 +8,7 @@ python run_complete_analysis.py \
  --species human \
  --cluster-key merged_treatment \
  --cluster-key-stratification level_2_annotation \
- --clusters "myCAF,CAF,Acinar,Malignant" \
+ --clusters "Acinar" \
  --raw-count-layer counts \
  --tf-dictionary /storage/sahuarea/samuele_cancellieri/reference_data/TFs/TG_to_TF_dictionary.pkl \
  --skip-qc \

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Complete TRNspot Analysis Pipeline
+Complete GeneCircuitry Analysis Pipeline
 ====================================
 This script runs the full analysis workflow:
 1. Data loading and quality control
@@ -30,15 +30,15 @@ import logging
 import traceback
 
 # Import TRNspot modules (use direct submodule imports to avoid circular import)
-from trnspot.config import set_random_seed, set_scanpy_settings
-from trnspot import config
-from trnspot.preprocessing import (
+from genecircuitry.config import set_random_seed, set_scanpy_settings
+from genecircuitry import config
+from genecircuitry.preprocessing import (
     perform_qc,
     perform_normalization,
     perform_dimensionality_reduction_clustering,
     ensure_categorical_obs,
 )
-from trnspot.reporting import generate_report, generate_stratified_report
+from genecircuitry.reporting import generate_report, generate_stratified_report
 
 
 # Global logger instances
@@ -205,7 +205,7 @@ def check_checkpoint(log_dir, step_name, input_hash):
 
 
 class PipelineController:
-    """Controller for managing TRNspot pipeline execution."""
+    """Controller for managing GeneCircuitry pipeline execution."""
 
     def __init__(self, args, start_time):
         """Initialize pipeline controller with arguments."""
@@ -348,7 +348,7 @@ class PipelineController:
                 self.atac_peaks_pkl = pkl_path
                 return pkl_path
 
-            from trnspot.atac_peaks_processing import process_atac_peaks
+            from genecircuitry.atac_peaks_processing import process_atac_peaks
 
             pkl_path = process_atac_peaks(
                 bed_path=bed_path,
@@ -452,7 +452,7 @@ class PipelineController:
         adata=None,
         celloracle_result=None,
         hotspot_result=None,
-        title="TRNspot Analysis Report",
+        title="GeneCircuitry Analysis Report",
         subtitle="",
     ):
         """Execute Step 7: Generate HTML/PDF Report."""
@@ -730,7 +730,7 @@ class PipelineController:
                     adata=adata_clustered,
                     celloracle_result=celloracle_result,
                     hotspot_result=hotspot_result,
-                    title="TRNspot Analysis Report",
+                    title="GeneCircuitry Analysis Report",
                     subtitle=self.args.name,
                 )
 
@@ -767,7 +767,10 @@ class PipelineController:
         )
 
         if self.adata_stratification_list and not self.args.skip_celloracle:
-            from trnspot.grn_deep_analysis import merge_scores, plot_heatmap_scores
+            from genecircuitry.grn_deep_analysis import (
+                merge_scores,
+                plot_heatmap_scores,
+            )
 
             tracked_files_path = os.path.join(self.args.output, "tracked_files.txt")
             if os.path.exists(tracked_files_path):
@@ -801,7 +804,7 @@ class PipelineController:
 
                 outputs = generate_stratified_report(
                     output_dir=self.args.output,
-                    title="TRNspot Analysis Report",
+                    title="GeneCircuitry Analysis Report",
                     subtitle=(
                         f"{self.args.name} - Stratified Analysis "
                         f"({len(self.stratification_results)} stratifications)"
@@ -1154,7 +1157,9 @@ def celloracle_pipeline(
         if log_dir and check_checkpoint(log_dir, "celloracle", step_hash):
             if os.path.exists(oracle_file) and os.path.exists(links_file):
                 try:
-                    from trnspot.celloracle_processing import load_celloracle_results
+                    from genecircuitry.celloracle_processing import (
+                        load_celloracle_results,
+                    )
 
                     log_step("CellOracle.Checkpoint", "LOADING")
                     print(f"  Loading CellOracle results from checkpoint...")
@@ -1169,7 +1174,7 @@ def celloracle_pipeline(
                     print(f"  Re-running CellOracle analysis...")
 
         try:
-            from trnspot.celloracle_processing import (
+            from genecircuitry.celloracle_processing import (
                 perform_grn_pre_processing,
                 create_oracle_object,
                 run_PCA,
@@ -1307,7 +1312,7 @@ def hotspot_pipeline(
             return hotspot_obj
 
         try:
-            from trnspot.hotspot_processing import (
+            from genecircuitry.hotspot_processing import (
                 create_hotspot_object,
                 run_hotspot_analysis,
             )
@@ -1414,7 +1419,7 @@ def generate_summary(adata, celloracle_result, hotspot_result, start_time, outpu
 
         summary = []
         summary.append("=" * 70)
-        summary.append("TRNspot Complete Pipeline - Analysis Summary")
+        summary.append("GeneCircuitry Complete Pipeline - Analysis Summary")
         summary.append("=" * 70)
         summary.append(
             f"\nAnalysis completed at: {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -1520,7 +1525,7 @@ def grn_deep_analysis_pipeline(grn_score_path, grn_links_path):
     )
 
     try:
-        from trnspot.grn_deep_analysis import (
+        from genecircuitry.grn_deep_analysis import (
             process_single_score_file,
             process_single_links_file,
             plot_scatter_scores,
@@ -1528,7 +1533,7 @@ def grn_deep_analysis_pipeline(grn_score_path, grn_links_path):
             plot_difference_cluster_scores,
             plot_network_graph,
         )
-        from trnspot.plotting.grn_plots import (
+        from genecircuitry.plotting.grn_plots import (
             generate_all_grn_plots,
             plot_enriched_tf_network,
             plot_tf_shared_target_network,
@@ -1596,7 +1601,7 @@ def grn_deep_analysis_pipeline(grn_score_path, grn_links_path):
 def main():
     """Main pipeline execution."""
     parser = argparse.ArgumentParser(
-        description="Run complete TRNspot analysis pipeline",
+        description="Run complete GeneCircuitry analysis pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -1774,7 +1779,7 @@ Examples:
 
     # Print header
     print("\n" + "=" * 70)
-    print("TRNspot Complete Analysis Pipeline")
+    print("GeneCircuitry Complete Analysis Pipeline")
     print("=" * 70)
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     start_time = datetime.now()
@@ -1805,7 +1810,7 @@ Examples:
 
     sc.settings.logfile = os.path.join(args.output, "logs", "scanpy_log.txt")
 
-    # Update TRNspot configuration
+    # Update GeneCircuitry configuration
     config.update_config(
         OUTPUT_DIR=args.output,
         FIGURES_DIR=os.path.join(args.output, "figures"),

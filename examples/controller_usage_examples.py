@@ -13,8 +13,8 @@ from argparse import Namespace
 from datetime import datetime
 
 # Import the controller from its proper package location
-from trnspot.pipeline import PipelineController, setup_directories
-from trnspot import set_random_seed, set_scanpy_settings, config
+from genecircuitry.pipeline import PipelineController, setup_directories
+from genecircuitry import set_random_seed, set_scanpy_settings, config
 
 
 def example_1_run_specific_steps():

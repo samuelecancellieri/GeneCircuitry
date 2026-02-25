@@ -1,5 +1,5 @@
 """
-TRNspot Reporting Module
+GeneCircuitry Reporting Module
 ========================
 
 This module generates comprehensive HTML and PDF reports from pipeline results,

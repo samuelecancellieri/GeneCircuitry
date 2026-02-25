@@ -6,7 +6,7 @@ import pytest
 import numpy as np
 import scanpy as sc
 from anndata import AnnData
-from trnspot.preprocessing import perform_qc
+from genecircuitry.preprocessing import perform_qc
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ def test_perform_qc_basic(sample_adata):
 
 def test_perform_qc_with_config_defaults(sample_adata):
     """Test QC with config defaults"""
-    from trnspot import config
+    from genecircuitry import config
 
     # Update config
     config.update_config(
@@ -110,7 +110,7 @@ def test_perform_qc_with_plots(sample_adata, tmp_path):
 
 def test_plot_qc_violin(sample_adata):
     """Test violin plot generation via plotting subpackage"""
-    from trnspot.plotting.qc_plots import plot_qc_violin_pre_filter
+    from genecircuitry.plotting.qc_plots import plot_qc_violin_pre_filter
 
     # First perform QC to get metrics
     adata_qc = perform_qc(sample_adata, plot=False)
@@ -121,7 +121,7 @@ def test_plot_qc_violin(sample_adata):
 
 def test_plot_qc_scatter(sample_adata):
     """Test scatter plot generation via plotting subpackage"""
-    from trnspot.plotting.qc_plots import plot_qc_scatter_pre_filter
+    from genecircuitry.plotting.qc_plots import plot_qc_scatter_pre_filter
 
     # First perform QC to get metrics
     adata_qc = perform_qc(sample_adata, plot=False)

@@ -1,5 +1,5 @@
 """
-Hotspot processing module for TRNspot
+Hotspot processing module for GeneCircuitry
 
 This module provides functions for Hotspot analysis of gene expression data.
 

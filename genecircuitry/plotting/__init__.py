@@ -1,8 +1,8 @@
 """
-TRNspot Plotting Module
+GeneCircuitry Plotting Module
 =======================
 
-Centralized plotting functions for TRNspot analysis pipeline.
+Centralized plotting functions for GeneCircuitry analysis pipeline.
 Organized by analysis type: QC, GRN, and Hotspot.
 
 Each plotting module provides:

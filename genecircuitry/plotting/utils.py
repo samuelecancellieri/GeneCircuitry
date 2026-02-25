@@ -1,5 +1,5 @@
 """
-Plot Utilities for TRNspot
+Plot Utilities for GeneCircuitry
 ==========================
 
 Provides centralized utilities for plot management including:

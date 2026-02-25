@@ -1,3 +1,3 @@
 """
-Tests for TRNspot package
+Tests for GeneCircuitry package
 """

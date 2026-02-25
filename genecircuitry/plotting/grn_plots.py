@@ -1,5 +1,5 @@
 """
-GRN Plotting Module for TRNspot
+GRN Plotting Module for GeneCircuitry
 ===============================
 
 Functions for generating Gene Regulatory Network visualizations including:

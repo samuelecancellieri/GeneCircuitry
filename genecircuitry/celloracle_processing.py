@@ -1,5 +1,5 @@
 """
-CellOracle processing module for TRNspot
+CellOracle processing module for GeneCircuitry
 """
 
 import scanpy as sc

@@ -1,5 +1,5 @@
 """
-Hotspot Plotting Module for TRNspot
+Hotspot Plotting Module for GeneCircuitry
 ===================================
 
 Functions for generating Hotspot gene module visualizations including:

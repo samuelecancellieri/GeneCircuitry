@@ -7,14 +7,14 @@ using Hotspot, which identifies genes with spatially autocorrelated expression p
 import os
 import scanpy as sc
 import pandas as pd
-from trnspot import set_random_seed, set_scanpy_settings, config
+from genecircuitry import set_random_seed, set_scanpy_settings, config
 
-from trnspot.preprocessing import (
+from genecircuitry.preprocessing import (
     perform_qc,
     perform_normalization,
 )
 
-from trnspot.hotspot_processing import (
+from genecircuitry.hotspot_processing import (
     create_hotspot_object,
     run_hotspot_analysis,
 )

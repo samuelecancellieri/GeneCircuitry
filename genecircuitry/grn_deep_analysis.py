@@ -1,5 +1,5 @@
 """
-GRN Deep Analysis module for TRNspot
+GRN Deep Analysis module for GeneCircuitry
 
 This module provides functions for deep analysis of Gene Regulatory Networks (GRN).
 

@@ -1,5 +1,5 @@
 """
-QC Plotting Module for TRNspot
+QC Plotting Module for GeneCircuitry
 ==============================
 
 Functions for generating quality control visualizations including:

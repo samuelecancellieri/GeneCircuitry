@@ -1,5 +1,5 @@
 """
-Configuration settings for TRNspot package
+Configuration settings for GeneCircuitry package
 """
 
 import numpy as np
@@ -277,7 +277,7 @@ LOW_MEMORY = False
 
 def set_scanpy_settings():
     """
-    Configure scanpy settings with TRNspot defaults.
+    Configure scanpy settings with GeneCircuitry defaults.
 
     This function sets common scanpy settings including figure parameters,
     verbosity, and caching.
@@ -435,7 +435,7 @@ def print_config():
     """
     config = get_config()
     print("=" * 60)
-    print("TRNspot Configuration")
+    print("GeneCircuitry Configuration")
     print("=" * 60)
     for key, value in config.items():
         print(f"{key:30s} = {value}")

@@ -3,17 +3,17 @@ Complete CellOracle workflow example for GRN inference
 """
 
 import scanpy as sc
-from trnspot import set_random_seed, set_scanpy_settings, config
+from genecircuitry import set_random_seed, set_scanpy_settings, config
 
-from trnspot.preprocessing import (
+from genecircuitry.preprocessing import (
     perform_qc,
     perform_normalization,
 )
-from trnspot.celloracle_processing import (
+from genecircuitry.celloracle_processing import (
     perform_grn_pre_processing,
 )
 
-from trnspot.celloracle_processing import (
+from genecircuitry.celloracle_processing import (
     create_oracle_object,
     run_PCA,
     run_KNN,

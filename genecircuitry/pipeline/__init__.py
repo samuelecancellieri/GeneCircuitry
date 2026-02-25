@@ -1,11 +1,11 @@
 """
-TRNspot Pipeline Module
+GeneCircuitry Pipeline Module
 ========================
 
-Central pipeline orchestration for TRNspot analysis workflows.
+Central pipeline orchestration for GeneCircuitry analysis workflows.
 
 This module provides the PipelineController class and supporting functions
-for running the complete TRNspot analysis pipeline.
+for running the complete GeneCircuitry analysis pipeline.
 
 Previously located at examples/complete_pipeline.py, this is the core
 pipeline engine — not an example.

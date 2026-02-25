@@ -1,9 +1,9 @@
 """
-Example demonstrating configuration usage in TRNspot
+Example demonstrating configuration usage in GeneCircuitry. This script shows how to access, update, and utilize configuration settings
 """
 
-import trnspot
-from trnspot import config
+import genecircuitry
+from genecircuitry import config
 
 # Print current configuration
 print("=" * 60)
@@ -31,13 +31,13 @@ config.update_config(RANDOM_SEED=123, QC_MIN_GENES=300, QC_MIN_COUNTS=1000)
 print("\n" + "=" * 60)
 print("Setting Random Seed")
 print("=" * 60)
-trnspot.set_random_seed(456)
+genecircuitry.set_random_seed(456)
 
 # Get config as dictionary
 print("\n" + "=" * 60)
 print("Get Config as Dictionary")
 print("=" * 60)
-cfg = trnspot.get_config()
+cfg = genecircuitry.get_config()
 print(f"Config type: {type(cfg)}")
 print(f"Number of config parameters: {len(cfg)}")
 print(f"\nSample parameters:")
@@ -52,8 +52,8 @@ print(
     """
 Example usage:
 
-from trnspot import config
-from trnspot.preprocessing import perform_qc
+from genecircuitry import config
+from genecircuitry.preprocessing import perform_qc
 
 # Use default config values
 adata_qc = perform_qc(

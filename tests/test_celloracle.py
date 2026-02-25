@@ -57,7 +57,7 @@ def sample_adata_for_oracle():
 @pytest.mark.skipif(not CELLORACLE_AVAILABLE, reason="CellOracle not installed")
 def test_create_oracle_object_with_raw_counts(sample_adata_for_oracle):
     """Test creating Oracle object with raw counts"""
-    from trnspot.celloracle_processing import create_oracle_object
+    from genecircuitry.celloracle_processing import create_oracle_object
 
     oracle = create_oracle_object(
         adata=sample_adata_for_oracle,
@@ -75,7 +75,7 @@ def test_create_oracle_object_with_raw_counts(sample_adata_for_oracle):
 @pytest.mark.skipif(not CELLORACLE_AVAILABLE, reason="CellOracle not installed")
 def test_create_oracle_object_with_normalized_counts(sample_adata_for_oracle):
     """Test creating Oracle object with normalized counts"""
-    from trnspot.celloracle_processing import create_oracle_object
+    from genecircuitry.celloracle_processing import create_oracle_object
 
     # Normalize the data
     sc.pp.normalize_total(sample_adata_for_oracle, target_sum=1e4)
@@ -96,7 +96,7 @@ def test_create_oracle_object_with_normalized_counts(sample_adata_for_oracle):
 @pytest.mark.skipif(not CELLORACLE_AVAILABLE, reason="CellOracle not installed")
 def test_create_oracle_object_with_custom_dict(sample_adata_for_oracle, tmp_path):
     """Test creating Oracle object with custom TF dictionary"""
-    from trnspot.celloracle_processing import create_oracle_object
+    from genecircuitry.celloracle_processing import create_oracle_object
     import pickle
 
     # Create a mock TF dictionary
@@ -119,14 +119,14 @@ def test_create_oracle_object_with_custom_dict(sample_adata_for_oracle, tmp_path
 
 def test_create_oracle_mock():
     """Test create_oracle_object with mocking (when CellOracle not available)"""
-    from trnspot.celloracle_processing import create_oracle_object
+    from genecircuitry.celloracle_processing import create_oracle_object
 
     # Create mock objects
     mock_adata = MagicMock()
     mock_adata.copy.return_value = mock_adata
     mock_adata.layers = {"raw_counts": np.random.rand(100, 50)}
 
-    with patch("trnspot.celloracle_processing.co") as mock_co:
+    with patch("genecircuitry.celloracle_processing.co") as mock_co:
         mock_oracle = MagicMock()
         mock_co.Oracle.return_value = mock_oracle
         mock_co.data.load_human_promoter_base_GRN.return_value = MagicMock()
@@ -143,7 +143,7 @@ def test_create_oracle_mock():
 @pytest.mark.skipif(not CELLORACLE_AVAILABLE, reason="CellOracle not installed")
 def test_run_pca(sample_adata_for_oracle):
     """Test PCA on Oracle object"""
-    from trnspot.celloracle_processing import create_oracle_object, run_PCA
+    from genecircuitry.celloracle_processing import create_oracle_object, run_PCA
 
     # Create Oracle object
     oracle = create_oracle_object(
@@ -162,7 +162,7 @@ def test_run_pca(sample_adata_for_oracle):
 
 def test_run_pca_mock():
     """Test run_PCA with mocking"""
-    from trnspot.celloracle_processing import run_PCA
+    from genecircuitry.celloracle_processing import run_PCA
 
     # Create mock Oracle object
     mock_oracle = MagicMock()
@@ -170,8 +170,10 @@ def test_run_pca_mock():
     mock_oracle.pca = MagicMock()
     mock_oracle.pca.explained_variance_ratio_ = np.linspace(0.1, 0.001, 200)
 
-    with patch("matplotlib.pyplot.plot"), patch("matplotlib.pyplot.axvline"), patch(
-        "matplotlib.pyplot.show"
+    with (
+        patch("matplotlib.pyplot.plot"),
+        patch("matplotlib.pyplot.axvline"),
+        patch("matplotlib.pyplot.show"),
     ):
         oracle_pca = run_PCA(mock_oracle)
 
@@ -183,7 +185,11 @@ def test_run_pca_mock():
 @pytest.mark.skipif(not CELLORACLE_AVAILABLE, reason="CellOracle not installed")
 def test_run_knn(sample_adata_for_oracle):
     """Test KNN imputation on Oracle object"""
-    from trnspot.celloracle_processing import create_oracle_object, run_PCA, run_KNN
+    from genecircuitry.celloracle_processing import (
+        create_oracle_object,
+        run_PCA,
+        run_KNN,
+    )
 
     # Create and prepare Oracle object
     oracle = create_oracle_object(
@@ -202,7 +208,7 @@ def test_run_knn(sample_adata_for_oracle):
 
 def test_run_knn_mock():
     """Test run_KNN with mocking"""
-    from trnspot.celloracle_processing import run_KNN
+    from genecircuitry.celloracle_processing import run_KNN
 
     # Create mock Oracle object
     mock_oracle = MagicMock()
@@ -217,7 +223,7 @@ def test_run_knn_mock():
 
 def test_run_knn_k_calculation():
     """Test automatic k calculation in run_KNN"""
-    from trnspot.celloracle_processing import run_KNN
+    from genecircuitry.celloracle_processing import run_KNN
 
     # Test with different cell numbers
     for n_cells in [100, 1000, 10000]:
@@ -236,7 +242,7 @@ def test_run_knn_k_calculation():
 @pytest.mark.skipif(not CELLORACLE_AVAILABLE, reason="CellOracle not installed")
 def test_run_links(sample_adata_for_oracle):
     """Test inferring regulatory links"""
-    from trnspot.celloracle_processing import (
+    from genecircuitry.celloracle_processing import (
         create_oracle_object,
         run_PCA,
         run_KNN,
@@ -261,7 +267,7 @@ def test_run_links(sample_adata_for_oracle):
 
 def test_run_links_mock():
     """Test run_links with mocking"""
-    from trnspot.celloracle_processing import run_links
+    from genecircuitry.celloracle_processing import run_links
 
     # Create mock Oracle object
     mock_oracle = MagicMock()
@@ -280,7 +286,7 @@ def test_run_links_mock():
 
 def test_run_links_p_cutoff():
     """Test different p-value cutoffs"""
-    from trnspot.celloracle_processing import run_links
+    from genecircuitry.celloracle_processing import run_links
 
     for p_cutoff in [0.001, 0.01, 0.0001]:
         mock_oracle = MagicMock()
@@ -296,8 +302,8 @@ def test_run_links_p_cutoff():
 
 def test_integration_with_config():
     """Test that config parameters are used correctly"""
-    from trnspot import config
-    from trnspot.celloracle_processing import run_KNN, run_links
+    from genecircuitry import config
+    from genecircuitry.celloracle_processing import run_KNN, run_links
 
     # Test GRN_N_JOBS is used in run_KNN
     mock_oracle = MagicMock()
@@ -335,7 +341,7 @@ def test_integration_with_config():
 def test_module_imports():
     """Test that module imports work correctly"""
     try:
-        from trnspot.celloracle_processing import (
+        from genecircuitry.celloracle_processing import (
             create_oracle_object,
             run_PCA,
             run_KNN,
@@ -349,7 +355,7 @@ def test_module_imports():
 
 def test_function_signatures():
     """Test that functions have correct signatures"""
-    from trnspot.celloracle_processing import (
+    from genecircuitry.celloracle_processing import (
         create_oracle_object,
         run_PCA,
         run_KNN,

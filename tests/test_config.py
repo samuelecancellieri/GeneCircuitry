@@ -4,7 +4,7 @@ Tests for configuration module
 
 import pytest
 import numpy as np
-from trnspot import config
+from genecircuitry import config
 
 
 def test_random_seed():
@@ -87,7 +87,7 @@ def test_print_config(capsys):
     captured = capsys.readouterr()
 
     # Check that output contains expected text
-    assert "TRNspot Configuration" in captured.out
+    assert "GeneCircuitry Configuration" in captured.out
     assert "RANDOM_SEED" in captured.out
     assert "QC_MIN_GENES" in captured.out
 
