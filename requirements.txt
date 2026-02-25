@@ -1,5 +1,3 @@
-numpy==1.26.4
-velocyto==0.17.17
 celloracle==0.18.0
 leidenalg
 hotspotsc==1.1.3

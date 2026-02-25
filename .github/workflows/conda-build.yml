@@ -1,0 +1,85 @@
+name: Conda Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  conda-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10"]
+
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Miniconda with Python ${{ matrix.python-version }}
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          auto-activate-base: false
+          activate-environment: genecircuitry-env
+          conda-solver: libmamba
+
+      - name: Install system dependencies for velocyto
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            gcc \
+            g++ \
+            zlib1g-dev \
+            libbz2-dev \
+            liblzma-dev \
+            libhdf5-dev \
+            libcurl4-openssl-dev \
+            libssl-dev
+
+      - name: Add bioconda and conda-forge channels
+        run: |
+          conda config --add channels defaults
+          conda config --add channels bioconda
+          conda config --add channels conda-forge
+          conda config --set channel_priority strict
+
+      - name: Install HDF5 and pysam via conda (velocyto prerequisites)
+        run: |
+          conda install -y hdf5 pysam
+
+      - name: Install velocyto
+        run: |
+          pip install velocyto==0.17.17
+
+      - name: Install remaining requirements via pip
+        run: |
+          pip install -r requirements.txt
+
+      - name: Install genecircuitry package
+        run: |
+          pip install -e ".[grn,hotspot,enrichment]"
+
+      - name: Verify installation
+        run: |
+          python -c "import genecircuitry; print('genecircuitry imported successfully')"
+          python -c "import velocyto; print('velocyto imported successfully')"
+
+      - name: Verify CLI entry point is on PATH and callable
+        run: |
+          # Confirm the wrapper command exists in the environment's bin directory
+          which genecircuitry
+          echo "genecircuitry CLI found at: $(which genecircuitry)"
+
+          # Run from a temp directory unrelated to the repo to prove it works standalone
+          TMPDIR=$(mktemp -d)
+          cd "$TMPDIR"
+          genecircuitry --help
+          echo "genecircuitry CLI works as a standalone command"
+          cd -
+          rm -rf "$TMPDIR"
