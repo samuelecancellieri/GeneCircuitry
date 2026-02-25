@@ -366,7 +366,7 @@ def create_preprocessing_section(
     <ul>
         <li>Normalization target sum: 10,000 counts per cell (CPM-like)</li>
         <li>HVG selection method: Seurat v3 (highly_variable_genes with flavor='seurat_v3')</li>
-        <li>Raw counts preserved in <code>adata.layers['raw_count']</code> for downstream tools</li>
+        <li>Raw counts preserved in <code>adata.layers['raw_counts']</code> for downstream tools</li>
     </ul>
     """
 

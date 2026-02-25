@@ -20,7 +20,7 @@ nav_order: 2
 ## Requirements
 
 - Python ≥ 3.9
-- Core dependencies installed automatically via pip: `numpy`, `pandas`, `scanpy`, `anndata`, `matplotlib`, `seaborn`, `scipy`, `adjustText`, `networkx`, `marsilea`
+- Core dependencies installed automatically via pip: `numpy`, `pandas`, `scanpy`, `anndata`, `matplotlib`, `seaborn`, `scipy`, `adjustText`, `networkx`
 
 ---
 

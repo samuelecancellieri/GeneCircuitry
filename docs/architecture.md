@@ -19,15 +19,15 @@ nav_order: 4
 
 ## Key components
 
-| File / Directory                   | Purpose                                                                       |
-| ---------------------------------- | ----------------------------------------------------------------------------- |
+| File / Directory                         | Purpose                                                                       |
+| ---------------------------------------- | ----------------------------------------------------------------------------- |
 | `genecircuitry/config.py`                | **Single source of truth** — all parameters live here                         |
 | `genecircuitry/pipeline/controller.py`   | `PipelineController` class — central orchestrator (~1900 lines)               |
-| `run_complete_analysis.py`         | CLI entry point — thin wrapper around `genecircuitry.pipeline.main`                 |
+| `run_complete_analysis.py`               | CLI entry point — thin wrapper around `genecircuitry.pipeline.main`           |
 | `genecircuitry/preprocessing.py`         | Scanpy wrappers: QC, normalization, dimensionality reduction, clustering      |
 | `genecircuitry/celloracle_processing.py` | CellOracle GRN inference (optional dep)                                       |
 | `genecircuitry/hotspot_processing.py`    | Hotspot gene module analysis (optional dep)                                   |
-| `genecircuitry/grn_deep_analysis.py`     | NetworkX + Marsilea network visualization                                     |
+| `genecircuitry/grn_deep_analysis.py`     | NetworkX network visualization                                                |
 | `genecircuitry/plotting/`                | Canonical plot generation (`qc_plots.py`, `grn_plots.py`, `hotspot_plots.py`) |
 | `genecircuitry/reporting/`               | HTML / PDF report generation                                                  |
 | `genecircuitry/atac_peaks_processing.py` | ATAC-seq peak motif scanning (optional)                                       |

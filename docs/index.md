@@ -20,7 +20,7 @@ GeneCircuitry is a Python package that integrates [Scanpy](https://scanpy.readth
 | Dimensionality reduction & clustering | Scanpy (PCA, UMAP, Leiden) | Cell embeddings + cluster labels          |
 | GRN inference                         | CellOracle                 | Per-cluster transcription factor networks |
 | Gene module identification            | Hotspot                    | Spatially autocorrelated gene modules     |
-| Visualization                         | NetworkX, Marsilea         | Network plots, heatmaps, scatter plots    |
+| Visualization                         | NetworkX                   | Network plots, heatmaps, scatter plots    |
 | Reporting                             | Custom HTML/PDF engine     | Interactive analysis report               |
 
 ---
@@ -53,7 +53,7 @@ CellOracle GRN         Hotspot modules
     └──────────┬───────────┘
                ▼
           Deep Analysis    ← genecircuitry/grn_deep_analysis.py
-          (NetworkX, Marsilea plots)
+          (NetworkX plots)
                │
                ▼
           HTML / PDF Report ← genecircuitry/reporting/

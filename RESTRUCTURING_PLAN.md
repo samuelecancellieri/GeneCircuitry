@@ -125,7 +125,7 @@ These are not about removal but need fixing:
 ### 4.6 Incomplete Dependencies
 
 - **File**: `pyproject.toml` and `requirements.txt`
-- **Missing from both**: `networkx`, `marsilea`, `gseapy`
+- **Missing from both**: `networkx`, `gseapy`
 - **Missing from `pyproject.toml`**: `matplotlib`, `seaborn`, `scipy`, `adjustText`
 - **Fix**: Sync `pyproject.toml` dependencies with `requirements.txt` and add missing ones. Consider `[project.optional-dependencies]` for `celloracle`, `hotspot`, `gseapy`, `genomepy`, `gimmemotifs`
 

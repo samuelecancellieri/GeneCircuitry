@@ -10,15 +10,15 @@
 
 ### Key Components
 
-| File                               | Purpose                                                         |
-| ---------------------------------- | --------------------------------------------------------------- |
+| File                                     | Purpose                                                         |
+| ---------------------------------------- | --------------------------------------------------------------- |
 | `genecircuitry/config.py`                | **SINGLE SOURCE OF TRUTH** - all parameters                     |
 | `genecircuitry/pipeline/controller.py`   | `PipelineController` class - central orchestrator (~1900 lines) |
-| `run_complete_analysis.py`         | Entry point wrapper (calls `genecircuitry.pipeline.main`)             |
+| `run_complete_analysis.py`               | Entry point wrapper (calls `genecircuitry.pipeline.main`)       |
 | `genecircuitry/preprocessing.py`         | Scanpy wrappers (QC, normalize, cluster)                        |
 | `genecircuitry/celloracle_processing.py` | GRN inference with CellOracle (optional dep)                    |
 | `genecircuitry/hotspot_processing.py`    | Spatial autocorrelation modules (optional dep)                  |
-| `genecircuitry/grn_deep_analysis.py`     | Network visualization (NetworkX, Marsilea)                      |
+| `genecircuitry/grn_deep_analysis.py`     | Network visualization (NetworkX)                                |
 | `genecircuitry/plotting/`                | Canonical plot generation (`qc_plots.py`, `grn_plots.py`, etc.) |
 | `genecircuitry/reporting/`               | HTML/PDF report generation                                      |
 

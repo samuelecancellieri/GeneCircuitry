@@ -60,7 +60,7 @@ adata = perform_normalization(
 )
 ```
 
-Stores raw counts in `adata.layers['raw_count']` before normalization.
+Stores raw counts in `adata.layers['raw_counts']` before normalization.
 
 ---
 
