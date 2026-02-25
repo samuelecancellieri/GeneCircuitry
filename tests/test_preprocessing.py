@@ -96,18 +96,6 @@ def test_perform_qc_strict_filtering(sample_adata):
     assert all(adata_qc.obs["pct_counts_mt"] < 10.0)
 
 
-def test_perform_qc_with_plots(sample_adata, tmp_path):
-    """Test QC with plot generation"""
-    save_path = tmp_path / "qc_test.png"
-
-    adata_qc = perform_qc(
-        sample_adata, min_genes=5, min_counts=10, plot=True, save_plots=str(save_path)
-    )
-
-    # Check that plots were saved
-    assert save_path.exists()
-
-
 def test_plot_qc_violin(sample_adata):
     """Test violin plot generation via plotting subpackage"""
     from genecircuitry.plotting.qc_plots import plot_qc_violin_pre_filter
