@@ -1,15 +1,15 @@
-# TRNspot Package Structure
+# GeneCircuitry Package Structure
 
 ## Overview
 
-TRNspot is a Python package for transcriptional regulatory network analysis with built-in quality control and preprocessing capabilities.
+GeneCircuitry is a Python package for transcriptional regulatory network analysis with built-in quality control and preprocessing capabilities.
 
 ## Directory Structure
 
 ```
-TRNspot_simple/
+GeneCircuitry_simple/
 ├── venv/                         # Virtual environment
-├── trnspot/                      # Main package
+├── genecircuitry/                      # Main package
 │   ├── __init__.py              # Package initialization
 │   ├── config.py                # Configuration module (NEW!)
 │   ├── preprocessing.py         # Data preprocessing & QC
@@ -107,8 +107,8 @@ TRNspot_simple/
 
 ```python
 # 1. Import and configure
-from trnspot import set_random_seed, config
-from trnspot.preprocessing import perform_qc
+from genecircuitry import set_random_seed, config
+from genecircuitry.preprocessing import perform_qc
 import scanpy as sc
 
 # 2. Set reproducibility
@@ -132,7 +132,7 @@ adata_qc = perform_qc(
 ### Custom Configuration Workflow
 
 ```python
-from trnspot import config
+from genecircuitry import config
 
 # Update for specific analysis
 config.update_config(
@@ -167,16 +167,16 @@ pytest tests/
 pytest tests/test_config.py -v
 
 # Run with coverage
-pytest tests/ --cov=trnspot
+pytest tests/ --cov=genecircuitry
 
 # Format code
-black trnspot/
+black genecircuitry/
 
 # Check linting
-flake8 trnspot/
+flake8 genecircuitry/
 
 # Type checking
-mypy trnspot/
+mypy genecircuitry/
 ```
 
 ## Next Steps

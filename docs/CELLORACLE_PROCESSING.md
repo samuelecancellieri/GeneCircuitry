@@ -55,7 +55,7 @@ This function initializes a CellOracle Oracle object with the provided single-ce
 
 ```python
 import scanpy as sc
-from trnspot.celloracle_processing import create_oracle_object
+from genecircuitry.celloracle_processing import create_oracle_object
 
 # Load preprocessed data
 adata = sc.read_h5ad('preprocessed_data.h5ad')
@@ -118,7 +118,7 @@ The automatic selection finds the "elbow" point where the rate of change in cumu
 **Example:**
 
 ```python
-from trnspot.celloracle_processing import create_oracle_object, run_PCA
+from genecircuitry.celloracle_processing import create_oracle_object, run_PCA
 
 # Create and process Oracle object
 oracle = create_oracle_object(adata, 'leiden', 'X_umap')
@@ -170,7 +170,7 @@ The imputation helps reduce noise and improve the quality of GRN inference.
 **Example:**
 
 ```python
-from trnspot.celloracle_processing import (
+from genecircuitry.celloracle_processing import (
     create_oracle_object,
     run_PCA,
     run_KNN
@@ -239,13 +239,13 @@ The resulting Links object contains:
 **Example:**
 
 ```python
-from trnspot.celloracle_processing import (
+from genecircuitry.celloracle_processing import (
     create_oracle_object,
     run_PCA,
     run_KNN,
     run_links
 )
-from trnspot import config
+from genecircuitry import config
 
 # Complete GRN inference pipeline
 oracle = create_oracle_object(adata, 'leiden', 'X_umap')
@@ -282,8 +282,8 @@ links.to_hdf5(f"{config.OUTPUT_DIR}/grn_links.celloracle.links")
 
 ```python
 import scanpy as sc
-from trnspot import config, set_random_seed
-from trnspot.celloracle_processing import (
+from genecircuitry import config, set_random_seed
+from genecircuitry.celloracle_processing import (
     create_oracle_object,
     run_PCA,
     run_KNN,
@@ -347,7 +347,7 @@ config.OUTPUT_DIR        # Directory for saving results
 Update these as needed:
 
 ```python
-from trnspot import config
+from genecircuitry import config
 
 config.update_config(
     GRN_N_JOBS=8,
@@ -385,7 +385,7 @@ Your AnnData object should have:
 
 ```python
 import scanpy as sc
-from trnspot.preprocessing import perform_qc, perform_grn_pre_processing
+from genecircuitry.preprocessing import perform_qc, perform_grn_pre_processing
 
 # Load and preprocess
 adata = sc.read_h5ad('raw_data.h5ad')
@@ -492,7 +492,7 @@ sc.tl.umap(adata)
 
 ## See Also
 
-- `trnspot.preprocessing` - Data preprocessing functions
-- `trnspot.config` - Configuration management
+- `genecircuitry.preprocessing` - Data preprocessing functions
+- `genecircuitry.config` - Configuration management
 - `docs/CONFIG.md` - Configuration documentation
 - `examples/` - Example workflows

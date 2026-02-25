@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `PipelineController` class provides a flexible, modular way to execute the TRNspot analysis pipeline. It allows you to:
+The `PipelineController` class provides a flexible, modular way to execute the GeneCircuitry analysis pipeline. It allows you to:
 
 - Run specific pipeline steps independently
 - Execute stratified analyses in parallel

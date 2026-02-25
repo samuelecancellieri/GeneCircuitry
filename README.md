@@ -1,4 +1,4 @@
-# TRNspot
+# GeneCircuitry
 
 A Python package for transcriptional regulatory network analysis.
 
@@ -8,8 +8,8 @@ A Python package for transcriptional regulatory network analysis.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/trnspot.git
-cd trnspot
+git clone https://github.com/yourusername/genecircuitry.git
+cd genecircuitry
 
 # Create and activate virtual environment
 python -m venv venv
@@ -118,7 +118,7 @@ figures/
 Set random seed and configure default parameters:
 
 ```python
-from trnspot import set_random_seed, config
+from genecircuitry import set_random_seed, config
 
 # Set random seed for reproducibility
 set_random_seed(42)
@@ -140,8 +140,8 @@ Perform comprehensive quality control on single-cell RNA-seq data:
 
 ```python
 import scanpy as sc
-from trnspot import config
-from trnspot.preprocessing import perform_qc, plot_qc_violin, plot_qc_scatter
+from genecircuitry import config
+from genecircuitry.preprocessing import perform_qc, plot_qc_violin, plot_qc_scatter
 
 # Load your data
 adata = sc.read_h5ad('your_data.h5ad')
@@ -163,8 +163,8 @@ adata_qc = perform_qc(
 
 ```python
 import scanpy as sc
-from trnspot import set_random_seed, config
-from trnspot.preprocessing import perform_qc, perform_grn_pre_processing
+from genecircuitry import set_random_seed, config
+from genecircuitry.preprocessing import perform_qc, perform_grn_pre_processing
 
 # 1. Set up reproducibility
 set_random_seed(42)
@@ -189,7 +189,7 @@ adata = perform_grn_pre_processing(adata)  # Uses config defaults
 Perform gene regulatory network inference using CellOracle:
 
 ```python
-from trnspot.celloracle_processing import (
+from genecircuitry.celloracle_processing import (
     create_oracle_object,
     run_PCA,
     run_KNN,
@@ -295,20 +295,20 @@ pytest tests/test_preprocessing.py -v
 pytest tests/test_celloracle.py -v
 
 # Run with coverage
-pytest tests/ --cov=trnspot --cov-report=html
+pytest tests/ --cov=genecircuitry --cov-report=html
 ```
 
 ### Code Quality
 
 ```bash
 # Format code
-black trnspot/
+black genecircuitry/
 
 # Check linting
-flake8 trnspot/
+flake8 genecircuitry/
 
 # Type checking
-mypy trnspot/
+mypy genecircuitry/
 ```
 
 ### Testing Notes

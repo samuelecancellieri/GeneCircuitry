@@ -134,7 +134,7 @@ pytest tests/test_celloracle.py -v -k "not skipif"
 ### Pattern 1: Basic Workflow
 
 ```python
-from trnspot.celloracle_processing import *
+from genecircuitry.celloracle_processing import *
 
 oracle = create_oracle_object(adata, 'leiden', 'X_umap')
 oracle = run_PCA(oracle)
@@ -169,7 +169,7 @@ links_lenient = run_links(oracle, 'leiden', p_cutoff=0.01)
 ### Pattern 4: With Config Control
 
 ```python
-from trnspot import config
+from genecircuitry import config
 
 config.update_config(
     GRN_N_JOBS=8,
@@ -318,14 +318,14 @@ links = run_links(oracle, 'leiden', p_cutoff=0.01)
 config.update_config(GRN_N_JOBS=8)  # Use fewer cores
 ```
 
-## Integration with TRNspot
+## Integration with GeneCircuitry
 
 ### Complete Pipeline
 
 ```python
 # 1. Config and QC
-from trnspot import set_random_seed, config
-from trnspot.preprocessing import perform_qc
+from genecircuitry import set_random_seed, config
+from genecircuitry.preprocessing import perform_qc
 
 set_random_seed(42)
 adata = perform_qc(adata)
@@ -335,7 +335,7 @@ sc.pp.normalize_total(adata, target_sum=config.NORMALIZE_TARGET_SUM)
 sc.pp.log1p(adata)
 
 # 3. CellOracle GRN inference
-from trnspot.celloracle_processing import *
+from genecircuitry.celloracle_processing import *
 
 oracle = create_oracle_object(adata, 'leiden', 'X_umap')
 oracle = run_PCA(oracle)
@@ -375,7 +375,7 @@ Potential improvements:
 
 1. CellOracle: https://morris-lab.github.io/CellOracle.documentation/
 2. Kamimoto et al., Nature, 2023 - Original CellOracle paper
-3. TRNspot documentation: `docs/` directory
+3. GeneCircuitry documentation: `docs/` directory
 
 ## Summary Statistics
 

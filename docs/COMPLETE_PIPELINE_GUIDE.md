@@ -1,8 +1,8 @@
-# TRNspot Complete Pipeline Usage Guide
+# GeneCircuitry Complete Pipeline Usage Guide
 
 ## Overview
 
-The complete pipeline script (`run_complete_analysis.py` / `examples/complete_pipeline.py`) provides a single command to run the entire TRNspot analysis workflow from raw data through GRN inference and module identification.
+The complete pipeline script (`run_complete_analysis.py` / `examples/complete_pipeline.py`) provides a single command to run the entire GeneCircuitry analysis workflow from raw data through GRN inference and module identification.
 
 ## Quick Start
 
@@ -290,7 +290,7 @@ sc.pl.umap(adata, color='leiden')
 Create a Python script to run with custom settings:
 
 ```python
-from trnspot import config
+from genecircuitry import config
 config.update_config(
     HOTSPOT_TOP_GENES=5000,
     HOTSPOT_FDR_THRESHOLD=0.01,

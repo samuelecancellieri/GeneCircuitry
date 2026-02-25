@@ -1,10 +1,10 @@
 <!-- TO REMOVE (from root): Dev notes — move to docs/dev/LOGGING_SYSTEM.md -->
 
-# TRNspot Logging System
+# GeneCircuitry Logging System
 
 ## Overview
 
-A comprehensive logging system has been implemented throughout the TRNspot pipeline to track execution progress, record intermediate steps, and capture errors with full tracebacks.
+A comprehensive logging system has been implemented throughout the GeneCircuitry pipeline to track execution progress, record intermediate steps, and capture errors with full tracebacks.
 
 ## Log Files
 

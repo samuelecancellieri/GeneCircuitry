@@ -36,7 +36,7 @@ Main function to perform quality control on AnnData objects.
 
 ```python
 import scanpy as sc
-from trnspot.preprocessing import perform_qc
+from genecircuitry.preprocessing import perform_qc
 
 # Load data
 adata = sc.read_h5ad('data.h5ad')
@@ -105,7 +105,7 @@ plot_qc_scatter(adata_qc, color_by='batch', save_path='scatter_qc.png')
 
 ```python
 import scanpy as sc
-from trnspot.preprocessing import perform_qc, plot_qc_violin, plot_qc_scatter
+from genecircuitry.preprocessing import perform_qc, plot_qc_violin, plot_qc_scatter
 
 # 1. Load data
 adata = sc.read_h5ad('raw_data.h5ad')

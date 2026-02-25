@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "trnspot"
+name = "genecircuitry"
 version = "0.1.0"
 description = "A package for transcriptional regulatory network analysis"
 readme = "README.md"
@@ -51,7 +51,7 @@ plotting = [
     "matplotlib",
 ]
 all = [
-    "trnspot[grn,hotspot,enrichment,atac,plotting]",
+    "genecircuitry[grn,hotspot,enrichment,atac,plotting]",
 ]
 dev = [
     "pytest>=7.0.0",

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `config.py` module provides centralized configuration management for TRNspot, including default parameters for quality control, preprocessing, plotting, and reproducibility settings.
+The `config.py` module provides centralized configuration management for GeneCircuitry, including default parameters for quality control, preprocessing, plotting, and reproducibility settings.
 
 ## Key Features
 
@@ -14,14 +14,14 @@ The `config.py` module provides centralized configuration management for TRNspot
 ## Quick Start
 
 ```python
-import trnspot
-from trnspot import config
+import genecircuitry
+from genecircuitry import config
 
 # Print all configuration parameters
 config.print_config()
 
 # Set random seed for reproducibility
-trnspot.set_random_seed(42)
+genecircuitry.set_random_seed(42)
 
 # Access configuration values
 min_genes = config.QC_MIN_GENES
@@ -38,7 +38,7 @@ config.update_config(RANDOM_SEED=123, QC_MIN_GENES=300)
 **Purpose**: Ensure reproducibility across analyses
 
 ```python
-from trnspot import set_random_seed
+from genecircuitry import set_random_seed
 
 # Set seed for numpy, random, and scanpy
 set_random_seed(42)
@@ -53,7 +53,7 @@ set_random_seed(42)
 Default thresholds for cell and gene filtering:
 
 ```python
-from trnspot import config
+from genecircuitry import config
 
 # QC parameters
 QC_MIN_GENES = 200          # Min genes per cell
@@ -66,7 +66,7 @@ QC_MIN_CELLS = 1            # Min cells per gene
 **Usage**:
 
 ```python
-from trnspot.preprocessing import perform_qc
+from genecircuitry.preprocessing import perform_qc
 
 adata_qc = perform_qc(
     adata,
@@ -171,7 +171,7 @@ VERBOSE = True                  # Verbose output
 Set random seed across all libraries for reproducibility.
 
 ```python
-from trnspot import set_random_seed
+from genecircuitry import set_random_seed
 
 set_random_seed(42)
 # Random seed set to: 42
@@ -182,7 +182,7 @@ set_random_seed(42)
 Get all configuration parameters as a dictionary.
 
 ```python
-from trnspot import get_config
+from genecircuitry import get_config
 
 config_dict = get_config()
 print(config_dict['RANDOM_SEED'])  # 42
@@ -193,11 +193,11 @@ print(config_dict['RANDOM_SEED'])  # 42
 Print all configuration parameters in a formatted table.
 
 ```python
-from trnspot import print_config
+from genecircuitry import print_config
 
 print_config()
 # ============================================================
-# TRNspot Configuration
+# GeneCircuitry Configuration
 # ============================================================
 # RANDOM_SEED                    = 42
 # QC_MIN_GENES                   = 200
@@ -209,7 +209,7 @@ print_config()
 Update one or more configuration parameters.
 
 ```python
-from trnspot import config
+from genecircuitry import config
 
 config.update_config(
     RANDOM_SEED=123,
@@ -226,8 +226,8 @@ config.update_config(
 ### Pattern 1: Use Default Configuration
 
 ```python
-from trnspot import config
-from trnspot.preprocessing import perform_qc
+from genecircuitry import config
+from genecircuitry.preprocessing import perform_qc
 
 # Use defaults directly
 adata_qc = perform_qc(
@@ -241,8 +241,8 @@ adata_qc = perform_qc(
 ### Pattern 2: Customize for Specific Analysis
 
 ```python
-from trnspot import config
-from trnspot.preprocessing import perform_qc
+from genecircuitry import config
+from genecircuitry.preprocessing import perform_qc
 
 # Update config for stricter QC
 config.update_config(
@@ -263,7 +263,7 @@ adata_qc = perform_qc(
 ### Pattern 3: Reproducible Analysis
 
 ```python
-from trnspot import set_random_seed, config
+from genecircuitry import set_random_seed, config
 
 # Set seed at start of analysis
 set_random_seed(42)
@@ -275,7 +275,7 @@ set_random_seed(42)
 ### Pattern 4: Configuration Profiles
 
 ```python
-from trnspot import config
+from genecircuitry import config
 
 def set_strict_qc():
     """Profile for strict QC"""
@@ -314,8 +314,8 @@ set_strict_qc()
 Complete analysis pipeline with configuration
 """
 
-from trnspot import set_random_seed, config
-from trnspot.preprocessing import perform_qc
+from genecircuitry import set_random_seed, config
+from genecircuitry.preprocessing import perform_qc
 import scanpy as sc
 
 # 1. Set reproducibility

@@ -1,8 +1,5 @@
-numpy==1.26.4
-scanpy
-leidenalg
-louvain
 celloracle==0.18.0
+leidenalg
 hotspotsc==1.1.3
 adjustText
 gseapy

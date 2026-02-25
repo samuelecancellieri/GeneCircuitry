@@ -4,7 +4,7 @@
 
 ## What Was Implemented
 
-This update transforms the TRNspot pipeline from a monolithic script into a flexible, modular system with the `PipelineController` class.
+This update transforms the GeneCircuitry pipeline from a monolithic script into a flexible, modular system with the `PipelineController` class.
 
 ### Key Features
 
@@ -125,7 +125,7 @@ controller.run_stratified_pipeline_parallel(n_jobs=8)
 
 ```python
 class PipelineController:
-    """Controller for managing TRNspot pipeline execution."""
+    """Controller for managing GeneCircuitry pipeline execution."""
 
     # Data management
     adata: AnnData

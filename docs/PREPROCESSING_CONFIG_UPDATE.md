@@ -2,7 +2,7 @@
 
 ## Overview
 
-The preprocessing module has been updated to use configuration defaults from `trnspot.config`. This provides consistent parameter management and improves reproducibility.
+The preprocessing module has been updated to use configuration defaults from `genecircuitry.config`. This provides consistent parameter management and improves reproducibility.
 
 ## Updated Functions
 
@@ -90,7 +90,7 @@ def perform_grn_pre_processing(
 ### Example 1: Use All Defaults
 
 ```python
-from trnspot.preprocessing import perform_qc
+from genecircuitry.preprocessing import perform_qc
 import scanpy as sc
 
 adata = sc.read_h5ad('data.h5ad')
@@ -116,7 +116,7 @@ adata_qc = perform_qc(
 ### Example 3: Update Config Globally
 
 ```python
-from trnspot import config
+from genecircuitry import config
 
 # Update config for all subsequent calls
 config.update_config(
@@ -133,7 +133,7 @@ adata_qc = perform_qc(adata)
 ### Example 4: GRN Preprocessing with Config
 
 ```python
-from trnspot.preprocessing import perform_grn_pre_processing
+from genecircuitry.preprocessing import perform_grn_pre_processing
 
 # Uses all config defaults
 adata_grn = perform_grn_pre_processing(adata_qc)
@@ -152,7 +152,7 @@ adata_grn = perform_grn_pre_processing(
 ### Example 5: Configuration Profiles
 
 ```python
-from trnspot import config
+from genecircuitry import config
 
 def set_strict_qc_profile():
     """Profile for strict quality control"""
@@ -193,7 +193,7 @@ Configuration can be saved and shared to ensure identical analysis parameters.
 
 ```python
 import json
-from trnspot import config
+from genecircuitry import config
 
 # Save configuration
 with open('analysis_config.json', 'w') as f:
@@ -222,7 +222,7 @@ Config parameters are documented in one place.
 ### Old Code
 
 ```python
-from trnspot.preprocessing import perform_qc
+from genecircuitry.preprocessing import perform_qc
 
 # Had to specify all parameters
 adata_qc = perform_qc(
@@ -236,7 +236,7 @@ adata_qc = perform_qc(
 ### New Code - Option 1: Use Defaults
 
 ```python
-from trnspot.preprocessing import perform_qc
+from genecircuitry.preprocessing import perform_qc
 
 # Simply use defaults
 adata_qc = perform_qc(adata)
@@ -245,8 +245,8 @@ adata_qc = perform_qc(adata)
 ### New Code - Option 2: Update Config
 
 ```python
-from trnspot import config
-from trnspot.preprocessing import perform_qc
+from genecircuitry import config
+from genecircuitry.preprocessing import perform_qc
 
 # Set defaults once
 config.update_config(
@@ -262,7 +262,7 @@ adata_qc = perform_qc(adata)
 ### New Code - Option 3: Override Specific
 
 ```python
-from trnspot.preprocessing import perform_qc
+from genecircuitry.preprocessing import perform_qc
 
 # Override only what you need
 adata_qc = perform_qc(
@@ -299,4 +299,4 @@ Updated tests include:
 
 - `docs/CONFIG.md` - Complete configuration documentation
 - `examples/preprocessing_with_config.py` - Comprehensive examples
-- `trnspot/config.py` - Configuration module source
+- `genecircuitry/config.py` - Configuration module source

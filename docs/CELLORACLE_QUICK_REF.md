@@ -9,7 +9,7 @@ pip install celloracle
 ## Quick Start
 
 ```python
-from trnspot.celloracle_processing import *
+from genecircuitry.celloracle_processing import *
 
 # 1. Create Oracle
 oracle = create_oracle_object(adata, 'leiden', 'X_umap')
@@ -84,7 +84,7 @@ links = run_links(
 ## Config Parameters
 
 ```python
-from trnspot import config
+from genecircuitry import config
 
 config.update_config(
     GRN_N_JOBS=-1,           # Parallel jobs
