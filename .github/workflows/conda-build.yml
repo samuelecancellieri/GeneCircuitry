@@ -55,7 +55,7 @@ jobs:
 
       - name: Install velocyto
         run: |
-          pip install velocyto==0.17.17
+          conda install -y bioconda::velocyto.py
 
       - name: Install remaining requirements via pip
         run: |
