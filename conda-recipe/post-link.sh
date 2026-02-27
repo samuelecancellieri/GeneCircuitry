@@ -13,7 +13,6 @@ echo "    hotspotsc==1.1.3"
     --no-deps \
     --quiet \
     celloracle==0.18.0 \
-    hotspotsc==1.1.3 \
-    genomepy>=0.8.4
+    hotspotsc==1.1.3
 
 echo "==> [genecircuitry post-link] Done."
