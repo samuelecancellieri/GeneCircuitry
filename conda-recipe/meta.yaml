@@ -26,14 +26,14 @@ build:
 
 requirements:
   host:
-    - python >=3.9,<3.11
+    - python >=3.9,<3.10
     - pip
     - setuptools >=45
     - wheel
     - setuptools_scm >=6.2
     - cython                  # required to build compiled deps (numba, velocyto)
   run:
-    - python >=3.9,<3.11
+    - python >=3.9,<3.10
     # --- core numerical stack ---
     - numpy ==1.26.4          # pinned; matches requirements.txt
     - scipy

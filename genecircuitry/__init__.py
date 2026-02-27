@@ -45,12 +45,30 @@ def __getattr__(name):
 # These will only fail when actually accessed, not on `import genecircuitry`
 try:
     from . import celloracle_processing
-except ImportError:
+except ImportError as _co_err:
+    import warnings as _warnings
+    _warnings.warn(
+        f"CellOracle optional dependency could not be loaded — GRN inference will be unavailable.\n"
+        f"  Missing module: {_co_err.name!r}\n"
+        f"  Full error   : {_co_err}\n"
+        f"  To fix       : pip install celloracle",
+        ImportWarning,
+        stacklevel=2,
+    )
     celloracle_processing = None  # type: ignore[assignment]
 
 try:
     from . import hotspot_processing
-except ImportError:
+except ImportError as _hs_err:
+    import warnings as _warnings
+    _warnings.warn(
+        f"Hotspot optional dependency could not be loaded — gene-module detection will be unavailable.\n"
+        f"  Missing module: {_hs_err.name!r}\n"
+        f"  Full error   : {_hs_err}\n"
+        f"  To fix       : pip install hotspot-sc",
+        ImportWarning,
+        stacklevel=2,
+    )
     hotspot_processing = None  # type: ignore[assignment]
 
 # Import commonly used functions

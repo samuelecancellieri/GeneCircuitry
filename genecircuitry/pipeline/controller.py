@@ -1250,10 +1250,22 @@ def celloracle_pipeline(
             log_step(
                 "CellOracle",
                 "SKIPPED",
-                {"reason": "CellOracle not installed", "error": str(ie)},
+                {
+                    "reason": "CellOracle import failed",
+                    "missing_module": getattr(ie, "name", None),
+                    "error": str(ie),
+                },
             )
-            print("\n⚠ CellOracle not installed. Skipping GRN inference.")
-            print("  To install: pip install celloracle")
+            print("\n⚠ CellOracle could not be loaded — GRN inference skipped.")
+            print(f"  Missing module : {ie.name!r}")
+            print(f"  ImportError    : {ie}")
+            print("  To fix         : pip install celloracle")
+            print(
+                "  Note: if celloracle is already installed, one of its dependencies\n"
+                "        may be missing or incompatible. Run:\n"
+                "          python -c 'import celloracle'\n"
+                "        to reproduce the error outside of this pipeline."
+            )
             return None
     except Exception as e:
         log_error("CellOracle", e)
