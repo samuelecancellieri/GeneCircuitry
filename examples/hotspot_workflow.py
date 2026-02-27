@@ -100,7 +100,7 @@ sc.tl.umap(adata)
 
 # Leiden clustering
 print("  Performing Leiden clustering...")
-sc.tl.leiden(adata, resolution=1.0)
+sc.tl.leiden(adata, resolution=config.LEIDEN_RESOLUTION,flavor="igraph", n_iterations=2)
 n_clusters = len(adata.obs["leiden"].unique())
 print(f"    Identified {n_clusters} clusters")
 

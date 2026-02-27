@@ -372,7 +372,7 @@ def perform_dimensionality_reduction_clustering(
     print("Computed UMAP embedding")
 
     # Clustering
-    sc.tl.leiden(adata_cc, resolution=config.LEIDEN_RESOLUTION)
+    sc.tl.leiden(adata_cc, resolution=config.LEIDEN_RESOLUTION, flavor="igraph", n_iterations=2)
     print(f"Performed Leiden clustering with resolution {config.LEIDEN_RESOLUTION}")
 
     # Convert categorical columns for stratification compatibility

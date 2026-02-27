@@ -47,7 +47,6 @@ requirements:
     - velocyto.py ==0.17.17
     - fa2_modified
     - weasyprint
-    - genomepy
     # celloracle and hotspot are not on conda-forge/bioconda;
     # they are installed automatically via post-link.sh
 
@@ -64,7 +63,7 @@ test:
     # Confirm the CLI entry point is present and callable
     - genecircuitry --help
     # Integration test: paul15 dataset, stratification on cluster 7MEP
-    - genecircuitry --cluster-key-stratification paul15_clusters --clusters "7MEP"
+    - genecircuitry --cluster-key-stratification "paul15_clusters" --clusters "7MEP"
 
   requires:
     - pytest >=7.0.0
