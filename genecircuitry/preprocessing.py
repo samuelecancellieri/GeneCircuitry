@@ -1,5 +1,5 @@
 """
-Data preprocessing module for TRNspot
+Data preprocessing module for genecircuitry
 """
 
 import os
@@ -67,8 +67,8 @@ def perform_qc(
     Examples
     --------
     >>> import scanpy as sc
-    >>> from trnspot.preprocessing import perform_qc
-    >>> from trnspot import config
+    >>> from genecircuitry.preprocessing import perform_qc
+    >>> from genecircuitry import config
     >>>
     >>> # Use default config values
     >>> adata = sc.read_h5ad('data.h5ad')
@@ -273,8 +273,8 @@ def perform_normalization(adata: AnnData) -> AnnData:
     Examples
     --------
     >>> import scanpy as sc
-    >>> from trnspot.preprocessing import perform_normalization
-    >>> from trnspot import config
+    >>> from genecircuitry.preprocessing import perform_normalization
+    >>> from genecircuitry import config
     >>>
     >>> adata = sc.read_h5ad('data.h5ad')
     >>> adata_normalized = perform_normalization(adata)

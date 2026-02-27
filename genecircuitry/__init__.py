@@ -31,7 +31,7 @@ from . import plotting
 from . import logging_utils
 
 # Lazy import for pipeline module (avoids circular import since
-# controller.py imports from trnspot.config and trnspot.preprocessing)
+# controller.py imports from genecircuitry.config and genecircuitry.preprocessing)
 import importlib as _importlib
 
 
@@ -42,7 +42,7 @@ def __getattr__(name):
 
 
 # Lazy imports for optional dependencies (CellOracle, Hotspot)
-# These will only fail when actually accessed, not on `import trnspot`
+# These will only fail when actually accessed, not on `import genecircuitry`
 try:
     from . import celloracle_processing
 except ImportError:

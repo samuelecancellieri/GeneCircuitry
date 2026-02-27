@@ -3,7 +3,7 @@ Hotspot processing module for GeneCircuitry
 
 This module provides functions for Hotspot analysis of gene expression data.
 
-NOTE: Plotting functions have been moved to trnspot.plotting.hotspot_plots.
+NOTE: Plotting functions have been moved to genecircuitry.plotting.hotspot_plots.
 The functions here are kept for backward compatibility but delegate to the new module.
 """
 

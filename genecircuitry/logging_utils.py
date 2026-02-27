@@ -6,7 +6,7 @@ here to ensure errors/warnings are recorded in the pipeline's error.log
 and pipeline.log files regardless of which module raises them.
 
 The loggers are the same instances created by
-``trnspot.pipeline.controller.setup_logging`` — they share the
+``genecircuitry.pipeline.controller.setup_logging`` — they share the
 ``"pipeline"`` and ``"error"`` logger names so that handlers registered
 by the controller are reused automatically.
 """

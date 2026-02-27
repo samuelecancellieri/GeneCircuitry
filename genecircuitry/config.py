@@ -25,7 +25,7 @@ def set_random_seed(seed: int = RANDOM_SEED):
 
     Examples
     --------
-    >>> from trnspot.config import set_random_seed
+    >>> from genecircuitry.config import set_random_seed
     >>> set_random_seed(123)
     """
     np.random.seed(seed)
@@ -253,7 +253,7 @@ VERBOSE = True
 LOG_PATH = os.path.join(OUTPUT_DIR, "logs")
 """Directory for saving log files"""
 
-LOG_FILE = os.path.join(LOG_PATH, "trnspot_log.txt")
+LOG_FILE = os.path.join(LOG_PATH, "genecircuitry_log.txt")
 """Path to the main log file"""
 
 
@@ -284,7 +284,7 @@ def set_scanpy_settings():
 
     Examples
     --------
-    >>> from trnspot.config import set_scanpy_settings
+    >>> from genecircuitry.config import set_scanpy_settings
     >>> set_scanpy_settings()
     """
     try:
@@ -344,7 +344,7 @@ def get_config():
 
     Examples
     --------
-    >>> from trnspot.config import get_config
+    >>> from genecircuitry.config import get_config
     >>> config = get_config()
     >>> print(config['RANDOM_SEED'])
     42
@@ -430,7 +430,7 @@ def print_config():
 
     Examples
     --------
-    >>> from trnspot.config import print_config
+    >>> from genecircuitry.config import print_config
     >>> print_config()
     """
     config = get_config()
@@ -453,7 +453,7 @@ def update_config(**kwargs):
 
     Examples
     --------
-    >>> from trnspot.config import update_config
+    >>> from genecircuitry.config import update_config
     >>> update_config(RANDOM_SEED=123, QC_MIN_GENES=300)
     """
     global_vars = globals()

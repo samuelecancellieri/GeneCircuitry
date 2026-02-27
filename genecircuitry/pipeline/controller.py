@@ -10,10 +10,10 @@ This script runs the full analysis workflow:
 5. Gene module identification with Hotspot
 
 Usage:
-    python -m trnspot.pipeline --input data/paul15/paul15.h5 --output output
+    python -m genecircuitry.pipeline --input data/paul15/paul15.h5 --output output
 
 Or with default paths:
-    python -m trnspot.pipeline
+    python -m genecircuitry.pipeline
 """
 
 import os
@@ -29,7 +29,7 @@ import json
 import logging
 import traceback
 
-# Import TRNspot modules (use direct submodule imports to avoid circular import)
+# Import genecircuitry modules (use direct submodule imports to avoid circular import)
 from genecircuitry.config import set_random_seed, set_scanpy_settings
 from genecircuitry import config
 from genecircuitry.preprocessing import (
@@ -1606,22 +1606,22 @@ def main():
         epilog="""
 Examples:
   # Run with example dataset
-  python -m trnspot.pipeline
+  python -m genecircuitry.pipeline
   
   # Run with custom input
-  python -m trnspot.pipeline --input data/my_data.h5ad
+  python -m genecircuitry.pipeline --input data/my_data.h5ad
   
   # Skip specific analyses
-  python -m trnspot.pipeline --skip-celloracle --skip-hotspot
+  python -m genecircuitry.pipeline --skip-celloracle --skip-hotspot
   
   # Run stratified analysis
-  python -m trnspot.pipeline --cluster-key-stratification celltype
+  python -m genecircuitry.pipeline --cluster-key-stratification celltype
   
   # Run specific steps only
-  python -m trnspot.pipeline --steps load preprocessing clustering
+  python -m genecircuitry.pipeline --steps load preprocessing clustering
   
   # Custom configuration
-  python -m trnspot.pipeline --seed 123 --n-jobs 16
+  python -m genecircuitry.pipeline --seed 123 --n-jobs 16
         """,
     )
 

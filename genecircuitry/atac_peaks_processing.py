@@ -16,7 +16,7 @@ Typical workflow:
     7. Export enriched motif matrix as a PKL file
 
 Usage within GeneCircuitry pipeline:
-    from trnspot.atac_peaks_processing import process_atac_peaks
+    from genecircuitry.atac_peaks_processing import process_atac_peaks
     tf_info_path = process_atac_peaks("peaks.bed", species="human")
 """
 

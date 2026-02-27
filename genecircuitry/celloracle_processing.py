@@ -373,8 +373,8 @@ def perform_grn_pre_processing(
     Examples
     --------
     >>> import scanpy as sc
-    >>> from trnspot.celloracle_processing import perform_grn_pre_processing
-    >>> from trnspot import config
+    >>> from genecircuitry.celloracle_processing import perform_grn_pre_processing
+    >>> from genecircuitry import config
     >>>
     >>> # Use default config values
     >>> adata = sc.read_h5ad('data.h5ad')

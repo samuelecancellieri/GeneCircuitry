@@ -3,7 +3,7 @@ GRN Deep Analysis module for GeneCircuitry
 
 This module provides functions for deep analysis of Gene Regulatory Networks (GRN).
 
-NOTE: Plotting functions have been moved to trnspot.plotting.grn_plots.
+NOTE: Plotting functions have been moved to genecircuitry.plotting.grn_plots.
 The functions here are kept for backward compatibility but delegate to the new module.
 """
 
@@ -34,7 +34,7 @@ def _plot_exists(filepath: str, skip_existing: bool = True) -> bool:
     """
     Check if a plot file already exists.
 
-    DEPRECATED: Use trnspot.plotting.plot_exists instead.
+    DEPRECATED: Use genecircuitry.plotting.plot_exists instead.
 
     Args:
         filepath (str): Path to the plot file.
