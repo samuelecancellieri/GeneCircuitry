@@ -63,6 +63,8 @@ test:
   commands:
     # Confirm the CLI entry point is present and callable
     - genecircuitry --help
+    # Integration test: paul15 dataset, stratification on cluster 7MEP
+    - genecircuitry --cluster-key-stratification paul15_clusters --clusters "7MEP"
 
   requires:
     - pytest >=7.0.0
