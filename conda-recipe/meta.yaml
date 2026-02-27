@@ -47,7 +47,8 @@ requirements:
     - velocyto.py ==0.17.17
     - fa2_modified
     - weasyprint
-    # celloracle and hotspot are not on conda-forge/bioconda; install via pip post-install
+    # celloracle and hotspot are not on conda-forge/bioconda;
+    # they are installed automatically via post-link.sh
 
 
 test:
