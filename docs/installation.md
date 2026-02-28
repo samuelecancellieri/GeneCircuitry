@@ -72,7 +72,7 @@ pip install -e ".[dev]"
 
 ```python
 import genecircuitry
-print(genecircuitry.__version__)           # 0.1.0
+print(genecircuitry.__version__)           # 0.1.2
 
 # Check optional deps
 print(genecircuitry.celloracle_processing) # None if not installed

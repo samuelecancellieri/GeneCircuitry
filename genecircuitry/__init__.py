@@ -18,7 +18,11 @@ Modules
 - config: Central configuration and parameters
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PkgNotFound
+try:
+    __version__ = _pkg_version("genecircuitry")
+except _PkgNotFound:
+    __version__ = "0.1.2"  # fallback for editable / source installs
 __author__ = "Samuele Cancellieri"
 
 # Import core modules (always available)
