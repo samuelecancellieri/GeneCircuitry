@@ -9,8 +9,8 @@ Hotspot into a modular, checkpoint-enabled pipeline.
 Modules
 -------
 - preprocessing: Scanpy wrappers for QC and normalization
-- celloracle_processing: GRN inference with CellOracle (optional dep)
-- hotspot_processing: Gene module analysis with Hotspot (optional dep)
+- celloracle_processing: GRN inference with CellOracle
+- hotspot_processing: Gene module analysis with Hotspot
 - grn_deep_analysis: Network visualization and analysis
 - reporting: HTML and PDF report generation
 - plotting: Centralized plot generation with logging
@@ -18,7 +18,11 @@ Modules
 - config: Central configuration and parameters
 """
 
-from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PkgNotFound
+from importlib.metadata import (
+    version as _pkg_version,
+    PackageNotFoundError as _PkgNotFound,
+)
+
 try:
     __version__ = _pkg_version("genecircuitry")
 except _PkgNotFound:
@@ -33,6 +37,8 @@ from . import config
 from . import reporting
 from . import plotting
 from . import logging_utils
+from . import celloracle_processing
+from . import hotspot_processing
 
 # Lazy import for pipeline module (avoids circular import since
 # controller.py imports from genecircuitry.config and genecircuitry.preprocessing)
@@ -44,36 +50,6 @@ def __getattr__(name):
         return _importlib.import_module(".pipeline", __name__)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-
-# Lazy imports for optional dependencies (CellOracle, Hotspot)
-# These will only fail when actually accessed, not on `import genecircuitry`
-try:
-    from . import celloracle_processing
-except ImportError as _co_err:
-    import warnings as _warnings
-    _warnings.warn(
-        f"CellOracle optional dependency could not be loaded — GRN inference will be unavailable.\n"
-        f"  Missing module: {_co_err.name!r}\n"
-        f"  Full error   : {_co_err}\n"
-        f"  To fix       : pip install celloracle",
-        ImportWarning,
-        stacklevel=2,
-    )
-    celloracle_processing = None  # type: ignore[assignment]
-
-try:
-    from . import hotspot_processing
-except ImportError as _hs_err:
-    import warnings as _warnings
-    _warnings.warn(
-        f"Hotspot optional dependency could not be loaded — gene-module detection will be unavailable.\n"
-        f"  Missing module: {_hs_err.name!r}\n"
-        f"  Full error   : {_hs_err}\n"
-        f"  To fix       : pip install hotspot-sc",
-        ImportWarning,
-        stacklevel=2,
-    )
-    hotspot_processing = None  # type: ignore[assignment]
 
 # Import commonly used functions
 from .config import set_random_seed, set_scanpy_settings, get_config, print_config

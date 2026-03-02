@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "numpy>=1.20.0",
+    "numpy>=1.20.0,<2.0.0",
     "pandas>=1.3.0",
     "scanpy>=1.9.0",
     "anndata>=0.8.0",
@@ -31,18 +31,16 @@ dependencies = [
     "scipy>=1.7.0",
     "adjustText>=0.7.3",
     "networkx>=2.6.0",
+    "leidenalg",
+    "fa2-modified",
+    "celloracle>=0.18.0",
+    "hotspotsc>=1.1.3",
 ]
 
 [project.scripts]
 genecircuitry = "genecircuitry.pipeline.controller:main"
 
 [project.optional-dependencies]
-grn = [
-    "celloracle",
-]
-hotspot = [
-    "hotspotsc",
-]
 enrichment = [
     "gseapy>=1.0.0",
 ]
@@ -50,11 +48,12 @@ atac = [
     "genomepy",
     "gimmemotifs",
 ]
-plotting = [
-    "matplotlib",
+reporting = [
+    "weasyprint",
+    "pdfkit",
 ]
 all = [
-    "genecircuitry[grn,hotspot,enrichment,atac,plotting]",
+    "genecircuitry[enrichment,atac,reporting]",
 ]
 dev = [
     "pytest>=7.0.0",

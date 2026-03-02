@@ -228,6 +228,7 @@ def process_atac_peaks(
 
     # Load motifs
     from gimmemotifs.motif import default_motifs
+    import pickle
 
     if species.lower() in ["human", "mouse"]:
         motifs = default_motifs()
@@ -253,11 +254,17 @@ def process_atac_peaks(
     # Generate TF info dataframe
     tfi.make_TFinfo_dataframe_and_dictionary(verbose=True)
     df = tfi.to_dataframe()
+    df_dict = tfi.to_dictionary()
 
     # Save result as pickle
-    pkl_path = os.path.join(atac_output_dir, "enriched_atac_peaks.pkl")
+    pkl_path = os.path.join(atac_output_dir, "enriched_atac_peaks_df.pkl")
     df.to_pickle(pkl_path)
     print(f"  ✓ Enriched ATAC peaks saved to: {pkl_path}")
     print(f"  TF info matrix shape: {df.shape}")
 
-    return pkl_path
+    pkl_path_dict = os.path.join(atac_output_dir, "enriched_atac_peaks_dict.pkl")
+    with open(pkl_path_dict, "wb") as f:
+        pickle.dump(df_dict, f)
+    print(f"  ✓ Enriched ATAC peaks dictionary saved to: {pkl_path_dict}")
+
+    return pkl_path_dict

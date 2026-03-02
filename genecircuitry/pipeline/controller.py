@@ -403,6 +403,7 @@ class PipelineController:
                 embedding_name=self.args.embedding_grn,
                 TG_to_TF_dictionary=tf_dictionary,
                 skip_celloracle=self.args.skip_celloracle,
+                no_base_grn=self.args.no_base_grn,
                 log_dir=log_dir,
             )
             log_step("Controller.CellOracle", "COMPLETED")
@@ -1123,6 +1124,7 @@ def celloracle_pipeline(
     raw_count_layer="raw_counts",
     TG_to_TF_dictionary=None,
     skip_celloracle=False,
+    no_base_grn=False,
     log_dir=None,
 ):
     """Run CellOracle GRN inference pipeline."""
@@ -1200,6 +1202,7 @@ def celloracle_pipeline(
                 raw_count_layer=raw_count_layer,
                 species=species,
                 TG_to_TF_dictionary=TG_to_TF_dictionary,
+                no_base_grn=no_base_grn,
             )
             print("  ✓ Oracle object created")
             log_step("CellOracle.CreateObject", "COMPLETED")
@@ -1723,6 +1726,12 @@ Examples:
         help="Path to BED file with pre-called ATAC peaks. "
         "When provided, peaks are processed through CellOracle motif analysis "
         "to generate an enriched TF info matrix used as custom base GRN.",
+    )
+    parser.add_argument(
+        "--no-base-grn",
+        action="store_true",
+        default=False,
+        help="Do not use a base GRN (use if already provided)",
     )
 
     # Quality control parameters

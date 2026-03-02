@@ -86,6 +86,7 @@ def create_oracle_object(
     species: str = "human",
     TG_to_TF_dictionary: Optional[str] = None,
     raw_count_layer: Optional[str] = None,
+    no_base_grn: bool = False,
 ):
     """
     Creates an Oracle object for CellOracle analysis.
@@ -96,6 +97,10 @@ def create_oracle_object(
             - A dictionary mapping target genes to transcription factors, or
             - An enriched ATAC peaks DataFrame (from process_atac_peaks).
             The file is loaded and added via oracle.addTFinfo_dictionary().
+        no_base_grn (bool): If True, skip loading the species promoter base GRN.
+            In this case a TG_to_TF_dictionary (or ATAC peaks pkl) must be
+            provided to supply TF information; otherwise the Oracle object
+            will have no TF data at all. Default: False.
         cluster_column_name (str): Name of the column in `adata.obs`
             that contains cluster information.
         embedding_name (str): Name of the embedding to be used.
@@ -121,15 +126,6 @@ def create_oracle_object(
             .astype("category")
         )
 
-    # Load base GRN based on species
-    base_GRN = None
-    if species == "human":
-        base_GRN = co.data.load_human_promoter_base_GRN()
-    elif species == "mouse":
-        base_GRN = co.data.load_mouse_promoter_base_GRN()
-    else:
-        print("if species is not human or mouse " "no base GRN is loaded")
-
     # Create Oracle object
     oracle = co.Oracle()
 
@@ -151,12 +147,46 @@ def create_oracle_object(
             embedding_name=embedding_name,
         )
 
-    # Import base GRN
-    if base_GRN is not None:
-        oracle.import_TF_data(TF_info_matrix=base_GRN)
+    # Load base GRN based on species (skip when --no-base-grn is set)
+    base_GRN = None
+    if no_base_grn:
+        print(
+            "⊘ Skipping base GRN loading (--no-base-grn). "
+            "TF information must be supplied via TG_to_TF_dictionary or ATAC peaks."
+        )
+    elif species == "human":
+        base_GRN = co.data.load_human_promoter_base_GRN()
+    elif species == "mouse":
+        base_GRN = co.data.load_mouse_promoter_base_GRN()
+    else:
+        print("species is not human or mouse; no base GRN is loaded")
 
-    if TG_to_TF_dictionary:
-        print(f"Loading TG to TF dictionary from: {TG_to_TF_dictionary}")
+    # Import base GRN (skipped when no_base_grn=True)
+    if base_GRN is not None:
+        print(f"Importing base GRN for species: {species} from CellOracle data module")
+        oracle.import_TF_data(TF_info_matrix=base_GRN)
+    elif no_base_grn and TG_to_TF_dictionary is not None:
+        print(
+            f"Loading TG to TF dictionary from: {TG_to_TF_dictionary} and "
+            "importing as TF data since --no-base-grn is set"
+        )
+        TG_to_TF_dictionary_open = pickle.load(
+            open(
+                TG_to_TF_dictionary,
+                "rb",
+            )
+        )
+        oracle.import_TF_data(TFdict=TG_to_TF_dictionary_open)
+    elif no_base_grn and TG_to_TF_dictionary is None:
+        print(
+            "⚠ Warning: --no-base-grn is set but no TG_to_TF_dictionary "
+            "was provided. The Oracle object has no TF data."
+        )
+
+    if TG_to_TF_dictionary is not None and base_GRN is not None:
+        print(
+            f"Loading TG to TF dictionary from: {TG_to_TF_dictionary} to enhance base GRN"
+        )
         # Load the TG to TF dictionary
         TG_to_TF_dictionary = pickle.load(
             open(
