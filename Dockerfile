@@ -67,7 +67,10 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 # ── Step 1: Cython + numpy (must precede packages that build C extensions) ───
 RUN pip install --no-cache-dir \
         Cython \
-        "numpy==1.26.4"
+        "numpy==1.26.4" 
+
+RUN pip install --no-cache-dir \
+        "velocyto==0.17.17"
 
 # ── Step 2: celloracle (pinned; requires numpy<2 and Cython already present) ─
 RUN pip install --no-cache-dir \
