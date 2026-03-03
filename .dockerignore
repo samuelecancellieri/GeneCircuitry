@@ -1,0 +1,40 @@
+# version control
+.git
+.gitignore
+.github
+
+# Python caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# virtual environments
+.venv/
+venv/
+env/
+
+# large data / results (bind-mount at runtime instead)
+data/
+results/
+
+# docs / examples (not needed at runtime)
+docs/
+examples/
+
+# dev / CI files
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.log
+
+# editor / OS artefacts
+.DS_Store
+*.swp
+*.swo
