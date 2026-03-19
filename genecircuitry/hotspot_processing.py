@@ -437,6 +437,9 @@ def run_hotspot_analysis(
     module_scores = hotspot_obj.calculate_module_scores()
     print("  Module scores calculated")
 
+    # save hotspot results before plotting to ensure results are saved even if plotting fails
+    save_hotspot_results(hotspot_obj)
+
     # Generate all Hotspot plots using the new plotting module
     print("\n  Generating Hotspot visualizations...")
     plot_results = generate_all_hotspot_plots(
@@ -450,8 +453,6 @@ def run_hotspot_analysis(
     generated = [k for k, v in plot_results.items() if v is True]
     if generated:
         print(f"  Generated plots: {', '.join(generated)}")
-
-    save_hotspot_results(hotspot_obj)
 
     return hotspot_obj
 
