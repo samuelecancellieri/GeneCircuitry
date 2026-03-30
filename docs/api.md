@@ -1,7 +1,8 @@
 ---
 layout: default
 title: API Reference
-nav_order: 6
+nav_order: 2
+parent: Reference
 has_children: false
 ---
 

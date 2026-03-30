@@ -1,6 +1,12 @@
-<!-- TO REMOVE (from root): Dev notes — move to docs/dev/CONTROLLER_IMPLEMENTATION.md -->
+---
+layout: default
+title: Controller Implementation
+nav_order: 1
+parent: Dev Notes
+permalink: /GeneCircuitry/dev/controller-implementation/
+---
 
-# Pipeline Controller Implementation Summary
+# Pipeline Controller Implementation
 
 ## What Was Implemented
 
@@ -98,15 +104,10 @@ controller.run_stratified_pipeline_parallel(n_jobs=8)
   - 5 comprehensive usage examples
   - Production-ready code samples
 
-- `docs/PIPELINE_CONTROLLER_GUIDE.md` (420+ lines)
-  - Complete API documentation
+- `docs/pipeline.md`
+  - Complete API documentation (merged from PIPELINE_CONTROLLER_GUIDE.md + CONTROLLER_QUICK_REF.md)
   - Performance optimization guide
   - Troubleshooting section
-
-- `docs/CONTROLLER_QUICK_REF.md` (200+ lines)
-  - Quick reference guide
-  - Common use cases
-  - Command examples
 
 - `verify_controller.py`
   - Automated verification script
@@ -230,7 +231,7 @@ Expected output:
 ## Next Steps
 
 1. **Try Examples**: Run `examples/controller_usage_examples.py`
-2. **Read Guides**: Check `docs/PIPELINE_CONTROLLER_GUIDE.md`
+2. **Read Guides**: Check `docs/pipeline.md` (Pipeline Overview)
 3. **Run Pipeline**: Use new flags with your data
 4. **Optimize**: Tune `--n-jobs` for your system
 

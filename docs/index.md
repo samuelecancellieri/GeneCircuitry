@@ -1,38 +1,93 @@
 ---
 layout: home
-title: GeneCircuitry
+title: Home
 nav_order: 1
 ---
 
 # GeneCircuitry
 
-**Transcriptional Regulatory Network analysis for single-cell data**
+**Transcriptional Regulatory Network analysis for single-cell RNA-seq data**
 
-GeneCircuitry is a Python package that integrates [Scanpy](https://scanpy.readthedocs.io/), [CellOracle](https://celloracle.org/), and [Hotspot](https://hotspot.readthedocs.io/) into a modular, checkpoint-enabled pipeline for gene regulatory network (GRN) inference from single-cell RNA-seq data.
+GeneCircuitry is a Python package that integrates [Scanpy](https://scanpy.readthedocs.io/), [CellOracle](https://celloracle.org/), and [Hotspot](https://hotspot.readthedocs.io/) into a single **modular, checkpoint-enabled pipeline** for gene regulatory network (GRN) inference from single-cell data. Run the full workflow with one command, or execute individual steps selectively and resume from where you left off.
 
 ---
 
 ## What GeneCircuitry does
 
-| Step                                  | Tool                       | Output                                    |
-| ------------------------------------- | -------------------------- | ----------------------------------------- |
-| Quality control & normalization       | Scanpy                     | Filtered, normalized `AnnData`            |
-| Dimensionality reduction & clustering | Scanpy (PCA, UMAP, Leiden) | Cell embeddings + cluster labels          |
-| GRN inference                         | CellOracle                 | Per-cluster transcription factor networks |
-| Gene module identification            | Hotspot                    | Spatially autocorrelated gene modules     |
-| Visualization                         | NetworkX                   | Network plots, heatmaps, scatter plots    |
-| Reporting                             | Custom HTML/PDF engine     | Interactive analysis report               |
+| Step                                  | Tool                       | Output                                       |
+| ------------------------------------- | -------------------------- | -------------------------------------------- |
+| Quality control & normalization       | Scanpy                     | Filtered, normalized `AnnData`               |
+| Dimensionality reduction & clustering | Scanpy (PCA, UMAP, Leiden) | Cell embeddings + cluster labels             |
+| GRN inference                         | CellOracle                 | Per-cluster transcription factor networks    |
+| Gene module identification            | Hotspot                    | Spatially autocorrelated gene modules        |
+| Network visualization                 | NetworkX                   | Centrality plots, network graphs, rank plots |
+| Reporting                             | Built-in HTML/PDF engine   | Interactive analysis report                  |
+| Stratified analysis                   | `PipelineController`       | Per-cell-type parallel runs                  |
 
 ---
 
-## Quick navigation
+## Quick install
 
-- [Installation](installation/) — how to install GeneCircuitry and its dependencies
-- [Quick Start](quickstart/) — run your first analysis in minutes
-- [Architecture](architecture/) — understand the codebase design
-- [API Reference](api/) — module-level function documentation
-- [Configuration](configuration/) — all parameters in `genecircuitry/config.py`
-- [Contributing](contributing/) — how to extend GeneCircuitry
+```bash
+# Clone and install — core pipeline
+git clone https://github.com/samuelecancellieri/genecircuitry.git
+cd GeneCircuitry
+pip install -e .
+
+# With GRN inference + Hotspot modules
+pip install -e ".[grn,hotspot]"
+```
+
+See [Getting Started → Installation](installation/) for all install options, including conda/pixi and Docker.
+
+---
+
+## Run your first analysis
+
+```bash
+# Run the full pipeline on the bundled PBMC 3k demo dataset
+python run_complete_analysis.py
+
+# Run on your own data
+python run_complete_analysis.py --input my_data.h5ad --output results/
+
+# Run only specific steps
+python -m genecircuitry.pipeline --input my_data.h5ad --output results/ \
+    --steps load preprocessing clustering
+```
+
+See [Getting Started → Quick Start](quickstart/) for the full walkthrough.
+
+---
+
+## Documentation
+
+### Getting Started
+
+- [Installation](installation/) — pip, conda, pixi, Docker
+- [Quick Start](quickstart/) — CLI and Python API walkthrough
+
+### User Guide
+
+- [Pipeline Overview](pipeline/) — step names, CLI flags, parallel execution, architecture
+- [Preprocessing & QC](preprocessing/) — filtering, normalization, clustering
+- [GRN Inference](celloracle/) — CellOracle Oracle objects and link inference
+- [Gene Modules](hotspot/) — Hotspot autocorrelation and module detection
+- [Plotting System](plotting/) — `genecircuitry/plotting/` subpackage
+- [Reporting](reporting/) — HTML/PDF report generation
+- [Stratified Analysis](stratification/) — per-cluster parallel runs
+- [Checkpoints & Resume](checkpoints/) — auto-resume and checkpoint management
+
+### Reference
+
+- [Configuration](configuration/) — all `config.py` parameters
+- [API Reference](api/) — function signatures across all modules
+- [ATAC Peaks Processing](atac-peaks/) — BED → TF motif matrix for CellOracle
+
+### Other
+
+- [Architecture](architecture/) — codebase design, data flow, design patterns
+- [Contributing](contributing/) — code conventions, PR checklist
 
 ---
 
@@ -42,30 +97,30 @@ GeneCircuitry is a Python package that integrates [Scanpy](https://scanpy.readth
 AnnData (.h5ad)
     │
     ▼
-Preprocessing    ← genecircuitry/preprocessing.py
-(QC, normalize, HVG, PCA, clustering)
+[Preprocessing & QC]            genecircuitry/preprocessing.py
+  ├─ perform_qc()
+  ├─ perform_normalization()
+  └─ perform_dimensionality_reduction_clustering()
     │
-    ├──────────────────────┐
-    ▼                      ▼
-CellOracle GRN         Hotspot modules
-(celloracle_processing) (hotspot_processing)
-    │                      │
-    └──────────┬───────────┘
-               ▼
-          Deep Analysis    ← genecircuitry/grn_deep_analysis.py
-          (NetworkX plots)
-               │
-               ▼
-          HTML / PDF Report ← genecircuitry/reporting/
+    ▼  (checkpoint: preprocessed_adata.h5ad)
+    │
+    ├──────────────────────────────────────────────────┐
+    ▼                                                  │
+[Optional: Stratification]       split by cell type    │
+  └─ per-cluster AnnData objects                       │
+    │                                                  │
+    ├────────────────────────┐                         │
+    ▼                        ▼                         │
+[CellOracle GRN]        [Hotspot Modules]              │
+  create_oracle_object()  create_hotspot_object()      │
+  run_PCA()               run_hotspot_analysis()       │
+  run_KNN()                                            │
+  run_links()                                          │
+    │                        │                         │
+    └────────────┬───────────┘                         │
+                 ▼                                     │
+         [GRN Deep Analysis]   genecircuitry/grn_deep_analysis.py
+         [Reporting]           genecircuitry/reporting/ → HTML + PDF
+                 ▲
+                 └─────────────────────────────────────┘
 ```
-
----
-
-## Quick install
-
-```bash
-pip install -e ".[grn,hotspot]"   # with CellOracle + Hotspot
-pip install -e "."                # core only
-```
-
-See [Installation](installation/) for full instructions.

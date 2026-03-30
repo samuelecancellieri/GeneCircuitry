@@ -1,9 +1,9 @@
 # ============================================================
 # GeneCircuitry Docker Image
-# Base: continuumio/miniforge3 (conda-forge + bioconda ready)
+# Base: condaforge/miniforge3 (conda-forge + bioconda ready)
 # Usage: docker run samuelecancellieri/genecircuitry --help
 # ============================================================
-FROM continuumio/miniforge3:latest
+FROM condaforge/miniforge3:latest
 
 LABEL maintainer="Samuele Cancellieri <samuelc@uio.no>" \
       description="GeneCircuitry – transcriptional regulatory network analysis" \

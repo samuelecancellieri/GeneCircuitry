@@ -1,4 +1,10 @@
-<!-- TO REMOVE (from root): Dev notes — move to docs/dev/LOGGING_SYSTEM.md -->
+---
+layout: default
+title: Logging System
+nav_order: 2
+parent: Dev Notes
+permalink: /GeneCircuitry/dev/logging-system/
+---
 
 # GeneCircuitry Logging System
 

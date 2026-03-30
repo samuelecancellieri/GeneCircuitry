@@ -36,6 +36,17 @@ footer_content: >
 last_edit_timestamp: true
 last_edit_time_format: "%b %e %Y at %I:%M %p"
 
+callouts:
+  note:
+    title: Note
+    color: blue
+  warning:
+    title: Warning
+    color: yellow
+  important:
+    title: Important
+    color: red
+
 plugins:
   - jekyll-remote-theme
   - jekyll-seo-tag

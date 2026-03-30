@@ -1,12 +1,14 @@
 ---
 layout: default
 title: Architecture
-nav_order: 4
+nav_order: 7
 ---
 
 # Architecture
 
 {: .no_toc }
+
+Overview of the codebase design, key components, and the patterns used throughout GeneCircuitry.
 
 ## Table of contents
 
@@ -14,6 +16,36 @@ nav_order: 4
 
 1. TOC
    {:toc}
+
+---
+
+## Package layout
+
+```
+genecircuitry/
+├── __init__.py                  # Package exports; optional deps wrapped in try/except
+├── config.py                    # Central config — single source of truth for all parameters
+├── preprocessing.py             # QC, normalization, clustering (Scanpy wrappers)
+├── celloracle_processing.py     # GRN inference (optional dep: celloracle)
+├── hotspot_processing.py        # Gene module detection (optional dep: hotspot-sc)
+├── grn_deep_analysis.py         # NetworkX GRN visualisation
+├── atac_peaks_processing.py     # ATAC peak → TF motif matrix (optional dep: genomepy, gimmemotifs)
+├── enrichment_analysis.py       # ORA enrichment via gseapy (optional dep)
+├── logging_utils.py             # Internal logging helpers
+├── pipeline/
+│   ├── __init__.py              # Exports PipelineController, log_step, log_error
+│   └── controller.py           # PipelineController class — central orchestrator
+├── plotting/
+│   ├── __init__.py
+│   ├── qc_plots.py             # Canonical QC violin/scatter plots
+│   ├── grn_plots.py            # GRN network graphs, centrality heatmaps
+│   ├── hotspot_plots.py        # Hotspot module heatmaps, score violins
+│   └── utils.py                # save_plot(), plot_exists()
+└── reporting/
+    ├── __init__.py              # generate_report() entry point
+    ├── generator.py            # ReportGenerator class (HTML + PDF)
+    └── sections.py             # Section builders (data summary, QC, GRN, Hotspot…)
+```
 
 ---
 

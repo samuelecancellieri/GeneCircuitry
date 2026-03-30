@@ -1,6 +1,12 @@
-<!-- TO REMOVE (from root): Dev notes — move to docs/dev/PARALLEL_PROCESSING_FIX.md -->
+---
+layout: default
+title: Parallel Processing Fix
+nav_order: 3
+parent: Dev Notes
+permalink: /GeneCircuitry/dev/parallel-processing-fix/
+---
 
-# Parallel Processing Fix - multiprocess Integration
+# Parallel Processing Fix — multiprocess Integration
 
 ## Problem Solved
 
