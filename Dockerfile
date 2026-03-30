@@ -27,6 +27,7 @@ RUN conda install -y -n base \
         "seaborn>=0.11.0" \
         "scipy>=1.7.0" \
         "networkx>=2.6.0" \
+        "velocyto.py>=0.17.17" \
         leidenalg \
         pip \
     && conda clean -afy
