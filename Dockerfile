@@ -10,7 +10,7 @@ LABEL maintainer="Samuele Cancellieri <samuelc@uio.no>" \
       version="0.1.6"
 
 # ── Activate strict channel priority for reproducibility ─────────────────────
-RUN conda config --system --set channel_priority strict
+# RUN conda config --system --set channel_priority strict
 
 # ── Step 1: conda-available core dependencies ────────────────────────────────
 # All packages listed here are available on conda-forge or bioconda.
