@@ -28,13 +28,13 @@ RUN conda install -y -n base \
         "scipy>=1.7.0" \
         "networkx>=2.6.0" \
         leidenalg \
-        "adjusttext>=0.7.3" \
-        fa2_modified \
         pip \
     && conda clean -afy
 
 # ── Step 2: pip-only dependencies (not on conda-forge / bioconda) ─────────────
 RUN pip install --no-cache-dir \
+        "adjustText>=0.7.3" \
+        "fa2-modified" \
         "celloracle==0.18.0" \
         "hotspotsc==1.1.3"
 
