@@ -17,7 +17,7 @@ RUN conda install -y -n base \
         -c bioconda \
         "python>=3.9,<3.11" \
         "numpy>=1.20.0,<2.0.0" \
-        "pandas>=1.3.0" \
+        "pandas>=1.0.3,<=1.5.3" \
         "scanpy>=1.9.0" \
         "anndata>=0.8.0" \
         "matplotlib>=3.6.3" \
