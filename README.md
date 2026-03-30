@@ -1,10 +1,10 @@
-# GeneCircuitry
+# genecircuitry
 
 A Python package for transcriptional regulatory network analysis.
 
 ## Installation
 
-GeneCircuitry requires **Python >=3.9, <3.11**. Most dependencies are available
+genecircuitry requires **Python >=3.9, <3.11**. Most dependencies are available
 on [conda-forge](https://conda-forge.org/) and [bioconda](https://bioconda.github.io/).
 Two optional analysis engines — [CellOracle](https://github.com/morris-lab/CellOracle)
 and [hotspotsc](https://github.com/YosefLab/Hotspot) — are **only available via pip**
@@ -24,7 +24,7 @@ curl -fsSL https://pixi.sh/install.sh | bash
 
 # Clone the repository
 git clone https://github.com/samuelecancellieri/genecircuitry.git
-cd GeneCircuitry
+cd genecircuitry
 
 # Create the environment and install all dependencies (conda + pip) in one step
 pixi install
@@ -47,16 +47,16 @@ pixi shell
 
 ### Option 2 — Conda
 
-Install GeneCircuitry and its conda-available dependencies from
+Install genecircuitry and its conda-available dependencies from
 [bioconda](https://bioconda.github.io/) and [conda-forge](https://conda-forge.org/),
 then install the pip-only dependencies manually.
 
 ```bash
-# 1. Create a fresh environment (Python 3.10 is recommended)
-conda create -n genecircuitry python=3.10
+# 1. Create a fresh environment (Python 3.9 is recommended)
+conda create -n genecircuitry python=3.9
 conda activate genecircuitry
 
-# 2. Install GeneCircuitry and all conda-available dependencies
+# 2. Install genecircuitry and all conda-available dependencies
 conda install -c bioconda -c conda-forge genecircuitry
 
 # 3. Install the pip-only optional analysis engines
@@ -74,7 +74,7 @@ pip install celloracle==0.18.0 hotspotsc==1.1.3
 ```bash
 # Clone the repository
 git clone https://github.com/samuelecancellieri/genecircuitry.git
-cd GeneCircuitry
+cd genecircuitry
 
 # Create and activate a virtual environment
 python -m venv venv
@@ -113,7 +113,7 @@ Build the image locally from source:
 
 ```bash
 git clone https://github.com/samuelecancellieri/genecircuitry.git
-cd GeneCircuitry
+cd genecircuitry
 docker build -t genecircuitry .
 docker run --rm genecircuitry --help
 ```
