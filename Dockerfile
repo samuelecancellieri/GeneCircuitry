@@ -31,6 +31,9 @@ RUN conda install -y -n base \
 
 # ── Step 2: pip-only packages (PyPI only — not on conda-forge/bioconda) ───────
 RUN pip install --no-cache-dir \
+        "velocyto>=0.17.17"
+
+RUN pip install --no-cache-dir \
         "fa2-modified" \
         "celloracle==0.18.0" \
         "hotspotsc==1.1.3"
