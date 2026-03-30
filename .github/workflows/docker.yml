@@ -59,7 +59,7 @@ jobs:
             org.opencontainers.image.title=GeneCircuitry
             org.opencontainers.image.description=Transcriptional regulatory network analysis pipeline
             org.opencontainers.image.authors=Samuele Cancellieri <samuelc@uio.no>
-            org.opencontainers.image.source=https://github.com/samuelecancellieri/GeneCircuitry
+            org.opencontainers.image.source=https://github.com/samuelecancellieri/genecircuitry
             org.opencontainers.image.licenses=MIT
 
       # ── 6. Build and push ─────────────────────────────────────────────────

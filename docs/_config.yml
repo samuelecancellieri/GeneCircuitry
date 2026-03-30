@@ -21,7 +21,7 @@ heading_anchors: true
 
 aux_links:
   "View on GitHub":
-    - "https://github.com/samuelecancellieri/GeneCircuitry"
+    - "https://github.com/samuelecancellieri/genecircuitry"
 
 aux_links_new_tab: true
 
@@ -31,7 +31,7 @@ back_to_top_text: "Back to top"
 
 footer_content: >
   GeneCircuitry &nbsp;·&nbsp; MIT License &nbsp;·&nbsp;
-  <a href="https://github.com/samuelecancellieri/GeneCircuitry">GitHub</a>
+  <a href="https://github.com/samuelecancellieri/genecircuitry">GitHub</a>
 
 last_edit_timestamp: true
 last_edit_time_format: "%b %e %Y at %I:%M %p"

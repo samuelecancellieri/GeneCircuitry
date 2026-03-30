@@ -27,7 +27,7 @@ nav_order: 2
 ## From source (recommended)
 
 ```bash
-git clone https://github.com/samuelecancellieri/GeneCircuitry.git
+git clone https://github.com/samuelecancellieri/genecircuitry.git
 cd GeneCircuitry
 
 # Create a virtual environment

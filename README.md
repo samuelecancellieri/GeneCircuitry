@@ -4,22 +4,118 @@ A Python package for transcriptional regulatory network analysis.
 
 ## Installation
 
-### From source
+GeneCircuitry requires **Python >=3.9, <3.11**. Most dependencies are available
+on [conda-forge](https://conda-forge.org/) and [bioconda](https://bioconda.github.io/).
+Two optional analysis engines — [CellOracle](https://github.com/morris-lab/CellOracle)
+and [hotspotsc](https://github.com/YosefLab/Hotspot) — are **only available via pip**
+and must be installed as a separate step after the conda environment is set up.
+
+---
+
+### Option 1 — Pixi (recommended)
+
+[Pixi](https://prefix.dev/docs/pixi/overview) manages conda and pip dependencies
+together in a single reproducible environment. It is the easiest and cleanest way
+to get a fully working installation.
+
+```bash
+# Install pixi (one-time, see https://prefix.dev/docs/pixi/installation)
+curl -fsSL https://pixi.sh/install.sh | bash
+
+# Clone the repository
+git clone https://github.com/samuelecancellieri/genecircuitry.git
+cd GeneCircuitry
+
+# Create the environment and install all dependencies (conda + pip) in one step
+pixi install
+
+# Run the pipeline inside the pixi environment
+pixi run run
+
+# Or drop into an interactive shell
+pixi shell
+```
+
+> **Developer environment** (adds pytest, black, flake8, mypy):
+>
+> ```bash
+> pixi install -e dev
+> pixi run -e dev test
+> ```
+
+---
+
+### Option 2 — Conda
+
+Install GeneCircuitry and its conda-available dependencies from
+[bioconda](https://bioconda.github.io/) and [conda-forge](https://conda-forge.org/),
+then install the pip-only dependencies manually.
+
+```bash
+# 1. Create a fresh environment (Python 3.10 is recommended)
+conda create -n genecircuitry python=3.10
+conda activate genecircuitry
+
+# 2. Install GeneCircuitry and all conda-available dependencies
+conda install -c bioconda -c conda-forge genecircuitry
+
+# 3. Install the pip-only optional analysis engines
+#    (CellOracle for GRN inference, hotspotsc for gene modules)
+pip install celloracle==0.18.0 hotspotsc==1.1.3
+```
+
+> Skip step 3 if you only need preprocessing/QC and do not require GRN inference
+> or gene module analysis.
+
+---
+
+### Option 3 — pip / venv
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/genecircuitry.git
-cd genecircuitry
+git clone https://github.com/samuelecancellieri/genecircuitry.git
+cd GeneCircuitry
 
-# Create and activate virtual environment
+# Create and activate a virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install the package in development mode
+# Install the package with all optional dependencies
+pip install -e ".[grn,hotspot]"
+
+# Or install core only (no CellOracle / hotspotsc)
 pip install -e .
 
-# Or install with development dependencies
+# Install with development dependencies
 pip install -e ".[dev]"
+```
+
+---
+
+### Option 4 — Docker
+
+A pre-built image is available that ships all dependencies (including CellOracle
+and hotspotsc) and works out of the box:
+
+```bash
+# Pull and run (bind-mount your data and output directories)
+docker run --rm \
+    -v /path/to/your/data:/data \
+    -v /path/to/output:/output \
+    samuelecancellieri/genecircuitry:latest \
+    --input /data/your_data.h5ad --output /output
+
+# Check available options
+docker run --rm samuelecancellieri/genecircuitry:latest --help
+```
+
+Build the image locally from source:
+
+```bash
+git clone https://github.com/samuelecancellieri/genecircuitry.git
+cd GeneCircuitry
+docker build -t genecircuitry .
+docker run --rm genecircuitry --help
 ```
 
 ## Quick Start

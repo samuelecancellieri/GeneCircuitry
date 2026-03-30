@@ -20,7 +20,7 @@ nav_order: 7
 ## Setup for development
 
 ```bash
-git clone https://github.com/samuelecancellieri/GeneCircuitry.git
+git clone https://github.com/samuelecancellieri/genecircuitry.git
 cd GeneCircuitry
 python -m venv venv && source venv/bin/activate
 pip install -e ".[dev,grn,hotspot]"
