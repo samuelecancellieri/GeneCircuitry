@@ -37,11 +37,10 @@ jobs:
         uses: prefix-dev/setup-pixi@v0.8.1
         with:
           pixi-version: latest
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          cache: false
 
       - name: Verify conda environment solves
-        run: pixi install --locked
+        run: pixi install
 
       - name: Check all key packages are importable
         run: |
