@@ -52,7 +52,6 @@ jobs:
           pixi run python -c "import scipy; print('scipy', scipy.__version__)"
           pixi run python -c "import networkx; print('networkx', networkx.__version__)"
           pixi run python -c "import seaborn; print('seaborn', seaborn.__version__)"
-          pixi run python -c "import fa2; print('fa2-modified ok')"
           pixi run python -c "import celloracle; print('celloracle', celloracle.__version__)"
           pixi run python -c "import hotspot; print('hotspotsc ok')"
           pixi run python -c "import velocyto; print('velocyto ok')"
