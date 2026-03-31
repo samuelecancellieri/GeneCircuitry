@@ -48,9 +48,7 @@ setuptools = ">=62.1.0,<81.0.0"
 no-build-isolation = ["velocyto"]
 
 # ── Install genecircuitry itself in editable mode from this source tree ───────
-# Uncomment one of the lines below depending on your use case:
-#   genecircuitry = { path = ".", editable = true }   # development (editable)
-#   genecircuitry = { path = "." }                    # non-editable local install
+genecircuitry = { path = ".", editable = true }
 
 # ── Development feature (pytest, linting, type checking) ─────────────────────
 [feature.dev.dependencies]
