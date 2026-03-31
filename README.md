@@ -102,11 +102,11 @@ and hotspotsc) and works out of the box:
 docker run --rm \
     -v /path/to/your/data:/data \
     -v /path/to/output:/output \
-    samuelecancellieri/genecircuitry:latest \
+    zanathos/genecircuitry:latest \
     --input /data/your_data.h5ad --output /output
 
 # Check available options
-docker run --rm samuelecancellieri/genecircuitry:latest --help
+docker run --rm zanathos/genecircuitry:latest --help
 ```
 
 Build the image locally from source:
