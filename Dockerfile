@@ -29,6 +29,7 @@ RUN conda install -y -n base \
         "cython" \
         "setuptools>=62.1.0" \
         "pango" \
+        "gcc_linux-64" \
         "pip" \
     && conda clean -afy
 
