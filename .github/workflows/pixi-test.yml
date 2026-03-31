@@ -1,0 +1,65 @@
+name: Test pixi environment
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "pixi.toml"
+      - "pyproject.toml"
+      - ".github/workflows/pixi-test.yml"
+  pull_request:
+    paths:
+      - "pixi.toml"
+      - "pyproject.toml"
+      - ".github/workflows/pixi-test.yml"
+  workflow_dispatch:
+
+jobs:
+  pixi-install:
+    name: Install & test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system build deps (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc g++ gsl-bin libgsl-dev libgomp1 zlib1g-dev
+
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+
+      - name: Verify conda environment solves
+        run: pixi install
+
+      - name: Check all key packages are importable
+        run: |
+          pixi run python -c "import numpy; print('numpy', numpy.__version__)"
+          pixi run python -c "import pandas; print('pandas', pandas.__version__)"
+          pixi run python -c "import scanpy; print('scanpy', scanpy.__version__)"
+          pixi run python -c "import anndata; print('anndata', anndata.__version__)"
+          pixi run python -c "import matplotlib; print('matplotlib', matplotlib.__version__)"
+          pixi run python -c "import scipy; print('scipy', scipy.__version__)"
+          pixi run python -c "import networkx; print('networkx', networkx.__version__)"
+          pixi run python -c "import seaborn; print('seaborn', seaborn.__version__)"
+          pixi run python -c "import fa2; print('fa2-modified ok')"
+          pixi run python -c "import celloracle; print('celloracle', celloracle.__version__)"
+          pixi run python -c "import hotspot; print('hotspotsc ok')"
+          pixi run python -c "import velocyto; print('velocyto ok')"
+          pixi run python -c "import weasyprint; print('weasyprint ok')"
+
+      - name: Install genecircuitry in editable mode
+        run: pixi run pip install --no-deps -e .
+
+      - name: Run test suite
+        run: pixi run test
