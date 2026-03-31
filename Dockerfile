@@ -38,7 +38,7 @@ RUN conda install -y -n base \
         "leidenalg" \
         "adjusttext>=0.7.3" \
         "cython" \
-        "setuptools>=62.1.0" \
+        "setuptools>=62.1.0,<81.0.0" \
         "pango" \
         "pip" \
         && conda clean -afy
