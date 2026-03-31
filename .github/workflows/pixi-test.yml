@@ -38,9 +38,10 @@ jobs:
         with:
           pixi-version: latest
           cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Verify conda environment solves
-        run: pixi install
+        run: pixi install --locked
 
       - name: Check all key packages are importable
         run: |
