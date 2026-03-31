@@ -3,7 +3,6 @@ cython
 wheel
 numpy==1.26.4
 celloracle==0.18.0
-igraph>=0.9,<0.10
 leidenalg
 hotspotsc==1.1.3
 adjustText
