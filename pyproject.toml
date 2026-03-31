@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=62.1.0,<81.0.0", "wheel", "setuptools_scm[toml]>=6.2", "Cython"]
+requires = ["setuptools>=62.1.0,<81.0.0", "wheel", "setuptools_scm[toml]>=6.2", "Cython","cython"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -32,7 +32,9 @@ dependencies = [
     "adjustText>=0.7.3",
     "networkx>=2.6.0",
     "leidenalg",
-    "fa2-modified"
+    "fa2-modified",
+    "gseapy>=1.0.0",
+    "genomepy",
 ]
 
 [project.scripts]

@@ -1,4 +1,6 @@
 Cython
+cython
+wheel
 numpy==1.26.4
 celloracle==0.18.0
 leidenalg

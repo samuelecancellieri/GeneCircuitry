@@ -18,6 +18,7 @@ seaborn = ">=0.11.0"
 scipy = ">=1.7.0"
 networkx = ">=2.6.0"
 leidenalg = "*"
+gseapy = "*"
 adjusttext = ">=0.7.3"
 # velocyto build deps (setup.py imports numpy + cython at build time)
 cython = "*"
@@ -35,6 +36,7 @@ pip = "*"
 # pixi resolves these via pip inside the conda environment, which is safe
 # and does not affect conda package metadata.
 [pypi-dependencies]
+wheel
 velocyto = ">=0.17.17"
 celloracle = "==0.18.0"
 hotspotsc = "==1.1.3"
