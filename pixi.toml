@@ -21,6 +21,9 @@ leidenalg = "*"
 adjusttext = ">=0.7.3"
 # velocyto build deps (setup.py imports numpy + cython at build time)
 cython = "*"
+# Ensure the conda env's libstdc++ is used instead of the (older) system one.
+# Prevents GLIBCXX_3.4.30 not found errors from scipy/numpy native extensions.
+libstdcxx-ng = ">=12"
 # <81.0.0: setuptools 81+ has breaking changes around pkg_resources and namespace packages
 setuptools = ">=62.1.0,<81.0.0"
 # weasyprint system libraries for PDF export
