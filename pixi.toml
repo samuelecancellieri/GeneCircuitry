@@ -36,7 +36,6 @@ pip = "*"
 # pixi resolves these via pip inside the conda environment, which is safe
 # and does not affect conda package metadata.
 [pypi-dependencies]
-wheel = "*"
 velocyto = ">=0.17.17"
 celloracle = "==0.18.0"
 hotspotsc = "==1.1.3"
