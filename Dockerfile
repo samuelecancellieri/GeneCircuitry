@@ -17,6 +17,7 @@ RUN apt-get update && \
         gsl-bin \
         libgsl-dev \
         libgomp1 \
+        zlib1g-dev \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ── Step 1: all conda-installable dependencies ───────────────────────────────
