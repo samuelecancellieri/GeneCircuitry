@@ -60,6 +60,12 @@ black = ">=22.0.0"
 flake8 = ">=4.0.0"
 mypy = ">=0.950"
 
+[feature.dev.tasks]
+test = "pytest tests/ -v"
+lint = "flake8 genecircuitry/"
+format = "black genecircuitry/"
+typecheck = "mypy genecircuitry/"
+
 # ── Environments ──────────────────────────────────────────────────────────────
 [environments]
 default = { features = [], solve-group = "default" }
@@ -67,8 +73,4 @@ dev = { features = ["dev"], solve-group = "default" }
 
 # ── Tasks ─────────────────────────────────────────────────────────────────────
 [tasks]
-test = "pytest tests/ -v"
-lint = "flake8 genecircuitry/"
-format = "black genecircuitry/"
-typecheck = "mypy genecircuitry/"
 run = "genecircuitry --help"

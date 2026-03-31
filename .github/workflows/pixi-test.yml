@@ -58,7 +58,7 @@ jobs:
           pixi run python -c "import weasyprint; print('weasyprint ok')"
 
       - name: Install genecircuitry in editable mode
-        run: pixi run pip install --no-deps -e .
+        run: pixi run --environment dev pip install --no-deps -e .
 
       - name: Run test suite
-        run: pixi run test
+        run: pixi run --environment dev test
