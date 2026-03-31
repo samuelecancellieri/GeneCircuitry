@@ -3,8 +3,23 @@ name: Conda Build
 on:
   push:
     branches: ["main"]
+    paths:
+      - "genecircuitry/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "conda-recipe/**"
+      - ".github/workflows/conda-build.yml"
   pull_request:
     branches: ["main"]
+    paths:
+      - "genecircuitry/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "conda-recipe/**"
+      - ".github/workflows/conda-build.yml"
+  workflow_dispatch:
 
 jobs:
   conda-build:

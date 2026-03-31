@@ -4,11 +4,15 @@ on:
   push:
     branches: ["main"]
     paths:
+      - "genecircuitry/**"
+      - "tests/**"
       - "pixi.toml"
       - "pyproject.toml"
       - ".github/workflows/pixi-test.yml"
   pull_request:
     paths:
+      - "genecircuitry/**"
+      - "tests/**"
       - "pixi.toml"
       - "pyproject.toml"
       - ".github/workflows/pixi-test.yml"

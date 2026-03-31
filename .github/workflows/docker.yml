@@ -4,12 +4,14 @@ on:
   push:
     branches: ["main"]
     paths:
+      - "genecircuitry/**"
       - "Dockerfile"
       - "pyproject.toml"
       - ".github/workflows/docker.yml"
   pull_request:
     branches: ["main"]
     paths:
+      - "genecircuitry/**"
       - "Dockerfile"
       - "pyproject.toml"
       - ".github/workflows/docker.yml"
