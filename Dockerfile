@@ -41,6 +41,8 @@ RUN conda install -y -n base \
         "setuptools>=62.1.0,<81.0.0" \
         "pango" \
         "pip" \
+        "gseapy>=1.0.0" \
+        "genomepy" \
         && conda clean -afy
 
 # ── Step 2: pip-only packages (PyPI only — not on conda-forge/bioconda) ───────
