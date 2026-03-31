@@ -6,8 +6,18 @@
 FROM condaforge/miniforge3:latest
 
 LABEL maintainer="Samuele Cancellieri <samuelc@uio.no>" \
-      description="GeneCircuitry – transcriptional regulatory network analysis" \
-      version="0.1.6"
+        description="GeneCircuitry – transcriptional regulatory network analysis" \
+        version="0.1.6"
+
+
+RUN apt-get update && \
+        apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
+        gsl-bin \
+        libgsl-dev \
+        libgomp1 \
+        && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ── Step 1: all conda-installable dependencies ───────────────────────────────
 # Mirrors pixi.toml [dependencies]. No strict channel priority to avoid
@@ -29,15 +39,14 @@ RUN conda install -y -n base \
         "cython" \
         "setuptools>=62.1.0" \
         "pango" \
-        "gcc_linux-64" \
         "pip" \
-    && conda clean -afy
+        && conda clean -afy
 
 # ── Step 2: pip-only packages (PyPI only — not on conda-forge/bioconda) ───────
 # velocyto's setup.py imports numpy and cython at build time; use
 # --no-build-isolation so the build inherits them from the conda env above.
 RUN pip install --no-cache-dir wheel && \
-    pip install --no-cache-dir --no-build-isolation \
+        pip install --no-cache-dir --no-build-isolation \
         "velocyto>=0.17.17"
 
 RUN pip install --no-cache-dir \
