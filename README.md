@@ -29,8 +29,11 @@ cd genecircuitry
 # Create the environment and install all dependencies (conda + pip) in one step
 pixi install
 
-# Run the pipeline inside the pixi environment
+# Run the pipeline inside the pixi environment (genecircuitry --help)
 pixi run run
+
+# Run the pipeline inside the pixi environment (genecircuitry test pipeline)
+pixi run genecircuitry
 
 # Or drop into an interactive shell
 pixi shell
