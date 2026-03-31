@@ -41,14 +41,13 @@ weasyprint = ">=52.5"
 # which requires setuptools to be present in the pip layer as well.
 # <81.0.0: setuptools 81+ has breaking changes around pkg_resources and namespace packages
 setuptools = ">=62.1.0,<81.0.0"
+# Install genecircuitry itself in editable mode from this source tree
+genecircuitry = { path = ".", editable = true }
 
 # velocyto's setup.py imports numpy at the top level, which breaks PEP 517
 # isolated builds. Disable isolation so the conda env's numpy/cython are used.
 [pypi-options]
 no-build-isolation = ["velocyto"]
-
-# ── Install genecircuitry itself in editable mode from this source tree ───────
-genecircuitry = { path = ".", editable = true }
 
 # ── Development feature (pytest, linting, type checking) ─────────────────────
 [feature.dev.dependencies]
