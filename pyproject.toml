@@ -31,7 +31,7 @@ dependencies = [
     "scipy>=1.7.0",
     "adjustText>=0.7.3",
     "networkx>=2.6.0",
-    "igraph>=0.10.1",
+    "igraph>=0.9,<0.10",
     "leidenalg",
     "fa2-modified",
     "gseapy>=1.0.0",
