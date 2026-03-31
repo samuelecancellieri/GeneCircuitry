@@ -1410,7 +1410,7 @@ def hotspot_pipeline(
                 {"reason": "Hotspot not installed", "error": str(ie)},
             )
             print("\n⚠ Hotspot not installed. Skipping module identification.")
-            print("  To install: pip install hotspot-sc")
+            print("  To install: pip install hotspotsc")
             return None
     except Exception as e:
         log_error("Hotspot", e)

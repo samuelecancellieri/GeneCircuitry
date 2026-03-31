@@ -58,7 +58,7 @@ pip install -e ".[dev]"
 | Extra        | Packages                            | Description                  |
 | ------------ | ----------------------------------- | ---------------------------- |
 | `grn`        | `celloracle`                        | GRN inference via CellOracle |
-| `hotspot`    | `hotspot-sc`                        | Gene module identification   |
+| `hotspot`    | `hotspotsc`                         | Gene module identification   |
 | `enrichment` | `gseapy>=1.0.0`                     | Gene set enrichment analysis |
 | `atac`       | `genomepy`, `gimmemotifs`           | ATAC-seq peak motif analysis |
 | `dev`        | `pytest`, `black`, `flake8`, `mypy` | Development tools            |

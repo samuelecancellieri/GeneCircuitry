@@ -19,6 +19,11 @@ scipy = ">=1.7.0"
 networkx = ">=2.6.0"
 leidenalg = "*"
 adjusttext = ">=0.7.3"
+# velocyto build deps (setup.py imports numpy + cython at build time)
+cython = "*"
+setuptools = ">=62.1.0"
+# weasyprint system libraries for PDF export
+pango = "*"
 pip = "*"
 
 # ── Pip-only dependencies (not on conda-forge/bioconda) ──────────────────────
@@ -31,6 +36,11 @@ celloracle = "==0.18.0"
 hotspotsc = "==1.1.3"
 weasyprint = ">=52.5"
 "fa2-modified" = "*"
+
+# velocyto's setup.py imports numpy at the top level, which breaks PEP 517
+# isolated builds. Disable isolation so the conda env's numpy/cython are used.
+[pypi-options]
+no-build-isolation = ["velocyto"]
 
 # ── Install genecircuitry itself in editable mode from this source tree ───────
 # Uncomment one of the lines below depending on your use case:

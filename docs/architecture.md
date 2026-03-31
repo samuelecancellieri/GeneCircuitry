@@ -27,7 +27,7 @@ genecircuitry/
 ├── config.py                    # Central config — single source of truth for all parameters
 ├── preprocessing.py             # QC, normalization, clustering (Scanpy wrappers)
 ├── celloracle_processing.py     # GRN inference (optional dep: celloracle)
-├── hotspot_processing.py        # Gene module detection (optional dep: hotspot-sc)
+├── hotspot_processing.py        # Gene module detection (optional dep: hotspotsc)
 ├── grn_deep_analysis.py         # NetworkX GRN visualisation
 ├── atac_peaks_processing.py     # ATAC peak → TF motif matrix (optional dep: genomepy, gimmemotifs)
 ├── enrichment_analysis.py       # ORA enrichment via gseapy (optional dep)

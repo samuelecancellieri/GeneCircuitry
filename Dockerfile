@@ -26,11 +26,17 @@ RUN conda install -y -n base \
         "networkx>=2.6.0" \
         "leidenalg" \
         "adjusttext>=0.7.3" \
+        "cython" \
+        "setuptools>=62.1.0" \
+        "pango" \
         "pip" \
     && conda clean -afy
 
 # ── Step 2: pip-only packages (PyPI only — not on conda-forge/bioconda) ───────
-RUN pip install --no-cache-dir \
+# velocyto's setup.py imports numpy and cython at build time; use
+# --no-build-isolation so the build inherits them from the conda env above.
+RUN pip install --no-cache-dir wheel && \
+    pip install --no-cache-dir --no-build-isolation \
         "velocyto>=0.17.17"
 
 RUN pip install --no-cache-dir \
@@ -38,9 +44,10 @@ RUN pip install --no-cache-dir \
         "celloracle==0.18.0" \
         "hotspotsc==1.1.3"
 
-# ── Step 3: optional reporting dependencies ───────────────────────────────────
+# ── Step 3: reporting / PDF kit ───────────────────────────────────────────────
+# weasyprint uses pango (installed via conda above) for PDF rendering.
 RUN pip install --no-cache-dir \
-        weasyprint
+        "weasyprint>=52.5"
 
 # ── Step 4: copy source and install genecircuitry itself ──────────────────────
 WORKDIR /opt/genecircuitry
