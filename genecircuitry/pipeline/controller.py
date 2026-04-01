@@ -1646,7 +1646,7 @@ Examples:
         "-i",
         type=str,
         default=None,
-        help="Input data file (.h5ad or .h5). If not provided, uses example dataset.",
+        help="Input data file (.h5ad). If not provided, uses example dataset.",
     )
     parser.add_argument(
         "--output",
