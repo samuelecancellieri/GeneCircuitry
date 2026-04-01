@@ -36,9 +36,98 @@ python run_complete_analysis.py \
 python run_complete_analysis.py --skip-celloracle  # no GRN inference
 python run_complete_analysis.py --skip-hotspot      # no module identification
 
+# Custom parameters
+python run_complete_analysis.py --seed 123 --n-jobs 16 --min-genes 300
+
 # See all options
 python run_complete_analysis.py --help
 ```
+
+---
+
+## The `genecircuitry` command
+
+After installation the `genecircuitry` console script is registered and is the **primary entrypoint** — it is equivalent to `python -m genecircuitry.pipeline` but works from any directory without needing the source tree.
+
+```bash
+genecircuitry --help
+```
+
+### Flag reference
+
+#### Input / output
+
+| Flag       | Short | Default             | Description                                                 |
+| ---------- | ----- | ------------------- | ----------------------------------------------------------- |
+| `--input`  | `-i`  | _(example dataset)_ | Input `.h5ad` or `.h5` file. Omit to auto-download PBMC 3k. |
+| `--output` | `-o`  | `output`            | Output directory. Created automatically.                    |
+| `--name`   | `-n`  | `test_run`          | Label for this run (used in logs and reports).              |
+
+#### Analysis
+
+| Flag                           | Short | Default           | Description                                                 |
+| ------------------------------ | ----- | ----------------- | ----------------------------------------------------------- |
+| `--species`                    | `-s`  | `human`           | Species for GRN base network (`human` or `mouse`).          |
+| `--cluster-key`                |       | `leiden`          | `adata.obs` column that holds cluster labels.               |
+| `--clusters`                   |       | `all`             | Comma-separated list of clusters to analyse (subset).       |
+| `--cluster-key-stratification` |       | _(disabled)_      | Run a per-cluster stratified analysis on this column.       |
+| `--embedding-grn`              |       | `X_draw_graph_fa` | Embedding used for CellOracle visualisations.               |
+| `--embedding-hotspot`          |       | `X_umap`          | Embedding used for Hotspot.                                 |
+| `--normalization-key`          |       | `n_counts`        | `adata.obs` column with per-cell total counts.              |
+| `--raw-count-layer`            |       | `raw_counts`      | Layer name where raw integer counts are stored.             |
+| `--tf-dictionary`              |       | _(auto)_          | Path to a custom TF→target pickle file.                     |
+| `--atac-peaks`                 |       | _(none)_          | BED file of pre-called ATAC peaks for motif-based base GRN. |
+| `--no-base-grn`                |       | `False`           | Disable the default base GRN (use with `--tf-dictionary`).  |
+
+#### Quality control
+
+| Flag           | Default                | Description                            |
+| -------------- | ---------------------- | -------------------------------------- |
+| `--min-genes`  | `config.QC_MIN_GENES`  | Minimum genes per cell to retain.      |
+| `--min-counts` | `config.QC_MIN_COUNTS` | Minimum UMI counts per cell to retain. |
+
+#### Computational
+
+| Flag       | Default         | Description                                    |
+| ---------- | --------------- | ---------------------------------------------- |
+| `--seed`   | `42`            | Global random seed.                            |
+| `--n-jobs` | `config.N_JOBS` | Parallel workers for Hotspot / stratification. |
+
+#### Pipeline control
+
+| Flag                | Default | Description                                       |
+| ------------------- | ------- | ------------------------------------------------- |
+| `--skip-qc`         | `False` | Skip QC filtering (input already filtered).       |
+| `--skip-celloracle` | `False` | Skip GRN inference.                               |
+| `--skip-hotspot`    | `False` | Skip gene-module identification.                  |
+| `--debug`           | `False` | Verbose debug logging.                            |
+| `--steps`           | _(all)_ | Space-separated list of steps to run (see below). |
+
+### Common recipes
+
+```bash
+# Minimal run — example data, all defaults
+genecircuitry
+
+# Your own data, custom output dir
+genecircuitry -i data/my_cells.h5ad -o results/my_run -n "My Experiment"
+
+# Human GRN only, 8 cores, reproducible seed
+genecircuitry -i data/my_cells.h5ad --skip-hotspot --n-jobs 8 --seed 1
+
+# Mouse data with ATAC peaks for base GRN
+genecircuitry -i data/mouse.h5ad --species mouse --atac-peaks data/peaks.bed
+
+# Per-cluster stratified analysis
+genecircuitry -i data/my_cells.h5ad \
+    --cluster-key-stratification cell_type \
+    --parallel --n-jobs 4
+
+# Run only selected steps (checkpoint-aware)
+genecircuitry -i data/my_cells.h5ad --steps load preprocessing clustering
+```
+
+> **Tip:** `genecircuitry` and `python -m genecircuitry.pipeline` share the same parser — all flags above work identically with both invocation styles.
 
 ---
 

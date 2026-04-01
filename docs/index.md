@@ -28,17 +28,45 @@ GeneCircuitry is a Python package that integrates [Scanpy](https://scanpy.readth
 
 ## Quick install
 
-```bash
-# Clone and install — core pipeline
-git clone https://github.com/samuelecancellieri/genecircuitry.git
-cd GeneCircuitry
-pip install -e .
+**Pixi (recommended)** — installs all conda and pip dependencies in one step:
 
-# With GRN inference + Hotspot modules
+```bash
+curl -fsSL https://pixi.sh/install.sh | bash   # install pixi once
+git clone https://github.com/samuelecancellieri/genecircuitry.git
+cd genecircuitry
+pixi install
+pixi run run        # launch the pipeline
+```
+
+**pip / venv:**
+
+```bash
+git clone https://github.com/samuelecancellieri/genecircuitry.git
+cd genecircuitry
 pip install -e ".[grn,hotspot]"
 ```
 
-See [Getting Started → Installation](installation/) for all install options, including conda/pixi and Docker.
+**Docker:**
+
+```bash
+docker run --rm \
+    -v /path/to/your/data:/data \
+    -v /path/to/output:/output \
+    zanathos/genecircuitry:latest \
+    --input /data/your_data.h5ad --output /output
+```
+
+**Singularity / Apptainer** (HPC clusters):
+
+```bash
+singularity pull genecircuitry.sif docker://zanathos/genecircuitry:latest
+singularity exec \
+    --bind /path/to/your/data:/data \
+    --bind /path/to/output:/output \
+    genecircuitry.sif genecircuitry --input /data/your_data.h5ad --output /output
+```
+
+See [Getting Started → Installation](installation/) for all five options, including Conda, version pins, and HPC-specific tips.
 
 ---
 
