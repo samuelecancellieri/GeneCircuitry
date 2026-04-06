@@ -26,7 +26,7 @@ from importlib.metadata import (
 try:
     __version__ = _pkg_version("genecircuitry")
 except _PkgNotFound:
-    __version__ = "0.1.2"  # fallback for editable / source installs
+    __version__ = "0.1.9"  # fallback for editable / source installs
 __author__ = "Samuele Cancellieri"
 
 # Import core modules (always available)

@@ -1,5 +1,5 @@
 {% set name = "genecircuitry" %}
-{% set version = "0.1.7" %}
+{% set version = "0.1.9" %}
 
 package:
   name: {{ name|lower }}
