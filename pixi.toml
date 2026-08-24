@@ -50,10 +50,6 @@ setuptools = ">=62.1.0,<81.0.0"
 # Install genecircuitry itself in editable mode from this source tree
 genecircuitry = { path = ".", editable = true }
 
-[build-dependencies]
-requires = ["setuptools>=75.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 # velocyto's setup.py imports numpy at the top level, which breaks PEP 517
 # isolated builds. Disable isolation so the conda env's numpy/cython are used.
 [pypi-options]
