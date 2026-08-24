@@ -5,6 +5,7 @@ description = "A package for transcriptional regulatory network analysis"
 authors = ["Samuele Cancellieri <samuelc@uio.no>"]
 channels = ["conda-forge", "bioconda"]
 platforms = ["linux-64"]
+license = "MIT"
 
 # ── Core conda-installable dependencies ──────────────────────────────────────
 [dependencies]
@@ -46,6 +47,7 @@ weasyprint = ">=52.5"
 # which requires setuptools to be present in the pip layer as well.
 # <81.0.0: setuptools 81+ has breaking changes around pkg_resources and namespace packages
 setuptools = ">=62.1.0,<81.0.0"
+build-backend = "setuptools.build_meta"
 # Install genecircuitry itself in editable mode from this source tree
 genecircuitry = { path = ".", editable = true }
 
