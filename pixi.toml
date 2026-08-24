@@ -50,7 +50,7 @@ setuptools = ">=62.1.0,<81.0.0"
 # Install genecircuitry itself in editable mode from this source tree
 genecircuitry = { path = ".", editable = true }
 
-[build-system]
+[build-dependencies]
 requires = ["setuptools>=75.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
