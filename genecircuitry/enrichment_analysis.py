@@ -28,9 +28,26 @@ def gseapy_ora_enrichment_analysis(
     for i, gene_set in enumerate(gene_sets):
         colors[gene_set] = f"C{i}"
 
-    enr = gseapy.enrichr(
-        gene_list=gene_list[:100], gene_sets=gene_sets, organism=species
-    )
+    import time
+
+    sleep_time = 2
+    max_sleep = 5
+    enr = None
+
+    while sleep_time <= max_sleep:
+        time.sleep(sleep_time)
+        try:
+            enr = gseapy.enrichr(
+                gene_list=gene_list[:100], gene_sets=gene_sets, organism=species
+            )
+            break
+        except Exception as e:
+            if "429" in str(e):
+                if sleep_time == max_sleep:
+                    raise e
+                sleep_time += 1
+            else:
+                raise e
     enr.results = enr.results[enr.results["Adjusted P-value"] < pval_cutoff]
 
     return enr
