@@ -181,7 +181,7 @@ python examples/complete_pipeline.py \
 - Process multiple stratifications simultaneously
 - Linear speedup with number of workers
 - Automatic checkpoint integration
-- See [Controller Guide](docs/CONTROLLER_QUICK_REF.md) for details
+- See [Pipeline Overview](https://samuelecancellieri.github.io/GeneCircuitry/pipeline/) for details
 
 The complete pipeline includes:
 
@@ -374,11 +374,13 @@ python examples/test_config_integration.py
 
 ## Documentation
 
-- **[Configuration Guide](docs/CONFIG.md)** - Complete configuration documentation
-- **[QC Functions](docs/QC_FUNCTIONS.md)** - Quality control functions guide
-- **[CellOracle Processing](docs/CELLORACLE_PROCESSING.md)** - CellOracle integration guide
-- **[Package Structure](docs/PACKAGE_STRUCTURE.md)** - Package organization overview
-- **[Preprocessing Updates](docs/PREPROCESSING_CONFIG_UPDATE.md)** - Config integration details
+Full documentation is available at **[samuelecancellieri.github.io/GeneCircuitry](https://samuelecancellieri.github.io/GeneCircuitry/)**.
+
+- **[Getting Started](https://samuelecancellieri.github.io/GeneCircuitry/installation/)** — installation, quick start
+- **[Configuration](https://samuelecancellieri.github.io/GeneCircuitry/configuration/)** — all `config.py` parameters
+- **[Pipeline Overview](https://samuelecancellieri.github.io/GeneCircuitry/pipeline/)** — step names, CLI flags, checkpoints
+- **[API Reference](https://samuelecancellieri.github.io/GeneCircuitry/api/)** — function signatures
+- **[Architecture](https://samuelecancellieri.github.io/GeneCircuitry/architecture/)** — codebase design and data flow
 
 ## Development
 
