@@ -29,6 +29,15 @@ except _PkgNotFound:
     __version__ = "0.2.2"  # fallback for editable / source installs
 __author__ = "Samuele Cancellieri"
 
+import warnings as _warnings
+
+# Suppress deprecated pkg_resources warning emitted by upstream dependencies (e.g., louvain)
+_warnings.filterwarnings(
+    "ignore",
+    message=".*pkg_resources is deprecated as an API.*",
+    category=UserWarning,
+)
+
 # Import core modules (always available)
 from . import preprocessing
 from . import grn_deep_analysis
@@ -54,8 +63,6 @@ def __getattr__(name):
 try:
     from . import celloracle_processing
 except ImportError as _co_err:
-    import warnings as _warnings
-
     _warnings.warn(
         f"CellOracle optional dependency could not be loaded — GRN inference will be unavailable.\n"
         f"  Missing module: {_co_err.name!r}\n"
@@ -69,8 +76,6 @@ except ImportError as _co_err:
 try:
     from . import hotspot_processing
 except ImportError as _hs_err:
-    import warnings as _warnings
-
     _warnings.warn(
         f"Hotspot optional dependency could not be loaded — gene-module detection will be unavailable.\n"
         f"  Missing module: {_hs_err.name!r}\n"
