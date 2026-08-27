@@ -217,7 +217,7 @@ docker save genecircuitry | singularity build genecircuitry.sif docker-archive:/
 
 ```python
 import genecircuitry
-print(genecircuitry.__version__)           # e.g. 0.1.7
+print(genecircuitry.__version__)           # e.g. 0.2.2
 
 # Check optional deps
 print(genecircuitry.celloracle_processing) # None if not installed

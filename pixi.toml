@@ -1,6 +1,6 @@
 [workspace]
 name = "genecircuitry"
-version = "0.2.1"
+version = "0.2.2"
 description = "A package for transcriptional regulatory network analysis"
 authors = ["Samuele Cancellieri <samuelc@uio.no>"]
 channels = ["conda-forge", "bioconda"]
@@ -20,7 +20,7 @@ scipy = ">=1.7.0"
 networkx = ">=2.6.0"
 python-igraph = "==0.11.9"
 leidenalg = "*"
-gseapy = "*"
+gseapy = ">=1.0.0"
 adjusttext = ">=0.7.3"
 # velocyto build deps (setup.py imports numpy + cython at build time)
 cython = "*"
@@ -28,7 +28,7 @@ c-compiler = "*"
 cxx-compiler = "*"
 gimmemotifs = "<=0.17.2"
 genomepy = "*"
-"velocyto.py" = "*"
+"velocyto.py" = ">=0.17.17"
 pysam = "*"
 # Ensure the conda env's libstdc++ is used instead of the (older) system one.
 # Prevents GLIBCXX_3.4.30 not found errors from scipy/numpy native extensions.

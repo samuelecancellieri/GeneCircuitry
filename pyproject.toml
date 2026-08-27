@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genecircuitry"
-version = "0.2.1"
+version = "0.2.2"
 description = "A package for transcriptional regulatory network analysis"
 readme = "README.md"
 requires-python = ">=3.9,<3.11"
@@ -54,13 +54,16 @@ enrichment = [
 ]
 atac = [
     "genomepy",
-    "gimmemotifs",
+    "gimmemotifs<=0.17.2",
 ]
 plotting = [
-    "matplotlib",
+    "matplotlib>=3.6.3,<3.7",
+]
+reporting = [
+    "weasyprint>=52.5",
 ]
 all = [
-    "genecircuitry[grn,hotspot,enrichment,atac,plotting]",
+    "genecircuitry[grn,hotspot,enrichment,atac,plotting,reporting]",
 ]
 dev = [
     "pytest>=7.0.0",

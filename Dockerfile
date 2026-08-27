@@ -7,7 +7,7 @@ FROM condaforge/miniforge3:latest
 
 LABEL maintainer="Samuele Cancellieri <samuelc@uio.no>" \
         description="GeneCircuitry – transcriptional regulatory network analysis" \
-        version="0.2.1"
+        version="0.2.2"
 
 
 RUN apt-get update && \
@@ -30,11 +30,12 @@ RUN conda install -y -n base \
         "numpy>=1.20.0,<2.0.0" \
         "pandas>=1.0.3,<=1.5.3" \
         "scanpy>=1.9.0" \
-        "anndata>=0.8.0" \
+        "anndata>=0.8.0,<0.11.0" \
         "matplotlib>=3.6.3,<3.7" \
         "seaborn>=0.11.0" \
         "scipy>=1.7.0" \
         "networkx>=2.6.0" \
+        "python-igraph==0.11.9" \
         "leidenalg" \
         "adjusttext>=0.7.3" \
         "cython" \
