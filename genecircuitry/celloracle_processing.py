@@ -359,11 +359,39 @@ def run_links(
     return links
 
 
+def load_hotspot_genes(hotspot_genes_path: str) -> list:
+    """
+    Load significant autocorrelated genes identified by Hotspot.
+
+    Parameters
+    ----------
+    hotspot_genes_path : str
+        Path to the ``significant_genes.csv`` file produced by Hotspot
+        (typically ``<output_dir>/hotspot/significant_genes.csv``).
+
+    Returns
+    -------
+    list
+        Gene names of Hotspot-significant autocorrelated genes.
+
+    Examples
+    --------
+    >>> from genecircuitry.celloracle_processing import load_hotspot_genes
+    >>> genes = load_hotspot_genes("output/hotspot/significant_genes.csv")
+    >>> print(f"Loaded {len(genes)} Hotspot genes")
+    """
+    df = pd.read_csv(hotspot_genes_path, index_col=0)
+    genes = df.index.tolist()
+    print(f"  Loaded {len(genes)} Hotspot significant genes from: {hotspot_genes_path}")
+    return genes
+
+
 def perform_grn_pre_processing(
     adata: AnnData,
     cluster_key: str,
     cell_downsample: int = 20000,
     top_genes: Optional[int] = None,
+    gene_list: Optional[list] = None,
     n_neighbors: Optional[int] = None,
     n_pcs: Optional[int] = None,
     svd_solver: Optional[str] = None,
@@ -371,8 +399,9 @@ def perform_grn_pre_processing(
     """
     Perform preprocessing for GRN analysis on AnnData object.
 
-    This function identifies highly variable genes, computes PCA and diffusion maps,
-    in preparation for gene regulatory network analysis.
+    This function identifies highly variable genes (or uses a custom gene list),
+    computes PCA and diffusion maps, in preparation for gene regulatory network
+    analysis.
 
     Parameters
     ----------
@@ -385,6 +414,11 @@ def perform_grn_pre_processing(
     top_genes : int, optional
         Number of highly variable genes to select.
         If None, uses config.HVGS_N_TOP_GENES (default: 2000).
+        Ignored when ``gene_list`` is provided.
+    gene_list : list, optional
+        Custom list of genes to use instead of HVG selection.
+        When provided, overrides ``top_genes``.  Useful for passing Hotspot
+        autocorrelated genes via :func:`load_hotspot_genes`.
     n_neighbors : int, optional
         Number of neighbors for KNN graph.
         If None, uses config.NEIGHBORS_N_NEIGHBORS (default: 15).
@@ -406,12 +440,19 @@ def perform_grn_pre_processing(
     >>> from genecircuitry.celloracle_processing import perform_grn_pre_processing
     >>> from genecircuitry import config
     >>>
-    >>> # Use default config values
+    >>> # Use default config values (HVG selection)
     >>> adata = sc.read_h5ad('data.h5ad')
     >>> adata_preprocessed = perform_grn_pre_processing(adata, cluster_key='louvain')
     >>>
     >>> # Override specific parameters
     >>> adata_preprocessed = perform_grn_pre_processing(adata, top_genes=5000, n_pcs=50)
+    >>>
+    >>> # Use Hotspot genes instead of HVGs
+    >>> from genecircuitry.celloracle_processing import load_hotspot_genes
+    >>> hotspot_genes = load_hotspot_genes("output/hotspot/significant_genes.csv")
+    >>> adata_preprocessed = perform_grn_pre_processing(
+    ...     adata, cluster_key='louvain', gene_list=hotspot_genes
+    ... )
     """
 
     # Use config defaults if not specified
@@ -433,9 +474,25 @@ def perform_grn_pre_processing(
             adata_cc.obs[cluster_key] = adata_cc.obs[cluster_key].astype("category")
             print(f"  Converted '{cluster_key}' to categorical")
 
-    # Filter genes based on variance and subset
-    sc.pp.highly_variable_genes(adata_cc, n_top_genes=top_genes, subset=True)
-    print(f"  Selected {top_genes} highly variable genes")
+    if gene_list is not None:
+        # Use provided gene list (e.g., Hotspot autocorrelated genes)
+        valid_genes = [g for g in gene_list if g in adata_cc.var_names]
+        if len(valid_genes) == 0:
+            raise ValueError(
+                "None of the genes in gene_list are present in adata.var_names. "
+                "Check that gene names match."
+            )
+        if len(valid_genes) < len(gene_list):
+            print(
+                f"  Warning: {len(gene_list) - len(valid_genes)} gene(s) from "
+                f"gene_list not found in data and were excluded."
+            )
+        adata_cc = adata_cc[:, valid_genes]
+        print(f"  Subsetting to {len(valid_genes)} provided genes (gene_list)")
+    else:
+        # Standard HVG selection
+        sc.pp.highly_variable_genes(adata_cc, n_top_genes=top_genes, subset=True)
+        print(f"  Selected {top_genes} highly variable genes")
 
     # PCA
     sc.tl.pca(adata_cc, svd_solver=svd_solver)

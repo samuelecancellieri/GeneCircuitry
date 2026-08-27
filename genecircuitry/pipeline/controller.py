@@ -377,7 +377,7 @@ class PipelineController:
             log_error("Controller.ATACPeaks", e)
             raise
 
-    def run_step_celloracle(self, adata, log_dir=None):
+    def run_step_celloracle(self, adata, log_dir=None, hotspot_genes_path=None):
         """Execute Step 4: CellOracle."""
         log_step("Controller.CellOracle", "STARTED")
         try:
@@ -404,6 +404,7 @@ class PipelineController:
                 TG_to_TF_dictionary=tf_dictionary,
                 skip_celloracle=self.args.skip_celloracle,
                 no_base_grn=self.args.no_base_grn,
+                hotspot_genes_path=hotspot_genes_path,
                 log_dir=log_dir,
             )
             log_step("Controller.CellOracle", "COMPLETED")
@@ -555,13 +556,31 @@ class PipelineController:
             adata_cluster, cluster_key=self.args.cluster_key, log_dir=stratified_log_dir
         )
 
-        celloracle_result = self.run_step_celloracle(
-            adata_clustered, log_dir=stratified_log_dir
-        )
+        use_hvgs = getattr(self.args, "use_hvgs", False)
 
-        hotspot_result = self.run_step_hotspot(
-            adata_clustered, log_dir=stratified_log_dir
-        )
+        if use_hvgs:
+            # Legacy workflow: CellOracle (HVGs) → Hotspot
+            celloracle_result = self.run_step_celloracle(
+                adata_clustered, log_dir=stratified_log_dir
+            )
+            hotspot_result = self.run_step_hotspot(
+                adata_clustered, log_dir=stratified_log_dir
+            )
+        else:
+            # Default workflow: Hotspot (identify genes) → CellOracle (use genes)
+            hotspot_result = self.run_step_hotspot(
+                adata_clustered, log_dir=stratified_log_dir
+            )
+            hotspot_genes_path = None
+            if not self.args.skip_hotspot:
+                hotspot_genes_path = os.path.join(
+                    config.OUTPUT_DIR, "hotspot", "significant_genes.csv"
+                )
+            celloracle_result = self.run_step_celloracle(
+                adata_clustered,
+                log_dir=stratified_log_dir,
+                hotspot_genes_path=hotspot_genes_path,
+            )
 
         # Generate summary
         generate_summary(
@@ -699,11 +718,31 @@ class PipelineController:
             celloracle_result = None
             hotspot_result = None
 
-            if "celloracle" in steps:
-                celloracle_result = self.run_step_celloracle(adata_clustered)
+            use_hvgs = getattr(self.args, "use_hvgs", False)
 
-            if "hotspot" in steps:
-                hotspot_result = self.run_step_hotspot(adata_clustered)
+            if use_hvgs:
+                # Legacy workflow: CellOracle (HVGs) → Hotspot
+                if "celloracle" in steps:
+                    celloracle_result = self.run_step_celloracle(adata_clustered)
+
+                if "hotspot" in steps:
+                    hotspot_result = self.run_step_hotspot(adata_clustered)
+            else:
+                # Default workflow: Hotspot (identify genes) → CellOracle (use genes)
+                if "hotspot" in steps:
+                    hotspot_result = self.run_step_hotspot(adata_clustered)
+
+                hotspot_genes_path = None
+                if not self.args.skip_hotspot:
+                    hotspot_genes_path = os.path.join(
+                        config.OUTPUT_DIR, "hotspot", "significant_genes.csv"
+                    )
+
+                if "celloracle" in steps:
+                    celloracle_result = self.run_step_celloracle(
+                        adata_clustered,
+                        hotspot_genes_path=hotspot_genes_path,
+                    )
 
             if "summary" in steps:
                 generate_summary(
@@ -1125,9 +1164,19 @@ def celloracle_pipeline(
     TG_to_TF_dictionary=None,
     skip_celloracle=False,
     no_base_grn=False,
+    hotspot_genes_path=None,
     log_dir=None,
 ):
-    """Run CellOracle GRN inference pipeline."""
+    """Run CellOracle GRN inference pipeline.
+
+    Parameters
+    ----------
+    hotspot_genes_path : str, optional
+        Path to ``significant_genes.csv`` produced by Hotspot.  When provided,
+        the genes listed in that file are used for GRN preprocessing instead of
+        standard highly-variable-gene selection.  This is the default workflow
+        (Hotspot-first); pass ``None`` to use HVGs (legacy ``--use-hvgs`` mode).
+    """
     log_step(
         "CellOracle",
         "STARTED",
@@ -1151,6 +1200,7 @@ def celloracle_pipeline(
             cluster_key=cluster_key,
             species=species,
             embedding_name=embedding_name,
+            hotspot_genes_path=hotspot_genes_path,
         )
 
         oracle_file = f"{config.OUTPUT_DIR}/celloracle/oracle_object.celloracle.oracle"
@@ -1183,13 +1233,50 @@ def celloracle_pipeline(
                 run_KNN,
                 run_links,
                 save_celloracle_results,
+                load_hotspot_genes,
             )
+
+            # Load Hotspot genes if path is provided (Hotspot-first workflow)
+            gene_list = None
+            if hotspot_genes_path is not None:
+                if os.path.exists(hotspot_genes_path):
+                    log_step(
+                        "CellOracle.LoadHotspotGenes",
+                        "STARTED",
+                        {"path": hotspot_genes_path},
+                    )
+                    gene_list = load_hotspot_genes(hotspot_genes_path)
+                    log_step(
+                        "CellOracle.LoadHotspotGenes",
+                        "COMPLETED",
+                        {"n_genes": len(gene_list)},
+                    )
+                    print(
+                        f"  Using {len(gene_list)} Hotspot autocorrelated genes "
+                        f"for GRN preprocessing"
+                    )
+                else:
+                    log_step(
+                        "CellOracle.LoadHotspotGenes",
+                        "SKIPPED",
+                        {
+                            "reason": "file not found",
+                            "path": hotspot_genes_path,
+                        },
+                    )
+                    print(
+                        f"  ⚠ Hotspot genes file not found: {hotspot_genes_path}"
+                    )
+                    print(
+                        "    Falling back to HVG selection for CellOracle preprocessing."
+                    )
 
             log_step("CellOracle.Preprocessing", "STARTED")
             print("\n[4.1] Preprocessing data for CellOracle...")
             adata = perform_grn_pre_processing(
                 adata,
                 cluster_key=cluster_key,
+                gene_list=gene_list,
             )
             print("  ✓ Preprocessing complete")
 
@@ -1791,6 +1878,17 @@ Examples:
         help="Skip Hotspot module identification",
     )
     parser.add_argument(
+        "--use-hvgs",
+        action="store_true",
+        default=False,
+        help=(
+            "Use highly variable genes (HVGs) for CellOracle instead of "
+            "Hotspot autocorrelated genes. Reverts to the legacy workflow "
+            "(CellOracle first, then Hotspot). By default, Hotspot runs first "
+            "and its significant genes are used as input to CellOracle."
+        ),
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         default=False,
@@ -1901,6 +1999,23 @@ Examples:
     print(f"Output directory: {args.output}")
     print(f"Figures directory: {os.path.join(args.output, 'figures')}")
     print(f"Parallel jobs: {args.n_jobs}")
+
+    # Print active workflow mode
+    if args.use_hvgs:
+        print(
+            "\nWorkflow mode: LEGACY (--use-hvgs)"
+        )
+        print(
+            "  Order: Load → Preprocess → Cluster → CellOracle (HVGs) → Hotspot"
+        )
+        log_step("Pipeline", "WORKFLOW_MODE", {"mode": "legacy_hvgs"})
+    else:
+        print("\nWorkflow mode: DEFAULT (Hotspot-first)")
+        print(
+            "  Order: Load → Preprocess → Cluster → Hotspot → CellOracle (Hotspot genes)"
+        )
+        print("  Use --use-hvgs to revert to the legacy CellOracle-first workflow.")
+        log_step("Pipeline", "WORKFLOW_MODE", {"mode": "hotspot_first"})
 
     # Print non-default input arguments
     non_default_args = []
