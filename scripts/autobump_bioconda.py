@@ -167,15 +167,22 @@ def run_cmd(
 ) -> subprocess.CompletedProcess:
     """Helper to run a shell command and print outputs."""
     print(f"+ {' '.join(cmd)}" + (f" (in {cwd})" if cwd else ""))
-    result = subprocess.run(
-        cmd,
-        cwd=cwd,
-        env=env,
-        check=check,
-        capture_output=capture_output,
-        text=True,
-    )
-    return result
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=cwd,
+            env=env,
+            check=check,
+            capture_output=capture_output,
+            text=True,
+        )
+        return result
+    except subprocess.CalledProcessError as exc:
+        if exc.stdout:
+            print(f"[Command stdout]\n{exc.stdout.strip()}")
+        if exc.stderr:
+            print(f"[Command stderr]\n{exc.stderr.strip()}", file=sys.stderr)
+        raise
 
 
 def submit_bioconda_pr(
@@ -194,11 +201,19 @@ def submit_bioconda_pr(
     Returns:
         The PR URL if created, or None.
     """
-    token = token or os.environ.get("BIOCONDA_TOKEN") or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    # Only use explicit BIOCONDA_TOKEN or GH_TOKEN PAT. Do not fall back to GITHUB_TOKEN,
+    # as the repository-scoped GITHUB_TOKEN cannot fork or push to user forks.
+    token = token or os.environ.get("BIOCONDA_TOKEN") or os.environ.get("GH_TOKEN")
     if not token and not dry_run:
         print(
-            "::warning::No BIOCONDA_TOKEN or GH_TOKEN secret found. "
-            "Cannot push or create PR against bioconda/bioconda-recipes."
+            "::warning::No BIOCONDA_TOKEN or GH_TOKEN secret found.\n"
+            "::warning::Cross-repository Bioconda PR submission requires a Personal Access Token (PAT) "
+            "with 'public_repo' (or 'repo') scope.\n"
+            "::warning::The default GITHUB_TOKEN is scoped to this repository and cannot push to user forks.\n"
+            "::warning::To enable automated Bioconda PRs:\n"
+            "::warning::  1. Create a GitHub Personal Access Token (classic) with 'public_repo' scope.\n"
+            "::warning::  2. Add it as repository secret 'BIOCONDA_TOKEN' under Settings > Secrets and variables > Actions.\n"
+            "::warning::Skipping Bioconda PR submission."
         )
         return None
 
@@ -240,7 +255,7 @@ def submit_bioconda_pr(
     user_res = run_cmd(["gh", "api", "user", "-q", ".login"], env=env, check=False)
     gh_user = user_res.stdout.strip() if user_res.returncode == 0 else ""
     if not gh_user:
-        gh_user = "samuelecancellieri"
+        gh_user = os.environ.get("GITHUB_REPOSITORY_OWNER") or "samuelecancellieri"
     print(f"Authenticated as GitHub user: {gh_user}")
 
     temp_dir = Path(tempfile.mkdtemp(prefix="bioconda_bump_"))
@@ -289,15 +304,29 @@ def submit_bioconda_pr(
         run_cmd(["git", "commit", "-m", commit_msg], cwd=work_tree, env=env)
 
         # Set up push remote: push to user fork
-        # Check or create fork via gh
         print(f"Ensuring fork exists for user {gh_user}...")
-        run_cmd(["gh", "repo", "fork", bioconda_repo, "--clone=false"], env=env, check=False)
+        fork_res = run_cmd(["gh", "repo", "fork", bioconda_repo, "--clone=false"], env=env, check=False)
+        if fork_res.returncode != 0:
+            err_msg = (fork_res.stderr or "").strip()
+            if err_msg and "already exists" not in err_msg.lower():
+                print(f"gh repo fork note: {err_msg}")
 
         fork_remote_url = f"https://x-access-token:{token}@github.com/{gh_user}/bioconda-recipes.git"
         run_cmd(["git", "remote", "add", "user_fork", fork_remote_url], cwd=work_tree, env=env)
 
-        print(f"Pushing branch {branch_name} to fork...")
-        run_cmd(["git", "push", "-u", "user_fork", branch_name, "--force"], cwd=work_tree, env=env)
+        print(f"Pushing branch {branch_name} to fork {gh_user}/bioconda-recipes...")
+        try:
+            run_cmd(["git", "push", "-u", "user_fork", branch_name, "--force"], cwd=work_tree, env=env)
+        except subprocess.CalledProcessError:
+            print(
+                f"::error::Failed to push branch '{branch_name}' to fork '{gh_user}/bioconda-recipes'.\n"
+                f"::error::Please check that:\n"
+                f"::error::  1. The secret BIOCONDA_TOKEN is a valid GitHub Personal Access Token (classic) with 'public_repo' (or 'repo') scope.\n"
+                f"::error::  2. The fork repository https://github.com/{gh_user}/bioconda-recipes exists and the token has write access to it.\n"
+                f"::error::  3. The token has not expired.",
+                file=sys.stderr,
+            )
+            raise
 
         # Check if PR already exists
         print("Checking if PR already exists...")

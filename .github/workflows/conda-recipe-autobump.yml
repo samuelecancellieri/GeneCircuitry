@@ -164,7 +164,6 @@ jobs:
             $( [ "$DRY_RUN" = "true" ] && echo "--dry-run" )
         env:
           BIOCONDA_TOKEN: ${{ secrets.BIOCONDA_TOKEN || secrets.GH_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Job Summary
         run: |
