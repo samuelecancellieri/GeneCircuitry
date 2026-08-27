@@ -2,9 +2,8 @@
 Hotspot processing module for GeneCircuitry
 
 This module provides functions for Hotspot analysis of gene expression data.
-
-NOTE: Plotting functions have been moved to genecircuitry.plotting.hotspot_plots.
-The functions here are kept for backward compatibility but delegate to the new module.
+Plotting functions have been consolidated in genecircuitry.plotting.hotspot_plots;
+the names below are kept for backward compatibility and delegate to that module.
 """
 
 from typing import Optional
@@ -12,196 +11,19 @@ import os
 import scanpy as sc
 import hotspot as hs
 from scipy.sparse import csc_matrix
-import matplotlib.pyplot as plt
 from anndata import AnnData
 import pickle
 import pandas as pd
-import seaborn as sns
 
 from . import config
 from .logging_utils import log_error, log_warning
 
 from . import enrichment_analysis as ea
-from matplotlib.patches import Patch
-
-# Import from new plotting module for backward compatibility
-from .plotting import plot_exists as _plot_exists
-from .plotting import save_plot
-from .plotting import (
-    plot_module_scores_violin as _new_plot_module_scores_violin,
-    generate_all_hotspot_plots,
-)
 
 
-def plot_hotspot_annotation(
-    hs_obj: hs.Hotspot,
-    gene_sets: list = config.ENRICHMENT_GENE_SETS,
-    top_n_annotations: int = 1,
-):
-    """
-    Plot Hotspot gene module annotations with enrichment analysis results.
-
-    Parameters:
-        hs_obj (hs.Hotspot): An instance of the Hotspot class containing analysis results.
-        gene_sets (list): Gene sets to use for enrichment analysis.
-            Default is ["MSigDB_Hallmark_2020"]. Other options include:
-            - "Reactome_Pathways_2024"
-            - "KEGG_2021_Human"
-            - "GO_Biological_Process_2023"
-            - "GO_Molecular_Function_2023"
-        top_n_annotations (int): Number of top annotations to display per module.
-
-    """
-
-    print(
-        f"Generating Hotspot local correlation heatmap with {gene_sets} annotations..."
-    )
-
-    # Perform enrichment analysis for each module
-    df_enrichment = pd.DataFrame()
-    for module in hs_obj.modules.unique():
-        if module == -1:  # Skip unassigned genes
-            continue
-        genes = hs_obj.modules[hs_obj.modules == module].index.tolist()
-        try:
-            enr_result = ea.gseapy_ora_enrichment_analysis(genes, gene_sets=gene_sets)
-            if enr_result.results is not None and not enr_result.results.empty:
-                df_module_enrichment = enr_result.results.copy()
-                df_module_enrichment.columns = [
-                    x.replace(" ", "_") for x in df_module_enrichment.columns
-                ]
-                df_module_enrichment["module"] = module
-                df_enrichment = pd.concat([df_enrichment, df_module_enrichment])
-        except Exception as e:
-            log_error(f"Hotspot.Enrichment(module={module})", e)
-            print(
-                f"  Warning: Enrichment analysis failed for module {module} "
-                f"({type(e).__name__}): {e}"
-            )
-            continue
-
-    # Save enrichment results
-    if not df_enrichment.empty:
-        df_enrichment.to_csv(
-            f"{config.OUTPUT_DIR}/hotspot/hotspot_module_enrichment_results.csv",
-            index=False,
-        )
-
-    # Create module colors using a large, distinct color palette
-    n_modules_total = len([m for m in hs_obj.modules.unique() if m != -1])
-    if n_modules_total <= 10:
-        colors = sns.color_palette("tab10", n_colors=10)
-    elif n_modules_total <= 20:
-        colors = sns.color_palette("tab20", n_colors=20)
-    else:
-        # For many modules, use husl which generates evenly spaced hues
-        colors = sns.color_palette("husl", n_colors=max(n_modules_total, 30))
-
-    module_colors = {i: colors[(i - 1) % len(colors)] for i in hs_obj.modules.unique()}
-    module_colors[-1] = "#ffffff"
-
-    row_colors1 = pd.Series(
-        [module_colors[i] for i in hs_obj.modules],
-        index=hs_obj.local_correlation_z.index,
-    )
-
-    # Get top annotations for each module from enrichment results
-    module_annotations = {}
-    for module in hs_obj.modules.unique():
-        if module == -1:  # Skip unassigned genes
-            module_annotations[module] = ""
-            continue
-        if not df_enrichment.empty and module in df_enrichment["module"].values:
-            module_df = df_enrichment[df_enrichment["module"] == module]
-            if not module_df.empty:
-                # Sort by Combined_Score or Adjusted_P-value
-                if "Combined_Score" in module_df.columns:
-                    top_terms = module_df.nlargest(top_n_annotations, "Combined_Score")[
-                        "Term"
-                    ].tolist()
-                else:
-                    top_terms = module_df.nsmallest(
-                        top_n_annotations, "Adjusted_P-value"
-                    )["Term"].tolist()
-                # Clean up term names (remove prefix like "HALLMARK_")
-                top_terms = [
-                    t.replace("HALLMARK_", "").replace("_", " ").title()
-                    for t in top_terms
-                ]
-                module_annotations[module] = "; ".join(top_terms[:top_n_annotations])
-            else:
-                module_annotations[module] = "No enrichment"
-        else:
-            module_annotations[module] = "No enrichment"
-
-    # Create annotation labels for genes based on their module's enrichment
-    gene_annotations = pd.Series(
-        [module_annotations.get(i, "") for i in hs_obj.modules],
-        index=hs_obj.local_correlation_z.index,
-        name="Top_Annotations",
-    )
-
-    # Create row colors DataFrame
-    row_colors = pd.DataFrame(
-        {
-            "Modules": row_colors1,
-        }
-    )
-
-    # Create the clustermap
-    g = sns.clustermap(
-        hs_obj.local_correlation_z,
-        row_linkage=hs_obj.linkage,
-        col_linkage=hs_obj.linkage,
-        row_colors=row_colors["Modules"],
-        cmap="RdBu_r",
-        vmin=-8,
-        vmax=8,
-        xticklabels=False,
-        yticklabels=False,
-        rasterized=True,
-        figsize=(12, 12),
-    )
-
-    # Remove axis dendrogram
-    g.ax_row_dendrogram.set_visible(False)
-    g.ax_col_dendrogram.set_visible(False)
-
-    # Create legend elements with module annotations
-    legend_elements = []
-    for module, color in sorted(module_colors.items()):
-        if module == -1:
-            continue
-        annotation = module_annotations.get(module, "")
-        if annotation and annotation != "No enrichment":
-            # Truncate long annotations
-            if len(annotation) > 50:
-                annotation = annotation[:47] + "..."
-            label = f"M{module}: {annotation}"
-        else:
-            label = f"Module {module}"
-        legend_elements.append(Patch(facecolor=color, edgecolor="k", label=label))
-
-    # Add the legend to the figure
-    g.ax_heatmap.legend(
-        handles=legend_elements,
-        loc="upper left",
-        bbox_to_anchor=(1.05, 1),
-        title="Modules (Hallmark Enrichment)",
-        frameon=False,
-        fontsize=8,
-    )
-
-    # Save the figure
-    plt.savefig(
-        f"{config.FIGURES_DIR_HOTSPOT}/hotspot_local_correlation_heatmap_with_annotations.png",
-        dpi=config.SAVE_DPI,
-        bbox_inches="tight",
-    )
-    plt.close()
-    print(
-        f"  ✓ Saved annotated heatmap to: {config.FIGURES_DIR_HOTSPOT}/hotspot_local_correlation_heatmap_with_annotations.png"
-    )
+# ---------------------------------------------------------------------------
+# Analysis helpers (non-plotting)
+# ---------------------------------------------------------------------------
 
 
 def save_hotspot_results(
@@ -307,8 +129,6 @@ def _get_module_enrichment_labels(
     gene_sets: list = None,
     max_label_length: int = 30,
 ) -> dict:
-    if gene_sets is None:
-        gene_sets = list(config.ENRICHMENT_GENE_SETS)
     """
     Get enrichment-based labels for each module.
 
@@ -320,6 +140,8 @@ def _get_module_enrichment_labels(
     Returns:
         dict: Mapping from module number to enrichment label.
     """
+    if gene_sets is None:
+        gene_sets = list(config.ENRICHMENT_GENE_SETS)
     module_labels = {}
 
     # First try to load existing enrichment results
@@ -405,6 +227,7 @@ def run_hotspot_analysis(
     Returns:
         hotspot_obj: The updated Hotspot object with analysis results.
     """
+    from .plotting.hotspot_plots import generate_all_hotspot_plots
 
     # Create KNN graph
     hotspot_obj.create_knn_graph(
@@ -440,7 +263,7 @@ def run_hotspot_analysis(
     # save hotspot results before plotting to ensure results are saved even if plotting fails
     save_hotspot_results(hotspot_obj)
 
-    # Generate all Hotspot plots using the new plotting module
+    # Generate all Hotspot plots using the canonical plotting module
     print("\n  Generating Hotspot visualizations...")
     plot_results = generate_all_hotspot_plots(
         hotspot_obj,
@@ -457,6 +280,32 @@ def run_hotspot_analysis(
     return hotspot_obj
 
 
+# ---------------------------------------------------------------------------
+# Plotting helpers — delegating to genecircuitry.plotting.hotspot_plots
+# ---------------------------------------------------------------------------
+
+
+def plot_hotspot_annotation(
+    hs_obj: hs.Hotspot,
+    gene_sets: list = None,
+    top_n_annotations: int = 1,
+):
+    """
+    Plot Hotspot gene module annotations with enrichment analysis results.
+
+    Delegates to genecircuitry.plotting.hotspot_plots.plot_hotspot_annotation.
+    """
+    from .plotting.hotspot_plots import plot_hotspot_annotation as _impl
+
+    if gene_sets is None:
+        gene_sets = list(config.ENRICHMENT_GENE_SETS)
+    return _impl(
+        hotspot_obj=hs_obj,
+        gene_sets=gene_sets,
+        top_n_annotations=top_n_annotations,
+    )
+
+
 def plot_module_scores_violin(
     hotspot_obj: hs.Hotspot,
     adata: AnnData,
@@ -464,177 +313,19 @@ def plot_module_scores_violin(
     figsize_per_cluster: tuple = (12, 6),
     gene_sets: list = None,
 ):
-    if gene_sets is None:
-        gene_sets = list(config.ENRICHMENT_GENE_SETS)
     """
     Plot violin plots of module scores for each cluster.
 
-    For each cluster, creates a violin plot with modules on x-axis
-    and module scores on y-axis. X-axis labels show enrichment annotations.
-
-    Parameters:
-        hotspot_obj: Hotspot object with computed module scores.
-        adata: AnnData object with cluster annotations.
-        cluster_key: Column name in adata.obs containing cluster assignments.
-        figsize_per_cluster: Figure size for each cluster plot.
-        gene_sets: Gene sets for enrichment annotation labels.
+    Delegates to genecircuitry.plotting.hotspot_plots.plot_module_scores_violin.
     """
-    print("  Generating module score violin plots per cluster...")
+    from .plotting.hotspot_plots import plot_module_scores_violin as _impl
 
-    # Get module scores
-    module_scores = hotspot_obj.module_scores
-
-    if module_scores is None or module_scores.empty:
-        log_warning("Hotspot.ViolinPlot", "No module scores available for violin plots")
-        print("  Warning: No module scores available for violin plots")
-        return
-
-    # Get clusters from adata
-    if cluster_key not in adata.obs.columns:
-        log_warning(
-            "Hotspot.ViolinPlot",
-            f"Cluster key '{cluster_key}' not found in adata.obs. "
-            f"Available columns: {list(adata.obs.columns)}",
-        )
-        print(f"  Warning: Cluster key '{cluster_key}' not found in adata.obs")
-        return
-
-    # Align cell indices
-    common_cells = module_scores.index.intersection(adata.obs.index)
-    if len(common_cells) == 0:
-        log_warning(
-            "Hotspot.ViolinPlot",
-            f"No common cells between module scores ({len(module_scores)}) and adata ({adata.n_obs})",
-        )
-        print("  Warning: No common cells between module scores and adata")
-        return
-
-    # Get module enrichment annotations
-    module_labels = _get_module_enrichment_labels(hotspot_obj, gene_sets)
-
-    # Create combined dataframe
-    scores_df = module_scores.loc[common_cells].copy()
-    scores_df["cluster"] = adata.obs.loc[common_cells, cluster_key].values
-
-    # Get unique modules (excluding -1 if present)
-    modules = [col for col in module_scores.columns if col != -1]
-    if not modules:
-        log_warning("Hotspot.ViolinPlot", "No valid modules found (all modules are -1)")
-        print("  Warning: No valid modules found for violin plots")
-        return
-
-    # Create a mapping from module number to label
-    module_to_label = {m: module_labels.get(m, f"Module {m}") for m in modules}
-
-    # Rename columns in scores_df to use enrichment labels
-    rename_dict = {m: module_to_label[m] for m in modules}
-    scores_df_labeled = scores_df.rename(columns=rename_dict)
-    labeled_modules = [module_to_label[m] for m in modules]
-
-    # Melt dataframe for seaborn
-    scores_melted = scores_df_labeled.melt(
-        id_vars=["cluster"],
-        value_vars=labeled_modules,
-        var_name="Module",
-        value_name="Score",
-    )
-
-    # Get unique clusters
-    clusters = scores_df["cluster"].unique()
-
-    # Plot 1: All clusters combined in one plot with facets
-    n_clusters = len(clusters)
-    n_cols = min(3, n_clusters)
-    n_rows = (n_clusters + n_cols - 1) // n_cols
-
-    fig, axes = plt.subplots(
-        n_rows,
-        n_cols,
-        figsize=(
-            figsize_per_cluster[0] * n_cols / 2,
-            figsize_per_cluster[1] * n_rows / 2,
-        ),
-        squeeze=False,
-    )
-    axes = axes.flatten()
-
-    # Color palette for modules
-    module_palette = sns.color_palette("husl", n_colors=len(modules))
-
-    for idx, cluster in enumerate(sorted(clusters)):
-        ax = axes[idx]
-        cluster_data = scores_melted[scores_melted["cluster"] == cluster]
-
-        if not cluster_data.empty:
-            sns.violinplot(
-                data=cluster_data,
-                x="Module",
-                y="Score",
-                palette=module_palette,
-                ax=ax,
-                inner="box",
-                cut=0,
-            )
-            ax.set_title(f"Cluster: {cluster}", fontsize=12, fontweight="bold")
-            ax.set_xlabel("Module (Enrichment)", fontsize=10)
-            ax.set_ylabel("Module Score", fontsize=10)
-            ax.tick_params(axis="x", rotation=60, labelsize=8)
-            # Ensure x-axis labels are fully visible
-            for label in ax.get_xticklabels():
-                label.set_ha("right")
-        else:
-            ax.set_visible(False)
-
-    # Hide unused axes
-    for idx in range(len(clusters), len(axes)):
-        axes[idx].set_visible(False)
-
-    plt.suptitle(
-        "Hotspot Module Scores per Cluster", fontsize=14, fontweight="bold", y=1.02
-    )
-    plt.tight_layout()
-    plt.savefig(
-        f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_per_cluster.png",
-        dpi=config.SAVE_DPI,
-        bbox_inches="tight",
-    )
-    plt.close()
-    print(
-        f"  ✓ Saved violin plots to: {config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_per_cluster.png"
-    )
-
-    # Plot 2: All clusters in one violin plot (modules on x, clusters as hue)
-    fig, ax = plt.subplots(figsize=(max(14, len(modules) * 2.5), 8))
-
-    # Create a palette for clusters
-    cluster_palette = sns.color_palette("Set2", n_colors=n_clusters)
-
-    sns.violinplot(
-        data=scores_melted,
-        x="Module",
-        y="Score",
-        hue="cluster",
-        palette=cluster_palette,
-        ax=ax,
-        inner="box",
-        cut=0,
-    )
-
-    ax.set_title("Hotspot Module Scores by Cluster", fontsize=14, fontweight="bold")
-    ax.set_xlabel("Module (Enrichment)", fontsize=12)
-    ax.set_ylabel("Module Score", fontsize=12)
-    ax.tick_params(axis="x", rotation=60, labelsize=9)
-    for label in ax.get_xticklabels():
-        label.set_ha("right")
-    ax.legend(title="Cluster", bbox_to_anchor=(1.02, 1), loc="upper left")
-
-    plt.tight_layout()
-    plt.savefig(
-        f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_all_clusters.png",
-        dpi=config.SAVE_DPI,
-        bbox_inches="tight",
-    )
-    plt.close()
-    print(
-        f"  ✓ Saved combined violin plot to: {config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_all_clusters.png"
+    if gene_sets is None:
+        gene_sets = list(config.ENRICHMENT_GENE_SETS)
+    return _impl(
+        hotspot_obj=hotspot_obj,
+        adata=adata,
+        cluster_key=cluster_key,
+        figsize_per_cluster=figsize_per_cluster,
+        gene_sets=gene_sets,
     )
