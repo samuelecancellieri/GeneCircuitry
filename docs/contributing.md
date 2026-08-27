@@ -107,6 +107,33 @@ except ImportError:
 
 ---
 
+## Releases & Bioconda Autobump
+
+When a new version tag/release is published on GitHub:
+1. `publish.yml` builds and pushes the distribution to PyPI.
+2. `conda-recipe-autobump.yml` detects the release, waits for PyPI availability, fetches the SHA256 checksum of the sdist, updates the local `conda-recipe/meta.yaml`, and commits it.
+3. The workflow automatically opens a Pull Request against [bioconda/bioconda-recipes](https://github.com/bioconda/bioconda-recipes) updating `recipes/genecircuitry/meta.yaml`.
+
+### Configuring Bioconda PR Submission
+
+To allow GitHub Actions to open PRs against `bioconda/bioconda-recipes`:
+- Generate a GitHub Personal Access Token (PAT) with `public_repo` (or fine-grained repo) scope.
+- Add it as a repository secret named `BIOCONDA_TOKEN` in GitHub Settings > Secrets and variables > Actions.
+
+### Manual Autobump Trigger
+
+You can also trigger the autobump workflow manually via the GitHub Actions tab (`workflow_dispatch`), or locally via the helper script:
+
+```bash
+# Dry run
+python scripts/autobump_bioconda.py --version 0.2.3 --dry-run
+
+# Run with token
+python scripts/autobump_bioconda.py --version 0.2.3 --token "$BIOCONDA_TOKEN"
+```
+
+---
+
 ## Pull request checklist
 
 - [ ] No hardcoded numeric values — all thresholds reference `config.*`
@@ -115,3 +142,4 @@ except ImportError:
 - [ ] New pipeline steps integrated into `PipelineController`, not standalone scripts
 - [ ] Optional dependencies wrapped in `try/except ImportError`
 - [ ] Docstrings include example imports from the correct module
+

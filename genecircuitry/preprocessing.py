@@ -313,70 +313,125 @@ def perform_normalization(adata: AnnData) -> AnnData:
 
 def perform_dimensionality_reduction_clustering(
     adata: AnnData,
+    cluster_key: str = "leiden",
+    skip_dimensionality_reduction: bool = False,
 ) -> AnnData:
     """
     Perform dimensionality reduction and clustering on AnnData object.
 
-    This function computes PCA, constructs a neighborhood graph, computes UMAP embedding,
-    and performs clustering using the Leiden algorithm.
+    This function identifies highly variable genes, computes PCA, constructs a
+    neighborhood graph, computes UMAP embedding, and performs Leiden clustering.
+    If `skip_dimensionality_reduction` is True, all steps are skipped.
+    Additionally, each step checks whether the corresponding result is already
+    present in `adata` and skips that individual step if already completed.
 
     Parameters
     ----------
     adata : AnnData
         Annotated data matrix with cells as observations and genes as variables.
-    n_pcs : int
-        Number of principal components to compute. Default is config.PCA_N_COMPONENTS (50).
-    n_neighbors : int
-        Number of neighbors for constructing the neighborhood graph. Default is config.NEIGHBORS_N_NEIGHBORS (15).
-    resolution : float
-        Resolution parameter for Leiden clustering. Default is config.CLUSTERING_RESOLUTION (1.0).
+    cluster_key : str, default="leiden"
+        Key to store cluster labels in `adata.obs`. Also used to check if clustering
+        is already present.
+    skip_dimensionality_reduction : bool, default=False
+        Whether to skip all dimensionality reduction and clustering steps.
 
     Returns
     -------
     AnnData
-        Annotated data matrix with PCA and clustering results.
+        Annotated data matrix with PCA, UMAP, and clustering results.
     """
-    print("\nPerforming dimensionality reduction and clustering...")
     adata_cc = adata.copy()
 
-    sc.pp.highly_variable_genes(
-        adata_cc,
-        n_top_genes=config.HVGS_N_TOP_GENES,
-        subset=False,
-    )
-    print(f"Identified top {config.HVGS_N_TOP_GENES} highly variable genes")
+    if skip_dimensionality_reduction:
+        print("\nSkipping dimensionality reduction and clustering (as requested)...")
+        adata_cc = ensure_categorical_obs(adata_cc, columns=[cluster_key])
+        return adata_cc
 
-    # PCA
-    sc.pp.pca(adata_cc, n_comps=config.PCA_N_COMPS, svd_solver=config.PCA_SVDSOLVE)
-    print(f"Computed PCA with {config.PCA_N_COMPS} components")
+    print("\nPerforming dimensionality reduction and clustering...")
 
-    # Neighborhood graph
-    sc.pp.neighbors(
-        adata_cc,
-        metric=config.NEIGHBORS_METRIC,
-        method=config.NEIGHBORS_METHOD,
-        n_neighbors=config.NEIGHBORS_N_NEIGHBORS,
-        n_pcs=config.NEIGHBORS_N_PCS,
-    )
-    print(
-        f"Constructed neighborhood graph with {config.NEIGHBORS_N_NEIGHBORS} neighbors"
-    )
+    # Step 1: Highly Variable Genes (HVG)
+    if "highly_variable" in adata_cc.var.columns:
+        n_hvgs = int(adata_cc.var["highly_variable"].sum())
+        print(
+            f"  - Highly variable genes already identified ({n_hvgs} HVGs found in .var['highly_variable']). Skipping HVG selection."
+        )
+    else:
+        sc.pp.highly_variable_genes(
+            adata_cc,
+            n_top_genes=config.HVGS_N_TOP_GENES,
+            subset=False,
+        )
+        print(f"Identified top {config.HVGS_N_TOP_GENES} highly variable genes")
 
-    # UMAP
-    sc.tl.umap(
-        adata_cc,
-        min_dist=config.UMAP_MIN_DIST,
-        spread=config.UMAP_SPREAD,
-        n_components=config.UMAP_N_COMPONENTS,
-    )
-    print("Computed UMAP embedding")
+    # Step 2: PCA
+    if "X_pca" in adata_cc.obsm:
+        n_comps = adata_cc.obsm["X_pca"].shape[1]
+        print(
+            f"  - PCA already computed ({n_comps} components found in .obsm['X_pca']). Skipping PCA."
+        )
+    else:
+        n_comps = config.PCA_N_COMPS
+        if n_comps is not None and config.PCA_SVDSOLVE == "arpack":
+            n_comps = min(n_comps, min(adata_cc.shape) - 1)
+        sc.pp.pca(adata_cc, n_comps=n_comps, svd_solver=config.PCA_SVDSOLVE)
+        print(f"Computed PCA with {n_comps} components")
 
-    # Clustering
-    sc.tl.leiden(adata_cc, resolution=config.LEIDEN_RESOLUTION, flavor="igraph", n_iterations=2)
-    print(f"Performed Leiden clustering with resolution {config.LEIDEN_RESOLUTION}")
+    # Step 3: Neighborhood graph
+    if "neighbors" in adata_cc.uns or (
+        "connectivities" in adata_cc.obsp and "distances" in adata_cc.obsp
+    ):
+        print(
+            "  - Neighborhood graph already constructed (found in .uns['neighbors'] / .obsp). Skipping neighbors."
+        )
+    else:
+        n_pcs = config.NEIGHBORS_N_PCS
+        if "X_pca" in adata_cc.obsm and n_pcs is not None:
+            n_pcs = min(n_pcs, adata_cc.obsm["X_pca"].shape[1])
+        sc.pp.neighbors(
+            adata_cc,
+            metric=config.NEIGHBORS_METRIC,
+            method=config.NEIGHBORS_METHOD,
+            n_neighbors=config.NEIGHBORS_N_NEIGHBORS,
+            n_pcs=n_pcs,
+        )
+        print(
+            f"Constructed neighborhood graph with {config.NEIGHBORS_N_NEIGHBORS} neighbors"
+        )
+
+    # Step 4: UMAP
+    if "X_umap" in adata_cc.obsm:
+        print(
+            "  - UMAP embedding already computed (found in .obsm['X_umap']). Skipping UMAP."
+        )
+    else:
+        sc.tl.umap(
+            adata_cc,
+            min_dist=config.UMAP_MIN_DIST,
+            spread=config.UMAP_SPREAD,
+            n_components=config.UMAP_N_COMPONENTS,
+        )
+        print("Computed UMAP embedding")
+
+    # Step 5: Clustering
+    if cluster_key in adata_cc.obs.columns:
+        n_clusters = len(adata_cc.obs[cluster_key].unique())
+        print(
+            f"  - Clustering '{cluster_key}' already exists ({n_clusters} clusters found in .obs['{cluster_key}']). Skipping clustering."
+        )
+    else:
+        sc.tl.leiden(
+            adata_cc,
+            key_added=cluster_key,
+            resolution=config.LEIDEN_RESOLUTION,
+            flavor="igraph",
+            n_iterations=2,
+        )
+        print(
+            f"Performed Leiden clustering with resolution {config.LEIDEN_RESOLUTION} (key: '{cluster_key}')"
+        )
 
     # Convert categorical columns for stratification compatibility
-    adata_cc = ensure_categorical_obs(adata_cc)
+    adata_cc = ensure_categorical_obs(adata_cc, columns=[cluster_key])
 
     return adata_cc
 
