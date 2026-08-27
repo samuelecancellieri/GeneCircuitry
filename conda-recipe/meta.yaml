@@ -8,7 +8,7 @@ package:
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
   # sha256 is filled in by the conda-forge/bioconda bot on submission
-  sha256: 8a2beff81c4033b38c368e54ba8cead8356256c48317c754eb92730ca0a6cfe5
+  sha256: af8d7a62fd7a36338984dc8c07f1ad51ad44588c168d719702d09bca2b786296
 
 build:
   number: 0
