@@ -189,7 +189,7 @@ HOTSPOT_MIN_GENES_PER_MODULE = 30
 HOTSPOT_CORE_ONLY = True
 """Whether to use only core genes in modules"""
 
-HOTSPOT_TOP_GENES = 3000
+HOTSPOT_TOP_GENES = 5000
 """Number of top genes to select for Hotspot analysis"""
 
 
