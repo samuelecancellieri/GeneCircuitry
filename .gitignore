@@ -111,3 +111,4 @@ run_pipe_regev_test_TODELETE.sh
 copy_recipe.sh
 *_log.txt
 output/*
+.agents/*.md

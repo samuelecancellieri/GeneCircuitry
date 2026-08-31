@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Union, Sequence
 from matplotlib.patches import Patch
 from anndata import AnnData
 
@@ -639,7 +639,7 @@ def _plot_hotspot_violin_single_worker(task: Dict[str, Any]) -> Tuple[str, bool]
 def plot_module_scores_violin(
     hotspot_obj,
     adata: AnnData,
-    cluster_key: str = "leiden",
+    cluster_key: Union[str, Sequence[str]] = "leiden",
     gene_sets: List[str] = None,
     figsize_per_cluster: Tuple[int, int] = (16, 8),
     skip_existing: bool = True,
@@ -654,8 +654,8 @@ def plot_module_scores_violin(
         Hotspot object with computed module scores.
     adata : AnnData
         AnnData object with cluster annotations.
-    cluster_key : str
-        Column name in adata.obs containing cluster assignments.
+    cluster_key : str or sequence of str
+        Column name(s) in adata.obs containing cluster assignments.
     gene_sets : list
         Gene sets for enrichment annotation labels. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     figsize_per_cluster : tuple
@@ -685,7 +685,15 @@ def plot_module_scores_violin(
         print("  Warning: No module scores available for violin plots")
         return results
 
-    # Check cluster key
+    # Check and resolve cluster key if multi-key
+    if not isinstance(cluster_key, str) or "," in cluster_key or cluster_key not in adata.obs.columns:
+        try:
+            from ..preprocessing import resolve_cluster_key
+            adata, cluster_key = resolve_cluster_key(adata, cluster_key)
+        except Exception:
+            from ..preprocessing import resolve_cluster_key_name
+            cluster_key = resolve_cluster_key_name(cluster_key)
+
     if cluster_key not in adata.obs.columns:
         log_warning(
             "HotspotPlotting.ViolinPlot",
@@ -766,7 +774,7 @@ def plot_module_scores_violin(
 def generate_all_hotspot_plots(
     hotspot_obj,
     adata: Optional[AnnData] = None,
-    cluster_key: str = "leiden",
+    cluster_key: Union[str, Sequence[str]] = "leiden",
     gene_sets: List[str] = None,
     skip_existing: bool = True,
     n_jobs: Optional[int] = None,
@@ -780,8 +788,8 @@ def generate_all_hotspot_plots(
         Hotspot object with analysis results.
     adata : AnnData, optional
         AnnData object with cluster annotations (for violin plots).
-    cluster_key : str
-        Column name for cluster assignments.
+    cluster_key : str or sequence of str
+        Column name(s) for cluster assignments.
     gene_sets : list
         Gene sets for enrichment analysis. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     skip_existing : bool

@@ -1154,6 +1154,8 @@ def generate_report(
     cluster_key = kwargs.get(
         "cluster_column_name", kwargs.get("cluster_column", cluster_key)
     )
+    from ..preprocessing import resolve_cluster_key_name
+    cluster_key = resolve_cluster_key_name(cluster_key) if cluster_key is not None else "leiden"
     from .sections import (
         create_data_summary_section,
         create_settings_section,
@@ -1286,6 +1288,8 @@ def generate_stratified_report(
     cluster_key = kwargs.get(
         "cluster_column_name", kwargs.get("cluster_column", cluster_key)
     )
+    from ..preprocessing import resolve_cluster_key_name
+    cluster_key = resolve_cluster_key_name(cluster_key) if cluster_key is not None else "leiden"
     from .sections import (
         create_data_summary_section,
         create_settings_section,

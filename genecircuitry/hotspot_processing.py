@@ -6,7 +6,7 @@ Plotting functions have been consolidated in genecircuitry.plotting.hotspot_plot
 the names below are kept for backward compatibility and delegate to that module.
 """
 
-from typing import Optional
+from typing import Optional, Union, Sequence
 import os
 import scanpy as sc
 import hotspot as hs
@@ -216,7 +216,7 @@ def _get_module_enrichment_labels(
 def run_hotspot_analysis(
     hotspot_obj,
     adata: Optional[AnnData] = None,
-    cluster_key: str = "leiden",
+    cluster_key: Union[str, Sequence[str]] = "leiden",
     n_jobs: Optional[int] = None,
 ):
     """
@@ -225,13 +225,20 @@ def run_hotspot_analysis(
     Parameters:
         hotspot_obj: An instance of the Hotspot class.
         adata: Optional AnnData object with cluster annotations for violin plots.
-        cluster_key: Column name in adata.obs containing cluster assignments.
+        cluster_key: Column name(s) in adata.obs containing cluster assignments.
         n_jobs: Number of parallel worker processes.
 
     Returns:
         hotspot_obj: The updated Hotspot object with analysis results.
     """
     from .plotting.hotspot_plots import generate_all_hotspot_plots
+    from .preprocessing import resolve_cluster_key, resolve_cluster_key_name
+
+    if adata is not None and cluster_key:
+        try:
+            adata, cluster_key = resolve_cluster_key(adata, cluster_key)
+        except Exception:
+            cluster_key = resolve_cluster_key_name(cluster_key)
 
     # Create KNN graph
     hotspot_obj.create_knn_graph(

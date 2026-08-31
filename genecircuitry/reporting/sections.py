@@ -386,6 +386,10 @@ def create_clustering_section(
     """
     Create Clustering & Visualization section.
     """
+    from ..preprocessing import resolve_cluster_key_name
+    if cluster_key is not None:
+        cluster_key = resolve_cluster_key_name(cluster_key)
+
     metrics = {}
 
     # Check for clustering results
@@ -1096,6 +1100,10 @@ def create_stratified_clustering_section(
 
     all_metrics = {"Stratifications": len(stratification_results)}
     subsections = []
+
+    from ..preprocessing import resolve_cluster_key_name
+    if cluster_key is not None:
+        cluster_key = resolve_cluster_key_name(cluster_key)
 
     for result in stratification_results:
         name = result["name"]

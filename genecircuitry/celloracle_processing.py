@@ -9,11 +9,17 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
 import numpy as np
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union, Sequence, List
 from anndata import AnnData
 import pickle
 
 from . import config
+from .preprocessing import (
+    resolve_cluster_key,
+    resolve_cluster_key_name,
+    parse_cluster_keys,
+    sanitize_identifier,
+)
 
 
 def load_celloracle_results(
@@ -116,24 +122,24 @@ def create_oracle_object(
     cluster_column_name = kwargs.get(
         "cluster_key", kwargs.get("cluster_column", cluster_column_name)
     )
+    if cluster_column_name is None:
+        cluster_column_name = "leiden"
 
     # Create a copy of the AnnData object to avoid modifying the original
     adata_cc = adata.copy()
 
-    # Check if cluster column name contains unsafe characters and replace them
-    if cluster_column_name in adata_cc.obs.columns:
-        # Replace unsafe characters in cluster names
-        adata_cc.obs[cluster_column_name] = (
-            adata_cc.obs[cluster_column_name]
-            .astype(str)
-            .apply(lambda x: x.replace(" ", "_").replace("/", "-"))
-            .astype("category")
-        )
-    else:
-        raise ValueError(
-            f"Cluster column '{cluster_column_name}' not found in adata.obs. "
-            f"Available columns: {list(adata_cc.obs.columns)}"
-        )
+    # Resolve cluster column name and construct composite if multi-key
+    adata_cc, cluster_column_name = resolve_cluster_key(
+        adata_cc, cluster_column_name, key_term="Cluster column"
+    )
+
+    # Replace unsafe characters in cluster names
+    adata_cc.obs[cluster_column_name] = (
+        adata_cc.obs[cluster_column_name]
+        .astype(str)
+        .apply(sanitize_identifier)
+        .astype("category")
+    )
 
     # Create Oracle object
     oracle = co.Oracle()
@@ -347,6 +353,7 @@ def run_links(
     cluster_column_name = kwargs.get(
         "cluster_key", kwargs.get("cluster_column", cluster_column_name)
     )
+    cluster_column_name = resolve_cluster_key_name(cluster_column_name)
     print(f"Calculating GRN links for cluster column: {cluster_column_name}")
 
     # Calculate GRN links
@@ -409,7 +416,7 @@ def load_hotspot_genes(hotspot_genes_path: str) -> list:
 
 def perform_grn_pre_processing(
     adata: AnnData,
-    cluster_key: str = "leiden",
+    cluster_key: Union[str, Sequence[str]] = "leiden",
     cell_downsample: int = 20000,
     top_genes: Optional[int] = None,
     gene_list: Optional[list] = None,
@@ -429,8 +436,9 @@ def perform_grn_pre_processing(
     ----------
     adata : AnnData
         Annotated data matrix with cells as observations and genes as variables.
-    cluster_key : str, default="leiden"
-        Key in adata.obs to use for clustering over GRN.
+    cluster_key : str or sequence of str, default="leiden"
+        Key(s) in adata.obs to use for clustering over GRN. Can be a single column,
+        a comma-separated string, or a sequence/list of columns.
     cell_downsample : int, default=20000
         Number of cells to downsample to (default: 20000).
     top_genes : int, optional
@@ -479,6 +487,8 @@ def perform_grn_pre_processing(
     cluster_key = kwargs.get(
         "cluster_column_name", kwargs.get("cluster_column", cluster_key)
     )
+    if cluster_key is None:
+        cluster_key = "leiden"
 
     # Use config defaults if not specified
     if top_genes is None:
@@ -493,16 +503,10 @@ def perform_grn_pre_processing(
     # Make a copy to avoid modifying the original
     adata_cc = adata.copy()
 
-    # Ensure cluster_key is categorical to avoid str/numeric comparison issues
-    if cluster_key in adata_cc.obs.columns:
-        if not isinstance(adata_cc.obs[cluster_key].dtype, pd.CategoricalDtype):
-            adata_cc.obs[cluster_key] = adata_cc.obs[cluster_key].astype("category")
-            print(f"  Converted '{cluster_key}' to categorical")
-    else:
-        raise ValueError(
-            f"Cluster key '{cluster_key}' not found in adata.obs. "
-            f"Available columns: {list(adata_cc.obs.columns)}"
-        )
+    # Resolve cluster_key (handles single key, comma-separated keys, or sequence of keys)
+    adata_cc, cluster_key = resolve_cluster_key(
+        adata_cc, cluster_key, key_term="Cluster key"
+    )
 
     if gene_list is not None:
         # Use provided gene list (e.g., Hotspot autocorrelated genes)

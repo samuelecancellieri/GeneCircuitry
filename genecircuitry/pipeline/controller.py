@@ -21,8 +21,11 @@ import shutil
 import argparse
 import sys
 from datetime import datetime
+from typing import Optional, List, Dict, Any, Union
+from collections.abc import Iterable, Sequence
 import scanpy as sc
 import pandas as pd
+import numpy as np
 import pickle
 import hashlib
 import json
@@ -37,6 +40,10 @@ from genecircuitry.preprocessing import (
     perform_normalization,
     perform_dimensionality_reduction_clustering,
     ensure_categorical_obs,
+    resolve_cluster_key,
+    resolve_cluster_key_name,
+    parse_cluster_keys,
+    sanitize_identifier,
 )
 from genecircuitry.reporting import generate_report, generate_stratified_report
 
@@ -295,9 +302,14 @@ class PipelineController:
                     self.args, "force_dimensionality_reduction", False
                 ) or config.FORCE_DIM_REDUCTION
 
+            cluster_key = getattr(self.args, "cluster_key", "leiden")
+            parsed = parse_cluster_keys(cluster_key)
+            if len(parsed) > 1 and all(k in adata.obs.columns for k in parsed):
+                adata, cluster_key = resolve_cluster_key(adata, cluster_key)
+
             result = dimensionality_reduction_clustering(
                 adata,
-                cluster_key=self.args.cluster_key,
+                cluster_key=cluster_key,
                 log_dir=log_dir,
                 force=force,
             )
@@ -325,6 +337,8 @@ class PipelineController:
                 log_step("Controller.ATACPeaks", "SKIPPED", {"reason": "no BED file"})
                 return None
 
+            output_dir = getattr(self.args, "output", config.OUTPUT_DIR)
+
             print(f"\n{'='*70}")
             print("STEP 3.5: ATAC Peaks Processing")
             print(f"{'='*70}")
@@ -340,10 +354,10 @@ class PipelineController:
             )
 
             dict_pkl_path = os.path.join(
-                config.OUTPUT_DIR, "celloracle", "enriched_atac_peaks_dict.pkl"
+                output_dir, "celloracle", "enriched_atac_peaks_dict.pkl"
             )
             df_pkl_path = os.path.join(
-                config.OUTPUT_DIR, "celloracle", "enriched_atac_peaks_df.pkl"
+                output_dir, "celloracle", "enriched_atac_peaks_df.pkl"
             )
             if (
                 log_dir
@@ -364,7 +378,7 @@ class PipelineController:
             dict_pkl_path = process_atac_peaks(
                 bed_path=bed_path,
                 species=self.args.species,
-                output_dir=config.OUTPUT_DIR,
+                output_dir=output_dir,
                 log_dir=log_dir,
             )
 
@@ -400,6 +414,10 @@ class PipelineController:
                 log_dir = self.log_dir
             if cluster_key is None:
                 cluster_key = getattr(self.args, "cluster_key", "leiden")
+
+            parsed = parse_cluster_keys(cluster_key)
+            if len(parsed) > 1 and all(k in adata.obs.columns for k in parsed):
+                adata, cluster_key = resolve_cluster_key(adata, cluster_key)
 
             # Determine TF dictionary: ATAC peaks PKL takes
             # priority over --tf-dictionary CLI argument
@@ -438,6 +456,10 @@ class PipelineController:
                 log_dir = self.log_dir
             if cluster_key is None:
                 cluster_key = getattr(self.args, "cluster_key", "leiden")
+
+            parsed = parse_cluster_keys(cluster_key)
+            if len(parsed) > 1 and all(k in adata.obs.columns for k in parsed):
+                adata, cluster_key = resolve_cluster_key(adata, cluster_key)
 
             result = hotspot_pipeline(
                 adata,
@@ -573,10 +595,19 @@ class PipelineController:
             FIGURES_DIR_HOTSPOT=os.path.join(stratified_figures_dir, "hotspot"),
         )
 
+        # Resolve cluster key on adata_cluster if multi-key
+        parsed = parse_cluster_keys(self.args.cluster_key)
+        if len(parsed) > 1 and all(k in adata_cluster.obs.columns for k in parsed):
+            adata_cluster, resolved_cluster_key = resolve_cluster_key(
+                adata_cluster, self.args.cluster_key
+            )
+        else:
+            resolved_cluster_key = resolve_cluster_key_name(self.args.cluster_key)
+
         # Run pipeline steps
         adata_clustered = dimensionality_reduction_clustering(
             adata_cluster,
-            cluster_key=self.args.cluster_key,
+            cluster_key=resolved_cluster_key,
             log_dir=stratified_log_dir,
             force=True,
         )
@@ -586,15 +617,21 @@ class PipelineController:
         if use_hvgs:
             # Legacy workflow: CellOracle (HVGs) → Hotspot
             celloracle_result = self.run_step_celloracle(
-                adata_clustered, log_dir=stratified_log_dir
+                adata_clustered,
+                log_dir=stratified_log_dir,
+                cluster_key=resolved_cluster_key,
             )
             hotspot_result = self.run_step_hotspot(
-                adata_clustered, log_dir=stratified_log_dir
+                adata_clustered,
+                log_dir=stratified_log_dir,
+                cluster_key=resolved_cluster_key,
             )
         else:
             # Default workflow: Hotspot (identify genes) → CellOracle (use genes)
             hotspot_result = self.run_step_hotspot(
-                adata_clustered, log_dir=stratified_log_dir
+                adata_clustered,
+                log_dir=stratified_log_dir,
+                cluster_key=resolved_cluster_key,
             )
             hotspot_genes_path = None
             if not self.args.skip_hotspot:
@@ -605,6 +642,7 @@ class PipelineController:
                 adata_clustered,
                 log_dir=stratified_log_dir,
                 hotspot_genes_path=hotspot_genes_path,
+                cluster_key=resolved_cluster_key,
             )
 
         # Generate summary
@@ -614,7 +652,7 @@ class PipelineController:
             hotspot_result,
             self.start_time,
             stratified_output_dir,
-            cluster_key=self.args.cluster_key,
+            cluster_key=resolved_cluster_key,
         )
 
         # Run GRN deep analysis
@@ -1056,52 +1094,128 @@ def preprocessing_pipeline(adata, name=None, skip_qc=False, log_dir=None):
 
 
 def stratification_pipeline(adata, cluster_key_stratification=None, clusters="all"):
-    """Perform stratification based on specified clustering key."""
-    if cluster_key_stratification and cluster_key_stratification in adata.obs.columns:
-        print(f"\n{'='*70}")
-        print("STEP 2.5: Stratification by Clusters")
-        print(f"{'='*70}")
+    """Perform stratification based on specified clustering key(s).
 
-        # Ensure the stratification column is categorical to avoid str/numeric conflicts
-        if not isinstance(
-            adata.obs[cluster_key_stratification].dtype, pd.CategoricalDtype
-        ):
-            adata.obs[cluster_key_stratification] = adata.obs[
-                cluster_key_stratification
-            ].astype("category")
-            print(f"  Converted '{cluster_key_stratification}' to categorical")
+    Supports single keys, comma-separated key strings (e.g. 'key1,key2'),
+    or sequences/lists of keys (e.g. ['key1', 'key2']).
+    """
+    keys = parse_cluster_keys(cluster_key_stratification)
+    if not keys:
+        print("\nNo stratification performed (no valid clustering key provided).")
+        return [], []
 
-        adata_list = list()
-        adata_stratification_list = list()
+    missing = [k for k in keys if k not in adata.obs.columns]
+    if missing:
+        print(
+            f"\nNo stratification performed (stratification key(s) {missing} not found in adata.obs)."
+        )
+        return [], []
 
-        # check unique clusters and filter based on 'clusters' parameter
-        if clusters == "all":
-            unique_clusters = adata.obs[cluster_key_stratification].cat.categories
-        else:
-            requested_clusters = set(
-                [c.strip() for c in clusters.split(",") if c.strip()]
-            )
+    print(f"\n{'='*70}")
+    print("STEP 2.5: Stratification by Clusters")
+    print(f"{'='*70}")
+
+    if adata.is_view:
+        adata = adata.copy()
+
+    # Ensure all stratification columns are categorical to avoid str/numeric conflicts
+    for k in keys:
+        if not isinstance(adata.obs[k].dtype, pd.CategoricalDtype):
+            adata.obs[k] = adata.obs[k].astype("category")
+            print(f"  Converted '{k}' to categorical")
+
+    adata_list = list()
+    adata_stratification_list = list()
+
+    if clusters is None or clusters == "all" or clusters == ["all"] or clusters == ("all",):
+        requested_clusters = None
+    elif isinstance(clusters, (str, bytes)):
+        c_str = clusters.decode() if isinstance(clusters, bytes) else clusters
+        requested_clusters = set(c.strip() for c in c_str.split(",") if c.strip())
+    elif isinstance(clusters, (Iterable, Sequence, np.ndarray, pd.Index, pd.Series)):
+        requested_clusters = set()
+        for item in clusters:
+            if isinstance(item, (str, bytes)):
+                item_str = item.decode() if isinstance(item, bytes) else item
+                for sub in item_str.split(","):
+                    sub_clean = sub.strip()
+                    if sub_clean:
+                        requested_clusters.add(sub_clean)
+            elif item is not None:
+                item_clean = str(item).strip()
+                if item_clean:
+                    requested_clusters.add(item_clean)
+        if "all" in requested_clusters and len(requested_clusters) == 1:
+            requested_clusters = None
+    else:
+        c_str = str(clusters).strip()
+        requested_clusters = {c_str} if c_str and c_str != "all" else None
+
+    if len(keys) == 1:
+        key = keys[0]
+        categories = adata.obs[key].cat.categories
+        if requested_clusters is not None:
             unique_clusters = [
                 c
-                for c in adata.obs[cluster_key_stratification].cat.categories
+                for c in categories
                 if str(c) in requested_clusters
+                or sanitize_identifier(c) in requested_clusters
+                or str(c).replace(" ", "_") in requested_clusters
+                or any(sanitize_identifier(rc) == sanitize_identifier(c) for rc in requested_clusters)
             ]
+        else:
+            unique_clusters = list(categories)
 
         for cluster in unique_clusters:
-            adata_cluster = adata[
-                adata.obs[cluster_key_stratification] == cluster
-            ].copy()
+            mask = (adata.obs[key] == cluster).values
+            if not mask.any():
+                continue
+            adata_cluster = adata[mask].copy()
             adata_list.append(adata_cluster)
             # Convert to string for folder naming (handles numeric cluster IDs)
-            adata_stratification_list.append(str(cluster).replace(" ", "_"))
+            strat_name = str(cluster).replace(" ", "_")
+            adata_stratification_list.append(strat_name)
             print(
                 f"  ✓ Cluster '{cluster}': {adata_cluster.n_obs} cells × {adata_cluster.n_vars} genes"
             )
 
         return adata_list, adata_stratification_list
     else:
-        print("\nNo stratification performed (no valid clustering key provided).")
-        return [], []  # Return empty lists for compatibility
+        # Multi-key stratification: Cartesian combinations of categories
+        import itertools
+
+        key_categories = [list(adata.obs[k].cat.categories) for k in keys]
+        combinations = itertools.product(*key_categories)
+
+        for comb in combinations:
+            # Composite subgroup identifier joined with underscore
+            comp_name = "_".join(sanitize_identifier(v) for v in comb)
+            raw_name = "_".join(str(v) for v in comb)
+
+            if requested_clusters is not None:
+                if (
+                    comp_name not in requested_clusters
+                    and raw_name not in requested_clusters
+                    and not any(sanitize_identifier(rc) == comp_name for rc in requested_clusters)
+                ):
+                    continue
+
+            # Find cells matching this combination
+            mask = np.ones(adata.n_obs, dtype=bool)
+            for k, v in zip(keys, comb):
+                mask &= (adata.obs[k] == v).values
+
+            if not mask.any():
+                continue  # Skip unobserved combinations
+
+            adata_cluster = adata[mask].copy()
+            adata_list.append(adata_cluster)
+            adata_stratification_list.append(comp_name)
+            print(
+                f"  ✓ Subgroup '{comp_name}': {adata_cluster.n_obs} cells × {adata_cluster.n_vars} genes"
+            )
+
+        return adata_list, adata_stratification_list
 
 
 def dimensionality_reduction_clustering(
@@ -1113,6 +1227,12 @@ def dimensionality_reduction_clustering(
         or kwargs.get("force_dim_reduction", False)
         or kwargs.get("force_dimensionality_reduction", False)
     )
+    parsed = parse_cluster_keys(cluster_key)
+    if len(parsed) > 1 and all(k in adata.obs.columns for k in parsed):
+        adata, cluster_key = resolve_cluster_key(adata, cluster_key)
+    else:
+        cluster_key = resolve_cluster_key_name(cluster_key)
+
     log_step(
         "DimReduction_Clustering",
         "STARTED",
@@ -1168,7 +1288,7 @@ def dimensionality_reduction_clustering(
         log_step("DimReduction_Clustering.Processing", "COMPLETED")
 
         # Get cluster count
-        n_clusters = len(adata.obs[cluster_key].unique())
+        n_clusters = len(adata.obs[cluster_key].unique()) if cluster_key in adata.obs.columns else 0
         print(f"✓ Identified {n_clusters} clusters")
 
         # Save checkpoint
@@ -1226,6 +1346,12 @@ def celloracle_pipeline(
     cluster_key = kwargs.get(
         "cluster_column_name", kwargs.get("cluster_column", cluster_key)
     )
+    parsed = parse_cluster_keys(cluster_key)
+    if len(parsed) > 1 and all(k in adata.obs.columns for k in parsed):
+        adata, cluster_key = resolve_cluster_key(adata, cluster_key)
+    else:
+        cluster_key = resolve_cluster_key_name(cluster_key)
+
     log_step(
         "CellOracle",
         "STARTED",
@@ -1430,6 +1556,12 @@ def hotspot_pipeline(
     cluster_key = kwargs.get(
         "cluster_column_name", kwargs.get("cluster_column", cluster_key)
     )
+    parsed = parse_cluster_keys(cluster_key)
+    if len(parsed) > 1 and all(k in adata.obs.columns for k in parsed):
+        adata, cluster_key = resolve_cluster_key(adata, cluster_key)
+    else:
+        cluster_key = resolve_cluster_key_name(cluster_key)
+
     log_step(
         "Hotspot", "STARTED", {"n_obs": adata.n_obs, "embedding_key": embedding_key}
     )
@@ -1573,6 +1705,7 @@ def generate_summary(
     cluster_key = kwargs.get(
         "cluster_column_name", kwargs.get("cluster_column", cluster_key)
     )
+    cluster_key = resolve_cluster_key_name(cluster_key)
     log_step("GenerateSummary", "STARTED")
 
     try:

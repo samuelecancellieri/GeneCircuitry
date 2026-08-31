@@ -3,13 +3,15 @@ Data preprocessing module for genecircuitry
 """
 
 import os
+import re
 import scanpy as sc
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
 import numpy as np
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Union, Any
+from collections.abc import Iterable, Sequence
 from anndata import AnnData
 
 from . import config
@@ -357,7 +359,13 @@ def perform_dimensionality_reduction_clustering(
 
     if skip_dimensionality_reduction:
         print("\nSkipping dimensionality reduction and clustering (as requested)...")
-        adata_cc = ensure_categorical_obs(adata_cc, columns=[cluster_key])
+        resolved_cluster_key = resolve_cluster_key_name(cluster_key)
+        parsed = parse_cluster_keys(cluster_key)
+        if len(parsed) > 1 and all(k in adata_cc.obs.columns for k in parsed):
+            adata_cc, resolved_cluster_key = resolve_cluster_key(adata_cc, cluster_key)
+        adata_cc = ensure_categorical_obs(
+            adata_cc, columns=[resolved_cluster_key, cluster_key]
+        )
         return adata_cc
 
     print("\nPerforming dimensionality reduction and clustering...")
@@ -426,11 +434,17 @@ def perform_dimensionality_reduction_clustering(
         )
         print("Computed UMAP embedding")
 
+    # Resolve cluster_key if multi-key or custom
+    resolved_cluster_key = resolve_cluster_key_name(cluster_key)
+    parsed = parse_cluster_keys(cluster_key)
+    if len(parsed) > 1 and all(k in adata_cc.obs.columns for k in parsed):
+        adata_cc, resolved_cluster_key = resolve_cluster_key(adata_cc, cluster_key)
+
     # Step 5: Clustering
-    if not force and cluster_key in adata_cc.obs.columns:
-        n_clusters = len(adata_cc.obs[cluster_key].unique())
+    if not force and resolved_cluster_key in adata_cc.obs.columns:
+        n_clusters = len(adata_cc.obs[resolved_cluster_key].unique())
         print(
-            f"  - Clustering '{cluster_key}' already exists ({n_clusters} clusters found in .obs['{cluster_key}']). Skipping clustering."
+            f"  - Clustering '{resolved_cluster_key}' already exists ({n_clusters} clusters found in .obs['{resolved_cluster_key}']). Skipping clustering."
         )
     else:
         sc.tl.leiden(
@@ -445,7 +459,9 @@ def perform_dimensionality_reduction_clustering(
         )
 
     # Convert categorical columns for stratification compatibility
-    adata_cc = ensure_categorical_obs(adata_cc, columns=[cluster_key])
+    adata_cc = ensure_categorical_obs(
+        adata_cc, columns=[resolved_cluster_key, cluster_key]
+    )
 
     return adata_cc
 
@@ -478,6 +494,9 @@ def ensure_categorical_obs(
     >>> adata = ensure_categorical_obs(adata)
     >>> adata = ensure_categorical_obs(adata, columns=['cell_type', 'batch'])
     """
+    if adata.is_view:
+        adata = adata.copy()
+
     # Common stratification/clustering columns to always convert if present
     default_categorical_cols = [
         "leiden",
@@ -508,7 +527,10 @@ def ensure_categorical_obs(
             if col in adata.obs.columns and col not in columns_to_convert:
                 columns_to_convert.append(col)
     else:
-        columns_to_convert = [c for c in columns if c in adata.obs.columns]
+        columns_to_convert = []
+        for k in parse_cluster_keys(columns):
+            if k in adata.obs.columns and k not in columns_to_convert:
+                columns_to_convert.append(k)
 
     converted = []
     for col in columns_to_convert:
@@ -520,3 +542,156 @@ def ensure_categorical_obs(
         print(f"Converted to categorical: {', '.join(converted)}")
 
     return adata
+
+
+def parse_cluster_keys(keys: Any) -> List[str]:
+    """
+    Parse cluster key(s) from None, str, or sequence/iterable into a list of unique strings.
+
+    Supports comma-separated strings (e.g. 'key1,key2' or 'key1, key2')
+    and sequences/iterables of keys (e.g. ['key1', 'key2'], ('k1', 'k2'), {'k1', 'k2'},
+    pd.Index, np.ndarray, dict_keys, generators, etc.).
+    """
+    if keys is None:
+        return []
+    if isinstance(keys, (str, bytes)):
+        keys_str = keys.decode() if isinstance(keys, bytes) else keys
+        parsed = []
+        for k in keys_str.split(","):
+            k_clean = k.strip()
+            if k_clean and k_clean not in parsed:
+                parsed.append(k_clean)
+        return parsed
+    if isinstance(keys, (Iterable, Sequence, np.ndarray, pd.Index, pd.Series)):
+        parsed = []
+        # For deterministic behavior if a set/frozenset is passed, sort by string representation
+        items = (
+            sorted(list(keys), key=lambda x: str(x))
+            if isinstance(keys, (set, frozenset))
+            else list(keys)
+        )
+        for item in items:
+            if isinstance(item, (str, bytes)):
+                item_str = item.decode() if isinstance(item, bytes) else item
+                for sub in item_str.split(","):
+                    sub_clean = sub.strip()
+                    if sub_clean and sub_clean not in parsed:
+                        parsed.append(sub_clean)
+            elif item is not None:
+                item_clean = str(item).strip()
+                if item_clean and item_clean not in parsed:
+                    parsed.append(item_clean)
+        return parsed
+    item_str = str(keys).strip()
+    return [item_str] if item_str else []
+
+
+def sanitize_identifier(val: Any) -> str:
+    """
+    Sanitize a value for filesystem-safe identifier and composite cluster naming.
+
+    Replaces spaces with underscores, slashes with hyphens, and removes/replaces
+    unsafe filename characters.
+    """
+    s = str(val).strip()
+    s = s.replace(" ", "_").replace("/", "-")
+    s = re.sub(r'[\\:*?"<>|]', "_", s)
+    return s
+
+
+def resolve_cluster_key_name(cluster_key: Any) -> str:
+    """
+    Return the resolved cluster key column name (e.g. 'key1_key2' for multi-key).
+    """
+    keys = parse_cluster_keys(cluster_key)
+    if not keys:
+        return "leiden"
+    if len(keys) == 1:
+        return keys[0]
+    return "_".join(keys)
+
+
+def resolve_cluster_key(
+    adata: AnnData,
+    cluster_key: Any,
+    key_term: str = "Cluster key",
+) -> Tuple[AnnData, str]:
+    """
+    Resolve cluster_key to a single column name in adata.obs.
+
+    If cluster_key contains multiple keys (comma-separated string or sequence),
+    constructs/ensures a composite categorical column in adata.obs representing
+    the combined grouping (e.g. 'key1_key2') and returns (adata, composite_key_name).
+    If cluster_key is a single key, ensures it is categorical and returns (adata, key).
+
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data matrix.
+    cluster_key : str or sequence of str
+        Single key, comma-separated keys, or sequence of keys.
+    key_term : str, default="Cluster key"
+        Descriptive term for error messages (e.g. 'Cluster key' or 'Cluster column').
+
+    Returns
+    -------
+    Tuple[AnnData, str]
+        (adata, resolved_cluster_key_name)
+    """
+    keys = parse_cluster_keys(cluster_key)
+    if not keys:
+        raise ValueError(f"{key_term} is required.")
+
+    if len(keys) == 1:
+        single_key = keys[0]
+        if single_key not in adata.obs.columns:
+            raise ValueError(
+                f"{key_term} '{single_key}' not found in adata.obs. "
+                f"Available columns: {list(adata.obs.columns)}"
+            )
+        if adata.is_view:
+            adata = adata.copy()
+        if not isinstance(adata.obs[single_key].dtype, pd.CategoricalDtype):
+            adata.obs[single_key] = adata.obs[single_key].astype("category")
+            print(f"  Converted '{single_key}' to categorical")
+        return adata, single_key
+
+    # Multi-key case:
+    missing = [k for k in keys if k not in adata.obs.columns]
+    if missing:
+        if len(missing) == 1:
+            raise ValueError(
+                f"{key_term} '{missing[0]}' not found in adata.obs. "
+                f"Available columns: {list(adata.obs.columns)}"
+            )
+        else:
+            raise ValueError(
+                f"{key_term}s {missing} not found in adata.obs. "
+                f"Available columns: {list(adata.obs.columns)}"
+            )
+
+    if adata.is_view:
+        adata = adata.copy()
+
+    composite_col = "_".join(keys)
+
+    # Ensure all constituent keys are categorical
+    for k in keys:
+        if not isinstance(adata.obs[k].dtype, pd.CategoricalDtype):
+            adata.obs[k] = adata.obs[k].astype("category")
+
+    # Build composite series from sanitized values
+    combined = None
+    for k in keys:
+        col_str = adata.obs[k].astype(str).apply(sanitize_identifier)
+        if combined is None:
+            combined = col_str
+        else:
+            combined = combined + "_" + col_str
+
+    adata.obs[composite_col] = combined.astype("category")
+    print(
+        f"  Constructed composite {key_term.lower()} column '{composite_col}' "
+        f"with {len(adata.obs[composite_col].cat.categories)} categories"
+    )
+    return adata, composite_col
