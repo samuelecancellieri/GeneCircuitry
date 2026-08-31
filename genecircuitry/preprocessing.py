@@ -435,13 +435,13 @@ def perform_dimensionality_reduction_clustering(
     else:
         sc.tl.leiden(
             adata_cc,
-            key_added=cluster_key,
+            key_added="leiden",
             resolution=config.LEIDEN_RESOLUTION,
             flavor="igraph",
             n_iterations=2,
         )
         print(
-            f"Performed Leiden clustering with resolution {config.LEIDEN_RESOLUTION} (key: '{cluster_key}')"
+            f"Performed Leiden clustering with resolution {config.LEIDEN_RESOLUTION} (key: 'leiden')"
         )
 
     # Convert categorical columns for stratification compatibility
