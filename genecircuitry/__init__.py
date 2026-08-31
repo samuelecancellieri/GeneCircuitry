@@ -38,14 +38,32 @@ _warnings.filterwarnings(
     category=UserWarning,
 )
 
-# Import core modules (always available)
-from . import preprocessing
-from . import grn_deep_analysis
-from . import atac_peaks_processing
+# Import core modules
 from . import config
+from . import logging_utils
 from . import reporting
 from . import plotting
-from . import logging_utils
+from . import grn_deep_analysis
+
+try:
+    from . import preprocessing
+except ImportError as _pp_err:
+    _warnings.warn(
+        f"Preprocessing dependencies could not be loaded ({type(_pp_err).__name__}): {_pp_err}",
+        ImportWarning,
+        stacklevel=2,
+    )
+    preprocessing = None  # type: ignore[assignment]
+
+try:
+    from . import atac_peaks_processing
+except ImportError as _atac_err:
+    _warnings.warn(
+        f"ATAC peaks processing dependencies could not be loaded ({type(_atac_err).__name__}): {_atac_err}",
+        ImportWarning,
+        stacklevel=2,
+    )
+    atac_peaks_processing = None  # type: ignore[assignment]
 
 # Lazy import for pipeline module (avoids circular import since
 # controller.py imports from genecircuitry.config and genecircuitry.preprocessing)

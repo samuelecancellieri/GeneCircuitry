@@ -5,7 +5,11 @@ correctly delegate to the canonical genecircuitry.plotting subpackage.
 
 import importlib
 import inspect
-import pytest
+import unittest
+try:
+    import pytest
+except ImportError:
+    pytest = None
 
 
 def test_grn_deep_analysis_no_inline_plt():
@@ -23,7 +27,9 @@ def test_hotspot_processing_no_inline_plt():
     try:
         import genecircuitry.hotspot_processing as mod
     except ImportError:
-        pytest.skip("hotspot optional dependency not installed")
+        if pytest is not None:
+            pytest.skip("hotspot optional dependency not installed")
+        return
 
     source = inspect.getsource(mod)
     assert "plt.savefig" not in source, "hotspot_processing still has plt.savefig"
@@ -77,7 +83,9 @@ def test_hotspot_processing_delegates_plot_hotspot_annotation():
     try:
         import genecircuitry.hotspot_processing as mod
     except ImportError:
-        pytest.skip("hotspot optional dependency not installed")
+        if pytest is not None:
+            pytest.skip("hotspot optional dependency not installed")
+        return
 
     source = inspect.getsource(mod.plot_hotspot_annotation)
     assert "hotspot_plots" in source or "_impl" in source
@@ -88,7 +96,9 @@ def test_hotspot_processing_delegates_plot_module_scores_violin():
     try:
         import genecircuitry.hotspot_processing as mod
     except ImportError:
-        pytest.skip("hotspot optional dependency not installed")
+        if pytest is not None:
+            pytest.skip("hotspot optional dependency not installed")
+        return
 
     source = inspect.getsource(mod.plot_module_scores_violin)
     assert "hotspot_plots" in source or "_impl" in source
@@ -137,3 +147,51 @@ def test_grn_deep_analysis_imports_are_clean():
     assert not hasattr(mod, "plt"), "matplotlib.pyplot imported at module level"
     assert not hasattr(mod, "sns"), "seaborn imported at module level"
     assert not hasattr(mod, "nx"), "networkx imported at module level"
+
+
+class TestPlottingDelegation(unittest.TestCase):
+    def test_grn_deep_analysis_no_inline_plt(self):
+        test_grn_deep_analysis_no_inline_plt()
+
+    def test_hotspot_processing_no_inline_plt(self):
+        test_hotspot_processing_no_inline_plt()
+
+    def test_grn_deep_analysis_delegates_plot_network_graph(self):
+        test_grn_deep_analysis_delegates_plot_network_graph()
+
+    def test_grn_deep_analysis_delegates_plot_scatter_scores(self):
+        test_grn_deep_analysis_delegates_plot_scatter_scores()
+
+    def test_grn_deep_analysis_delegates_plot_heatmap_scores(self):
+        test_grn_deep_analysis_delegates_plot_heatmap_scores()
+
+    def test_grn_deep_analysis_delegates_plot_difference_cluster_scores(self):
+        test_grn_deep_analysis_delegates_plot_difference_cluster_scores()
+
+    def test_grn_deep_analysis_delegates_plot_compare_cluster_scores(self):
+        test_grn_deep_analysis_delegates_plot_compare_cluster_scores()
+
+    def test_hotspot_processing_delegates_plot_hotspot_annotation(self):
+        test_hotspot_processing_delegates_plot_hotspot_annotation()
+
+    def test_hotspot_processing_delegates_plot_module_scores_violin(self):
+        test_hotspot_processing_delegates_plot_module_scores_violin()
+
+    def test_grn_deep_analysis_no_deprecated_plot_exists(self):
+        test_grn_deep_analysis_no_deprecated_plot_exists()
+
+    def test_grn_deep_analysis_no_plot_score_comparison_2d(self):
+        test_grn_deep_analysis_no_plot_score_comparison_2d()
+
+    def test_canonical_grn_plots_has_no_plt_show(self):
+        test_canonical_grn_plots_has_no_plt_show()
+
+    def test_canonical_hotspot_plots_uses_save_plot(self):
+        test_canonical_hotspot_plots_uses_save_plot()
+
+    def test_grn_deep_analysis_imports_are_clean(self):
+        test_grn_deep_analysis_imports_are_clean()
+
+
+if __name__ == "__main__":
+    unittest.main()

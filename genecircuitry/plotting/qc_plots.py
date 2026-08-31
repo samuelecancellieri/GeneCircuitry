@@ -15,7 +15,7 @@ from typing import Optional, Tuple, Dict, Any
 from anndata import AnnData
 
 from .. import config
-from .utils import save_plot, plot_exists
+from .utils import save_plot, plot_exists, run_parallel_tasks
 
 
 def plot_qc_violin_pre_filter(
@@ -254,14 +254,45 @@ def plot_qc_scatter_post_filter(
     )
 
 
+def _plot_qc_single_worker(task: Dict[str, Any]) -> Tuple[str, bool]:
+    """Worker function for a single QC plot."""
+    plot_type = task["plot_type"]
+    adata = task["adata"]
+    save_name = task["save_name"]
+    skip_existing = task.get("skip_existing", True)
+    figsize = task.get("figsize")
+
+    if plot_type == "violin_pre_filter":
+        res = plot_qc_violin_pre_filter(
+            adata, save_name=save_name, figsize=figsize, skip_existing=skip_existing
+        )
+    elif plot_type == "violin_post_filter":
+        res = plot_qc_violin_post_filter(
+            adata, save_name=save_name, figsize=figsize, skip_existing=skip_existing
+        )
+    elif plot_type == "scatter_pre_filter":
+        res = plot_qc_scatter_pre_filter(
+            adata, save_name=save_name, figsize=figsize, skip_existing=skip_existing
+        )
+    elif plot_type == "scatter_post_filter":
+        res = plot_qc_scatter_post_filter(
+            adata, save_name=save_name, figsize=figsize, skip_existing=skip_existing
+        )
+    else:
+        res = False
+
+    return (plot_type, res)
+
+
 def generate_all_qc_plots(
     adata_pre: AnnData,
     adata_post: AnnData,
     save_name: str = "default",
     skip_existing: bool = True,
+    n_jobs: Optional[int] = None,
 ) -> Dict[str, bool]:
     """
-    Generate all QC plots for pre and post-filtering data.
+    Generate all QC plots for pre and post-filtering data in parallel.
 
     Parameters
     ----------
@@ -273,30 +304,53 @@ def generate_all_qc_plots(
         Suffix for saved filenames.
     skip_existing : bool
         If True, skip existing plots.
+    n_jobs : int, optional
+        Number of parallel worker processes. Default uses config.N_JOBS.
 
     Returns
     -------
     dict
         Dictionary mapping plot names to generation status (True/False).
     """
-    results = {}
-
     print("Generating QC plots...")
 
-    results["violin_pre_filter"] = plot_qc_violin_pre_filter(
-        adata_pre, save_name, skip_existing=skip_existing
-    )
-    results["violin_post_filter"] = plot_qc_violin_post_filter(
-        adata_post, save_name, skip_existing=skip_existing
-    )
-    results["scatter_pre_filter"] = plot_qc_scatter_pre_filter(
-        adata_pre, save_name, skip_existing=skip_existing
-    )
-    results["scatter_post_filter"] = plot_qc_scatter_post_filter(
-        adata_post, save_name, skip_existing=skip_existing
+    tasks = [
+        {
+            "plot_type": "violin_pre_filter",
+            "adata": adata_pre,
+            "save_name": save_name,
+            "skip_existing": skip_existing,
+        },
+        {
+            "plot_type": "violin_post_filter",
+            "adata": adata_post,
+            "save_name": save_name,
+            "skip_existing": skip_existing,
+        },
+        {
+            "plot_type": "scatter_pre_filter",
+            "adata": adata_pre,
+            "save_name": save_name,
+            "skip_existing": skip_existing,
+        },
+        {
+            "plot_type": "scatter_post_filter",
+            "adata": adata_post,
+            "save_name": save_name,
+            "skip_existing": skip_existing,
+        },
+    ]
+
+    results_list = run_parallel_tasks(
+        _plot_qc_single_worker,
+        tasks,
+        n_jobs=n_jobs,
+        desc="qc_plots",
     )
 
-    generated = sum(results.values())
+    results = {plot_type: status for plot_type, status in results_list}
+
+    generated = sum(1 for status in results.values() if status)
     skipped = len(results) - generated
     print(f"  QC plots: {generated} generated, {skipped} skipped")
 

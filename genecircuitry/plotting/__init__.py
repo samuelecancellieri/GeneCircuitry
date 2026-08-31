@@ -17,6 +17,7 @@ from .utils import (
     plot_exists,
     save_plot,
     get_plot_registry,
+    run_parallel_tasks,
 )
 
 from .qc_plots import (
@@ -52,6 +53,7 @@ __all__ = [
     "plot_exists",
     "save_plot",
     "get_plot_registry",
+    "run_parallel_tasks",
     # QC plots
     "plot_qc_violin_pre_filter",
     "plot_qc_violin_post_filter",

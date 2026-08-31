@@ -10,6 +10,7 @@ import os
 import pickle
 import pandas as pd
 import numpy as np
+from typing import Optional, List, Dict, Any
 
 from . import config
 from .logging_utils import log_error, log_warning
@@ -115,6 +116,7 @@ def plot_network_graph(
     links_df: pd.DataFrame,
     scores=None,
     skip_existing: bool = True,
+    n_jobs: Optional[int] = None,
 ):
     """
     Plot network graphs for multiple scores.
@@ -128,6 +130,7 @@ def plot_network_graph(
         links_df=links_df,
         scores=scores,
         skip_existing=skip_existing,
+        n_jobs=n_jobs,
     )
 
 
@@ -161,6 +164,7 @@ def plot_heatmap_scores(
     top_n_genes: int = 10,
     scores=None,
     skip_existing: bool = True,
+    n_jobs: Optional[int] = None,
 ):
     """
     Plot heatmaps for multiple scores across cluster combinations.
@@ -174,6 +178,7 @@ def plot_heatmap_scores(
         top_n_genes=top_n_genes,
         scores=scores,
         skip_existing=skip_existing,
+        n_jobs=n_jobs,
     )
 
 
@@ -181,6 +186,7 @@ def plot_scatter_scores(
     score_df: pd.DataFrame,
     scores_list=None,
     skip_existing: bool = True,
+    n_jobs: Optional[int] = None,
 ):
     """
     Plot scatter plots comparing scores between cluster pairs.
@@ -193,6 +199,7 @@ def plot_scatter_scores(
         score_df=score_df,
         scores_list=scores_list,
         skip_existing=skip_existing,
+        n_jobs=n_jobs,
     )
 
 
@@ -200,6 +207,7 @@ def plot_difference_cluster_scores(
     score_df: pd.DataFrame,
     scores=None,
     skip_existing: bool = True,
+    n_jobs: Optional[int] = None,
 ):
     """
     Plot rank plots showing score differences between clusters.
@@ -212,6 +220,7 @@ def plot_difference_cluster_scores(
         score_df=score_df,
         scores=scores,
         skip_existing=skip_existing,
+        n_jobs=n_jobs,
     )
 
 
@@ -219,6 +228,7 @@ def plot_compare_cluster_scores(
     score_df: pd.DataFrame,
     scores=None,
     skip_existing: bool = True,
+    n_jobs: Optional[int] = None,
 ):
     """
     Compare scores across clusters and plot differences.
@@ -231,4 +241,5 @@ def plot_compare_cluster_scores(
         score_df=score_df,
         scores=scores,
         skip_existing=skip_existing,
+        n_jobs=n_jobs,
     )

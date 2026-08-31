@@ -11,7 +11,7 @@ Provides centralized utilities for plot management including:
 import os
 import json
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple, Callable, Union
 from pathlib import Path
 import matplotlib.pyplot as plt
 
@@ -111,11 +111,50 @@ class PlotLogger:
             if info.get("plot_type") == plot_type
         ]
 
+    def register_plots_batch(
+        self,
+        plots: List[Tuple[str, str, Optional[Dict[str, Any]]]],
+    ) -> None:
+        """
+        Register multiple generated plots in the registry at once.
+
+        Parameters
+        ----------
+        plots : list of tuple
+            List of (filepath, plot_type, metadata) tuples.
+        """
+        for filepath, plot_type, metadata in plots:
+            self.register_plot(filepath, plot_type, metadata)
+
     def save(self) -> None:
-        """Save the registry to disk."""
-        os.makedirs(os.path.dirname(self.log_file), exist_ok=True)
-        with open(self.log_file, "w") as f:
-            json.dump(self.registry, f, indent=2, default=str)
+        """Save the registry to disk atomically."""
+        log_dir = os.path.dirname(self.log_file)
+        os.makedirs(log_dir, exist_ok=True)
+        # Reload latest from disk if available to merge parallel updates
+        if os.path.exists(self.log_file):
+            try:
+                with open(self.log_file, "r") as f:
+                    disk_registry = json.load(f)
+                if isinstance(disk_registry, dict):
+                    disk_registry.update(self.registry)
+                    self.registry = disk_registry
+            except Exception:
+                pass
+        # Write atomically using a temporary file
+        temp_file = f"{self.log_file}.tmp.{os.getpid()}"
+        try:
+            with open(temp_file, "w") as f:
+                json.dump(self.registry, f, indent=2, default=str)
+            os.replace(temp_file, self.log_file)
+        except Exception:
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except OSError:
+                    pass
+            # Fallback direct write
+            with open(self.log_file, "w") as f:
+                json.dump(self.registry, f, indent=2, default=str)
 
     def get_summary(self) -> Dict[str, int]:
         """Get summary count of plots by type."""
@@ -124,6 +163,10 @@ class PlotLogger:
             plot_type = info.get("plot_type", "unknown")
             summary[plot_type] = summary.get(plot_type, 0) + 1
         return summary
+
+    def get_plot_count(self) -> int:
+        """Get total number of registered plots."""
+        return len(self.registry)
 
     def __len__(self) -> int:
         return len(self.registry)
@@ -320,3 +363,101 @@ def ensure_plot_dirs(output_dir: Optional[str] = None) -> None:
 
     for d in dirs:
         os.makedirs(d, exist_ok=True)
+
+
+def _resolve_n_jobs(n_jobs: Optional[int] = None) -> int:
+    """
+    Resolve effective number of parallel workers.
+
+    Parameters
+    ----------
+    n_jobs : int, optional
+        Requested worker count. If None, defaults to config.N_JOBS (or 1).
+        If -1, uses os.cpu_count().
+
+    Returns
+    -------
+    int
+        Positive integer worker count >= 1.
+    """
+    if n_jobs is None:
+        n_jobs = getattr(config, "N_JOBS", 1)
+    if n_jobs == -1:
+        n_jobs = os.cpu_count() or 1
+    try:
+        n_jobs = int(n_jobs)
+    except (ValueError, TypeError):
+        n_jobs = 1
+    return max(1, n_jobs)
+
+
+def run_parallel_tasks(
+    worker_fn,
+    tasks: List[Any],
+    n_jobs: Optional[int] = None,
+    desc: Optional[str] = None,
+) -> List[Any]:
+    """
+    Execute a worker function across tasks either sequentially or in parallel.
+
+    Parameters
+    ----------
+    worker_fn : callable
+        Module-level picklable worker function accepting a single argument.
+    tasks : list
+        List of task inputs passed one-by-one to worker_fn.
+    n_jobs : int, optional
+        Number of worker processes. If None, uses config.N_JOBS.
+        If 1 or len(tasks) <= 1, executes sequentially.
+    desc : str, optional
+        Description of tasks for progress/logging.
+
+    Returns
+    -------
+    list
+        Results collected in the same order as tasks.
+    """
+    if not tasks:
+        return []
+
+    effective_jobs = _resolve_n_jobs(n_jobs)
+
+    if effective_jobs <= 1 or len(tasks) <= 1:
+        results = []
+        for task in tasks:
+            try:
+                results.append(worker_fn(task))
+            except Exception as e:
+                import logging
+
+                logging.getLogger("error").error(
+                    f"Task execution failed ({type(e).__name__}): {e}",
+                    exc_info=True,
+                )
+                results.append(None)
+        return results
+
+    import concurrent.futures
+
+    max_workers = min(effective_jobs, len(tasks))
+    results = [None] * len(tasks)
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        future_to_idx = {
+            executor.submit(worker_fn, task): idx
+            for idx, task in enumerate(tasks)
+        }
+        for future in concurrent.futures.as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                results[idx] = future.result()
+            except Exception as e:
+                import logging
+
+                logging.getLogger("error").error(
+                    f"Parallel task {idx} failed ({type(e).__name__}): {e}",
+                    exc_info=True,
+                )
+                results[idx] = None
+
+    return results

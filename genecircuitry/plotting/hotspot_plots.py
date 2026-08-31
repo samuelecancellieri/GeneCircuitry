@@ -19,7 +19,7 @@ from anndata import AnnData
 
 from .. import config
 from ..logging_utils import log_error, log_warning
-from .utils import save_plot, plot_exists
+from .utils import save_plot, plot_exists, run_parallel_tasks
 
 # Import hotspot only when needed to avoid hard dependency
 try:
@@ -65,10 +65,37 @@ def plot_hotspot_local_correlations(
     )
 
 
+def _enrich_single_module_worker(task: Dict[str, Any]) -> Tuple[int, Optional[pd.DataFrame]]:
+    """Worker function for single module ORA enrichment."""
+    module = task["module"]
+    genes = task["genes"]
+    gene_sets = task.get("gene_sets")
+
+    try:
+        from .. import enrichment_analysis as ea
+
+        enr_result = ea.gseapy_ora_enrichment_analysis(genes, gene_sets=gene_sets)
+        if enr_result.results is not None and not enr_result.results.empty:
+            df_module_enrichment = enr_result.results.copy()
+            df_module_enrichment.columns = [
+                x.replace(" ", "_") for x in df_module_enrichment.columns
+            ]
+            df_module_enrichment["module"] = module
+            return (module, df_module_enrichment)
+    except Exception as e:
+        log_warning(
+            f"HotspotPlotting.ModuleEnrichment(module={module})",
+            f"Enrichment failed ({type(e).__name__}): {e}",
+        )
+
+    return (module, None)
+
+
 def _get_module_enrichment_labels(
     hotspot_obj,
     gene_sets: list = config.ENRICHMENT_GENE_SETS,
     max_label_length: int = 30,
+    n_jobs: Optional[int] = None,
 ) -> Dict[int, str]:
     """
     Get enrichment-based labels for each module.
@@ -81,6 +108,8 @@ def _get_module_enrichment_labels(
         Gene sets for enrichment analysis. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     max_label_length : int
         Maximum length of label text.
+    n_jobs : int, optional
+        Number of parallel worker processes. Default uses config.N_JOBS.
 
     Returns
     -------
@@ -97,8 +126,6 @@ def _get_module_enrichment_labels(
         )
         return {m: f"Module {m}" for m in hotspot_obj.modules.unique() if m != -1}
 
-    module_labels = {}
-
     # Try to load existing enrichment results
     enrichment_file = (
         f"{config.OUTPUT_DIR}/hotspot/hotspot_module_enrichment_results.csv"
@@ -107,6 +134,7 @@ def _get_module_enrichment_labels(
     if os.path.exists(enrichment_file):
         try:
             df_enrichment = pd.read_csv(enrichment_file)
+            module_labels = {}
             for module in hotspot_obj.modules.unique():
                 if module == -1:
                     continue
@@ -133,33 +161,37 @@ def _get_module_enrichment_labels(
         except Exception as e:
             log_error("HotspotPlotting.LoadEnrichmentFile", e)
 
-    # If no file exists, compute enrichment on the fly
-    for module in hotspot_obj.modules.unique():
-        if module == -1:
-            continue
-        genes = hotspot_obj.modules[hotspot_obj.modules == module].index.tolist()
-        try:
-            enr_result = ea.gseapy_ora_enrichment_analysis(genes, gene_sets=gene_sets)
-            if enr_result.results is not None and not enr_result.results.empty:
-                if "Combined_Score" in enr_result.results.columns:
-                    top_term = enr_result.results.nlargest(1, "Combined_Score")[
-                        "Term"
-                    ].iloc[0]
-                else:
-                    top_term = enr_result.results.nsmallest(1, "Adjusted P-value")[
-                        "Term"
-                    ].iloc[0]
-                top_term = top_term.replace("HALLMARK_", "").replace("_", " ").title()
-                if len(top_term) > max_label_length:
-                    top_term = top_term[: max_label_length - 3] + "..."
-                module_labels[module] = f"M{module}: {top_term}"
+    # If no file exists, compute enrichment on the fly in parallel
+    unique_modules = [m for m in hotspot_obj.modules.unique() if m != -1]
+    tasks = [
+        {
+            "module": module,
+            "genes": hotspot_obj.modules[hotspot_obj.modules == module].index.tolist(),
+            "gene_sets": gene_sets,
+        }
+        for module in unique_modules
+    ]
+
+    enrichment_results = run_parallel_tasks(
+        _enrich_single_module_worker,
+        tasks,
+        n_jobs=n_jobs,
+        desc="module_enrichment_labels",
+    )
+
+    module_labels = {}
+    for module, df_res in enrichment_results:
+        if df_res is not None and not df_res.empty:
+            if "Combined_Score" in df_res.columns:
+                top_term = df_res.nlargest(1, "Combined_Score")["Term"].iloc[0]
             else:
-                module_labels[module] = f"Module {module}"
-        except Exception as e:
-            log_warning(
-                f"HotspotPlotting.ModuleEnrichment(module={module})",
-                f"Enrichment failed ({type(e).__name__}): {e}",
-            )
+                adj_col = "Adjusted_P-value" if "Adjusted_P-value" in df_res.columns else "Adjusted P-value"
+                top_term = df_res.nsmallest(1, adj_col)["Term"].iloc[0]
+            top_term = top_term.replace("HALLMARK_", "").replace("_", " ").title()
+            if len(top_term) > max_label_length:
+                top_term = top_term[: max_label_length - 3] + "..."
+            module_labels[module] = f"M{module}: {top_term}"
+        else:
             module_labels[module] = f"Module {module}"
 
     return module_labels
@@ -170,9 +202,10 @@ def plot_hotspot_annotation(
     gene_sets: List[str] = None,
     top_n_annotations: int = 1,
     skip_existing: bool = True,
+    n_jobs: Optional[int] = None,
 ) -> bool:
     """
-    Plot Hotspot local correlation heatmap with enrichment annotations.
+    Plot Hotspot local correlation heatmap with enrichment annotations in parallel.
 
     Parameters
     ----------
@@ -184,6 +217,8 @@ def plot_hotspot_annotation(
         Number of top annotations per module.
     skip_existing : bool
         If True, skip if file already exists.
+    n_jobs : int, optional
+        Number of parallel worker processes. Default uses config.N_JOBS.
 
     Returns
     -------
@@ -214,28 +249,26 @@ def plot_hotspot_annotation(
         print("  Warning: Enrichment analysis not available")
         return False
 
-    # Perform enrichment analysis for each module
-    df_enrichment = pd.DataFrame()
-    for module in hotspot_obj.modules.unique():
-        if module == -1:
-            continue
-        genes = hotspot_obj.modules[hotspot_obj.modules == module].index.tolist()
-        try:
-            enr_result = ea.gseapy_ora_enrichment_analysis(genes, gene_sets=gene_sets)
-            if enr_result.results is not None and not enr_result.results.empty:
-                df_module_enrichment = enr_result.results.copy()
-                df_module_enrichment.columns = [
-                    x.replace(" ", "_") for x in df_module_enrichment.columns
-                ]
-                df_module_enrichment["module"] = module
-                df_enrichment = pd.concat([df_enrichment, df_module_enrichment])
-        except Exception as e:
-            log_error(f"HotspotPlotting.Enrichment(module={module})", e)
-            print(
-                f"  Warning: Enrichment failed for module {module} "
-                f"({type(e).__name__}): {e}"
-            )
-            continue
+    # Perform enrichment analysis for each module in parallel
+    unique_modules = [m for m in hotspot_obj.modules.unique() if m != -1]
+    tasks = [
+        {
+            "module": module,
+            "genes": hotspot_obj.modules[hotspot_obj.modules == module].index.tolist(),
+            "gene_sets": gene_sets,
+        }
+        for module in unique_modules
+    ]
+
+    enrichment_results = run_parallel_tasks(
+        _enrich_single_module_worker,
+        tasks,
+        n_jobs=n_jobs,
+        desc="hotspot_module_enrichment",
+    )
+
+    df_list = [df for _, df in enrichment_results if df is not None and not df.empty]
+    df_enrichment = pd.concat(df_list, ignore_index=True) if df_list else pd.DataFrame()
 
     # Save enrichment results
     if not df_enrichment.empty:
@@ -245,8 +278,7 @@ def plot_hotspot_annotation(
         )
 
     # Create module colors using a large, distinct color palette
-    # Combine multiple palettes to ensure enough unique colors
-    n_modules_total = len([m for m in hotspot_obj.modules.unique() if m != -1])
+    n_modules_total = len(unique_modules)
     if n_modules_total <= 10:
         colors = sns.color_palette("tab10", n_colors=10)
     elif n_modules_total <= 20:
@@ -279,8 +311,13 @@ def plot_hotspot_annotation(
                         "Term"
                     ].tolist()
                 else:
+                    adj_col = (
+                        "Adjusted_P-value"
+                        if "Adjusted_P-value" in module_df.columns
+                        else "Adjusted P-value"
+                    )
                     top_terms = module_df.nsmallest(
-                        top_n_annotations, "Adjusted_P-value"
+                        top_n_annotations, adj_col
                     )["Term"].tolist()
                 top_terms = [
                     t.replace("HALLMARK_", "").replace("_", " ").title()
@@ -349,6 +386,256 @@ def plot_hotspot_annotation(
     )
 
 
+def _plot_hotspot_violin_single_worker(task: Dict[str, Any]) -> Tuple[str, bool]:
+    """Worker function for a single hotspot violin plot variant."""
+    variant = task["variant"]
+    scores_melted = task["scores_melted"]
+    clusters = task["clusters"]
+    modules = task["modules"]
+    cluster_key = task["cluster_key"]
+    skip_existing = task.get("skip_existing", True)
+    n_clusters = len(clusters)
+    n_modules = len(modules)
+
+    if variant == "per_cluster":
+        filepath = (
+            f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_per_cluster.png"
+        )
+        if plot_exists(filepath, skip_existing):
+            return ("per_cluster", False)
+
+        n_cols = min(2, n_clusters)
+        n_rows = (n_clusters + n_cols - 1) // n_cols
+        fig_width = max(16, n_modules * 1.8) * n_cols / 2
+        fig_height = 6 * n_rows
+
+        fig, axes = plt.subplots(
+            n_rows,
+            n_cols,
+            figsize=(fig_width, fig_height),
+            squeeze=False,
+            sharex=True,
+            sharey=False,
+        )
+        axes = axes.flatten()
+
+        module_palette = sns.color_palette("husl", n_colors=n_modules)
+        y_min = scores_melted["Score"].min()
+        y_max = scores_melted["Score"].max()
+        y_margin = (y_max - y_min) * 0.1
+
+        for idx, cluster in enumerate(clusters):
+            ax = axes[idx]
+            cluster_data = scores_melted[scores_melted["cluster"] == cluster]
+
+            if not cluster_data.empty:
+                sns.violinplot(
+                    data=cluster_data,
+                    x="Module",
+                    y="Score",
+                    hue="Module",
+                    palette=module_palette,
+                    ax=ax,
+                    inner="box",
+                    cut=0,
+                    linewidth=1.5,
+                    width=0.85,
+                    saturation=0.9,
+                )
+                ax.set_title(
+                    f"Cluster: {cluster}",
+                    fontsize=14,
+                    fontweight="bold",
+                    pad=10,
+                )
+                ax.set_ylabel("Module Score", fontsize=11)
+                ax.set_ylim(y_min - y_margin, y_max + y_margin)
+
+                if idx >= (n_rows - 1) * n_cols:
+                    ax.set_xlabel("Module", fontsize=11)
+                    ax.tick_params(axis="x", rotation=45, labelsize=9)
+                    for label in ax.get_xticklabels():
+                        label.set_ha("right")
+                else:
+                    ax.set_xlabel("")
+
+                ax.yaxis.grid(True, linestyle="--", alpha=0.3)
+                ax.set_axisbelow(True)
+                ax.spines["top"].set_visible(False)
+                ax.spines["right"].set_visible(False)
+
+        for ax in axes:
+            if not ax.has_data():
+                ax.set_visible(False)
+
+        plt.suptitle(
+            "Hotspot Module Scores per Cluster",
+            fontsize=16,
+            fontweight="bold",
+            y=1.01,
+        )
+        plt.tight_layout()
+
+        saved = save_plot(
+            fig=fig,
+            filepath=filepath,
+            plot_type="hotspot",
+            metadata={
+                "plot_name": "module_scores_violin_per_cluster",
+                "cluster_key": cluster_key,
+                "n_clusters": n_clusters,
+            },
+            skip_existing=False,
+        )
+        return ("per_cluster", saved)
+
+    elif variant == "all_clusters":
+        filepath = (
+            f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_all_clusters.png"
+        )
+        if plot_exists(filepath, skip_existing):
+            return ("all_clusters", False)
+
+        fig_width = max(30, n_modules * 3.5)
+        fig_height = 10
+
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+        cluster_palette = sns.color_palette("Set2", n_colors=n_clusters)
+
+        sns.violinplot(
+            data=scores_melted,
+            x="Module",
+            y="Score",
+            hue="cluster",
+            palette=cluster_palette,
+            ax=ax,
+            inner="box",
+            cut=0,
+            linewidth=1.2,
+            width=0.9,
+            saturation=0.85,
+        )
+
+        ax.set_title(
+            "Hotspot Module Scores by Cluster",
+            fontsize=16,
+            fontweight="bold",
+            pad=15,
+        )
+        ax.set_xlabel("Module", fontsize=13)
+        ax.set_ylabel("Module Score", fontsize=13)
+        ax.tick_params(axis="x", rotation=45, labelsize=10)
+        ax.tick_params(axis="y", labelsize=10)
+        for label in ax.get_xticklabels():
+            label.set_ha("right")
+
+        ax.legend(
+            title="Cluster",
+            title_fontsize=11,
+            fontsize=10,
+            bbox_to_anchor=(1.02, 1),
+            loc="upper left",
+            frameon=True,
+            fancybox=True,
+            shadow=True,
+        )
+
+        ax.yaxis.grid(True, linestyle="--", alpha=0.3)
+        ax.set_axisbelow(True)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        if not ax.has_data():
+            ax.set_visible(False)
+
+        plt.tight_layout()
+
+        saved = save_plot(
+            fig=fig,
+            filepath=filepath,
+            plot_type="hotspot",
+            metadata={
+                "plot_name": "module_scores_violin_all_clusters",
+                "cluster_key": cluster_key,
+            },
+            skip_existing=False,
+        )
+        return ("all_clusters", saved)
+
+    elif variant == "horizontal":
+        filepath = (
+            f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_horizontal.png"
+        )
+        if plot_exists(filepath, skip_existing):
+            return ("horizontal", False)
+
+        fig_height = max(10, n_modules * 1.5)
+        fig_width = max(14, n_clusters * 2.5)
+
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+        cluster_palette = sns.color_palette("Set2", n_colors=n_clusters)
+
+        sns.violinplot(
+            data=scores_melted,
+            y="Module",
+            x="Score",
+            hue="cluster",
+            palette=cluster_palette,
+            ax=ax,
+            inner="box",
+            cut=0,
+            linewidth=1.2,
+            width=0.85,
+            saturation=0.85,
+            orient="h",
+        )
+
+        ax.set_title(
+            "Hotspot Module Scores by Cluster (Horizontal)",
+            fontsize=16,
+            fontweight="bold",
+            pad=15,
+        )
+        ax.set_xlabel("Module Score", fontsize=13)
+        ax.set_ylabel("Module", fontsize=13)
+        ax.tick_params(axis="both", labelsize=10)
+
+        ax.legend(
+            title="Cluster",
+            title_fontsize=11,
+            fontsize=10,
+            bbox_to_anchor=(1.02, 1),
+            loc="upper left",
+            frameon=True,
+            fancybox=True,
+            shadow=True,
+        )
+
+        ax.xaxis.grid(True, linestyle="--", alpha=0.3)
+        ax.set_axisbelow(True)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        if not ax.has_data():
+            ax.set_visible(False)
+
+        plt.tight_layout()
+
+        saved = save_plot(
+            fig=fig,
+            filepath=filepath,
+            plot_type="hotspot",
+            metadata={
+                "plot_name": "module_scores_violin_horizontal",
+                "cluster_key": cluster_key,
+            },
+            skip_existing=False,
+        )
+        return ("horizontal", saved)
+
+    return (variant, False)
+
+
 def plot_module_scores_violin(
     hotspot_obj,
     adata: AnnData,
@@ -356,9 +643,10 @@ def plot_module_scores_violin(
     gene_sets: List[str] = None,
     figsize_per_cluster: Tuple[int, int] = (16, 8),
     skip_existing: bool = True,
+    n_jobs: Optional[int] = None,
 ) -> Dict[str, bool]:
     """
-    Plot violin plots of module scores for each cluster.
+    Plot violin plots of module scores for each cluster in parallel.
 
     Parameters
     ----------
@@ -374,6 +662,8 @@ def plot_module_scores_violin(
         Figure size for each cluster subplot.
     skip_existing : bool
         If True, skip existing plots.
+    n_jobs : int, optional
+        Number of parallel worker processes. Default uses config.N_JOBS.
 
     Returns
     -------
@@ -416,7 +706,9 @@ def plot_module_scores_violin(
         return results
 
     # Get module enrichment annotations
-    module_labels = _get_module_enrichment_labels(hotspot_obj, gene_sets)
+    module_labels = _get_module_enrichment_labels(
+        hotspot_obj, gene_sets, n_jobs=n_jobs
+    )
 
     # Create combined dataframe
     scores_df = module_scores.loc[common_cells].copy()
@@ -448,274 +740,27 @@ def plot_module_scores_violin(
     )
 
     clusters = sorted(scores_df["cluster"].unique())
-    n_clusters = len(clusters)
-    n_modules = len(modules)
 
-    # Plot 1: Faceted plot by cluster with shared x-axis
-    filepath1 = (
-        f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_per_cluster.png"
+    tasks = [
+        {
+            "variant": variant,
+            "scores_melted": scores_melted,
+            "clusters": clusters,
+            "modules": modules,
+            "cluster_key": cluster_key,
+            "skip_existing": skip_existing,
+        }
+        for variant in ["per_cluster", "all_clusters", "horizontal"]
+    ]
+
+    results_list = run_parallel_tasks(
+        _plot_hotspot_violin_single_worker,
+        tasks,
+        n_jobs=n_jobs,
+        desc="hotspot_violins",
     )
 
-    if not plot_exists(filepath1, skip_existing):
-        # Calculate optimal layout - prefer more rows for better x-axis visibility
-        n_cols = min(2, n_clusters)  # Max 2 columns for wider violins
-        n_rows = (n_clusters + n_cols - 1) // n_cols
-
-        # Larger figure size for better visibility
-        fig_width = max(16, n_modules * 1.8) * n_cols / 2
-        fig_height = 6 * n_rows
-
-        fig, axes = plt.subplots(
-            n_rows,
-            n_cols,
-            figsize=(fig_width, fig_height),
-            squeeze=False,
-            sharex=True,  # Share x-axis for consistency
-            sharey=False,  # Share y-axis for comparison
-        )
-        axes = axes.flatten()
-
-        # Use a distinct color palette for modules
-        module_palette = sns.color_palette("husl", n_colors=n_modules)
-
-        # Get global y-axis limits for consistency
-        y_min = scores_melted["Score"].min()
-        y_max = scores_melted["Score"].max()
-        y_margin = (y_max - y_min) * 0.1
-
-        for idx, cluster in enumerate(clusters):
-            ax = axes[idx]
-            cluster_data = scores_melted[scores_melted["cluster"] == cluster]
-
-            if not cluster_data.empty:
-                sns.violinplot(
-                    data=cluster_data,
-                    x="Module",
-                    y="Score",
-                    hue="Module",
-                    palette=module_palette,
-                    ax=ax,
-                    inner="box",
-                    cut=0,
-                    linewidth=1.5,
-                    width=0.85,  # Wider violins
-                    saturation=0.9,
-                )
-
-                # Style the plot
-                ax.set_title(
-                    f"Cluster: {cluster}",
-                    fontsize=14,
-                    fontweight="bold",
-                    pad=10,
-                )
-                ax.set_ylabel("Module Score", fontsize=11)
-                ax.set_ylim(y_min - y_margin, y_max + y_margin)
-
-                # Only show x-label on bottom row
-                if idx >= (n_rows - 1) * n_cols:
-                    ax.set_xlabel("Module", fontsize=11)
-                    ax.tick_params(axis="x", rotation=45, labelsize=9)
-                    for label in ax.get_xticklabels():
-                        label.set_ha("right")
-                else:
-                    ax.set_xlabel("")
-
-                # Add grid for readability
-                ax.yaxis.grid(True, linestyle="--", alpha=0.3)
-                ax.set_axisbelow(True)
-
-                # Style spines
-                ax.spines["top"].set_visible(False)
-                ax.spines["right"].set_visible(False)
-
-        # Remove inactive axes from the final plot
-        for ax in axes:
-            if not ax.has_data():
-                ax.set_visible(False)
-
-        plt.suptitle(
-            "Hotspot Module Scores per Cluster",
-            fontsize=16,
-            fontweight="bold",
-            y=1.01,
-        )
-        plt.tight_layout()
-
-        results["per_cluster"] = save_plot(
-            fig=fig,
-            filepath=filepath1,
-            plot_type="hotspot",
-            metadata={
-                "plot_name": "module_scores_violin_per_cluster",
-                "cluster_key": cluster_key,
-                "n_clusters": n_clusters,
-            },
-            skip_existing=False,
-        )
-    else:
-        results["per_cluster"] = False
-
-    # Plot 2: All clusters combined - horizontal layout with larger violins
-    filepath2 = (
-        f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_all_clusters.png"
-    )
-
-    if not plot_exists(filepath2, skip_existing):
-        # Make figure wider to accommodate all modules and clusters
-        fig_width = max(30, n_modules * 3.5)
-        fig_height = 10
-
-        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-
-        # Use a color palette that distinguishes clusters well
-        cluster_palette = sns.color_palette("Set2", n_colors=n_clusters)
-
-        sns.violinplot(
-            data=scores_melted,
-            x="Module",
-            y="Score",
-            hue="cluster",
-            palette=cluster_palette,
-            ax=ax,
-            inner="box",
-            cut=0,
-            linewidth=1.2,
-            width=0.9,  # Wider violins
-            saturation=0.85,
-        )
-
-        ax.set_title(
-            "Hotspot Module Scores by Cluster",
-            fontsize=16,
-            fontweight="bold",
-            pad=15,
-        )
-        ax.set_xlabel("Module", fontsize=13)
-        ax.set_ylabel("Module Score", fontsize=13)
-        ax.tick_params(axis="x", rotation=45, labelsize=10)
-        ax.tick_params(axis="y", labelsize=10)
-        for label in ax.get_xticklabels():
-            label.set_ha("right")
-
-        # Move legend outside and make it more visible
-        ax.legend(
-            title="Cluster",
-            title_fontsize=11,
-            fontsize=10,
-            bbox_to_anchor=(1.02, 1),
-            loc="upper left",
-            frameon=True,
-            fancybox=True,
-            shadow=True,
-        )
-
-        # Add grid for readability
-        ax.yaxis.grid(True, linestyle="--", alpha=0.3)
-        ax.set_axisbelow(True)
-
-        # Style spines
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-
-        # Remove axis if inactive
-        if not ax.has_data():
-            ax.set_visible(False)
-
-        plt.tight_layout()
-
-        results["all_clusters"] = save_plot(
-            fig=fig,
-            filepath=filepath2,
-            plot_type="hotspot",
-            metadata={
-                "plot_name": "module_scores_violin_all_clusters",
-                "cluster_key": cluster_key,
-            },
-            skip_existing=False,
-        )
-    else:
-        results["all_clusters"] = False
-
-    # Plot 3: Horizontal violins for better label readability
-    filepath3 = (
-        f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_horizontal.png"
-    )
-
-    if not plot_exists(filepath3, skip_existing):
-        # Horizontal layout - modules on y-axis, better for long labels
-        fig_height = max(10, n_modules * 1.5)
-        fig_width = max(14, n_clusters * 2.5)
-
-        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-
-        cluster_palette = sns.color_palette("Set2", n_colors=n_clusters)
-
-        sns.violinplot(
-            data=scores_melted,
-            y="Module",  # Modules on y-axis
-            x="Score",  # Score on x-axis
-            hue="cluster",
-            palette=cluster_palette,
-            ax=ax,
-            inner="box",
-            cut=0,
-            linewidth=1.2,
-            width=0.85,
-            saturation=0.85,
-            orient="h",  # Horizontal orientation
-        )
-
-        ax.set_title(
-            "Hotspot Module Scores by Cluster (Horizontal)",
-            fontsize=16,
-            fontweight="bold",
-            pad=15,
-        )
-        ax.set_xlabel("Module Score", fontsize=13)
-        ax.set_ylabel("Module", fontsize=13)
-        ax.tick_params(axis="both", labelsize=10)
-
-        # Move legend outside
-        ax.legend(
-            title="Cluster",
-            title_fontsize=11,
-            fontsize=10,
-            bbox_to_anchor=(1.02, 1),
-            loc="upper left",
-            frameon=True,
-            fancybox=True,
-            shadow=True,
-        )
-
-        # Add grid for readability
-        ax.xaxis.grid(True, linestyle="--", alpha=0.3)
-        ax.set_axisbelow(True)
-
-        # Style spines
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-
-        # Remove axis if inactive
-        if not ax.has_data():
-            ax.set_visible(False)
-
-        plt.tight_layout()
-
-        results["horizontal"] = save_plot(
-            fig=fig,
-            filepath=filepath3,
-            plot_type="hotspot",
-            metadata={
-                "plot_name": "module_scores_violin_horizontal",
-                "cluster_key": cluster_key,
-            },
-            skip_existing=False,
-        )
-    else:
-        results["horizontal"] = False
-
-    return results
+    return dict(results_list)
 
 
 def generate_all_hotspot_plots(
@@ -724,9 +769,10 @@ def generate_all_hotspot_plots(
     cluster_key: str = "leiden",
     gene_sets: List[str] = None,
     skip_existing: bool = True,
+    n_jobs: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
-    Generate all Hotspot plots.
+    Generate all Hotspot plots in parallel.
 
     Parameters
     ----------
@@ -740,6 +786,8 @@ def generate_all_hotspot_plots(
         Gene sets for enrichment analysis. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     skip_existing : bool
         If True, skip existing plots.
+    n_jobs : int, optional
+        Number of parallel worker processes. Default uses config.N_JOBS.
 
     Returns
     -------
@@ -757,7 +805,7 @@ def generate_all_hotspot_plots(
 
     # Annotated heatmap
     results["annotated_heatmap"] = plot_hotspot_annotation(
-        hotspot_obj, gene_sets=gene_sets, skip_existing=skip_existing
+        hotspot_obj, gene_sets=gene_sets, skip_existing=skip_existing, n_jobs=n_jobs
     )
 
     # Violin plots (if adata provided)
@@ -768,6 +816,7 @@ def generate_all_hotspot_plots(
             cluster_key=cluster_key,
             gene_sets=gene_sets,
             skip_existing=skip_existing,
+            n_jobs=n_jobs,
         )
         results.update(violin_results)
 

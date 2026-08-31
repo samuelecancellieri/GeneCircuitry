@@ -214,7 +214,10 @@ def _get_module_enrichment_labels(
 
 
 def run_hotspot_analysis(
-    hotspot_obj, adata: Optional[AnnData] = None, cluster_key: str = "leiden"
+    hotspot_obj,
+    adata: Optional[AnnData] = None,
+    cluster_key: str = "leiden",
+    n_jobs: Optional[int] = None,
 ):
     """
     Run Hotspot analysis on the given Hotspot object.
@@ -223,6 +226,7 @@ def run_hotspot_analysis(
         hotspot_obj: An instance of the Hotspot class.
         adata: Optional AnnData object with cluster annotations for violin plots.
         cluster_key: Column name in adata.obs containing cluster assignments.
+        n_jobs: Number of parallel worker processes.
 
     Returns:
         hotspot_obj: The updated Hotspot object with analysis results.
@@ -270,6 +274,7 @@ def run_hotspot_analysis(
         adata=adata,
         cluster_key=cluster_key,
         skip_existing=False,  # Always regenerate for fresh analysis
+        n_jobs=n_jobs,
     )
 
     # Report which plots were generated
@@ -289,6 +294,7 @@ def plot_hotspot_annotation(
     hs_obj: hs.Hotspot,
     gene_sets: list = None,
     top_n_annotations: int = 1,
+    n_jobs: Optional[int] = None,
 ):
     """
     Plot Hotspot gene module annotations with enrichment analysis results.
@@ -303,6 +309,7 @@ def plot_hotspot_annotation(
         hotspot_obj=hs_obj,
         gene_sets=gene_sets,
         top_n_annotations=top_n_annotations,
+        n_jobs=n_jobs,
     )
 
 
@@ -312,6 +319,7 @@ def plot_module_scores_violin(
     cluster_key: str = "leiden",
     figsize_per_cluster: tuple = (12, 6),
     gene_sets: list = None,
+    n_jobs: Optional[int] = None,
 ):
     """
     Plot violin plots of module scores for each cluster.
@@ -328,4 +336,5 @@ def plot_module_scores_violin(
         cluster_key=cluster_key,
         figsize_per_cluster=figsize_per_cluster,
         gene_sets=gene_sets,
+        n_jobs=n_jobs,
     )
