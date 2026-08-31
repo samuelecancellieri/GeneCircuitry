@@ -347,6 +347,7 @@ def run_links(
     cluster_column_name = kwargs.get(
         "cluster_key", kwargs.get("cluster_column", cluster_column_name)
     )
+    print(f"Calculating GRN links for cluster column: {cluster_column_name}")
 
     # Calculate GRN links
     links = oracle.get_links(
