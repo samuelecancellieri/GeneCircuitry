@@ -137,6 +137,9 @@ def process_atac_peaks(
     output_dir: Optional[str] = None,
     fpr: Optional[float] = None,
     motif_score_threshold: Optional[int] = None,
+    log_dir: Optional[str] = None,
+    force: bool = False,
+    **kwargs,
 ) -> str:
     """
     Process ATAC-seq peaks BED file to generate enriched TF motif matrix.
@@ -144,9 +147,10 @@ def process_atac_peaks(
     The full workflow is:
     1. Read the BED file and annotate peaks with TSS / gene info (CSV)
     2. Load the annotated CSV, validate peak format
-    3. Scan peaks for TF binding motifs
+    3. Scan peaks for TF binding motifs (or load existing TFinfo HDF5)
     4. Filter motifs by score
-    5. Save the resulting TF info matrix as a pickle file
+    5. Save the resulting TF info matrix DataFrame and dictionary PKL files
+    6. Save checkpoint to log_dir to avoid recomputing on subsequent runs
 
     Parameters
     ----------
@@ -163,11 +167,16 @@ def process_atac_peaks(
     motif_score_threshold : int, optional
         Minimum motif score for filtering.
         Defaults to config.ATAC_MOTIF_SCORE_THRESHOLD.
+    log_dir : str, optional
+        Path to log directory for checkpoint tracking.
+    force : bool, default False
+        If True, re-run motif scanning and processing even if checkpoint or
+        output files exist.
 
     Returns
     -------
     str
-        Path to the saved enriched ATAC peaks pickle file.
+        Path to the saved enriched ATAC peaks dictionary pickle file.
 
     Raises
     ------
@@ -176,6 +185,7 @@ def process_atac_peaks(
     ValueError
         If species is not supported.
     """
+    import pickle
     from celloracle import motif_analysis as ma
 
     # Resolve defaults from config
@@ -194,77 +204,142 @@ def process_atac_peaks(
     atac_output_dir = os.path.join(output_dir, "celloracle")
     os.makedirs(atac_output_dir, exist_ok=True)
 
+    csv_path = os.path.join(atac_output_dir, "tss_annotated_peaks.csv")
+    tfi_path = os.path.join(atac_output_dir, "motif_enriched_tfi.celloracle.tfinfo")
+    pkl_path_df = os.path.join(atac_output_dir, "enriched_atac_peaks_df.pkl")
+    pkl_path_dict = os.path.join(atac_output_dir, "enriched_atac_peaks_dict.pkl")
+
+    # ------------------------------------------------------------------
+    # Step 0: Checkpoint check (avoid recomputing motif analysis)
+    # ------------------------------------------------------------------
+    step_hash = None
+    if log_dir:
+        from genecircuitry.pipeline.controller import check_checkpoint, compute_input_hash
+
+        step_hash = compute_input_hash(
+            bed_path,
+            species=species,
+            fpr=fpr,
+            threshold=motif_score_threshold,
+        )
+
+    if not force:
+        has_checkpoint = bool(
+            log_dir and check_checkpoint(log_dir, "atac_peaks", step_hash)
+        )
+        files_exist = os.path.exists(pkl_path_dict) and os.path.exists(pkl_path_df)
+
+        if has_checkpoint or files_exist:
+            print(f"\n  ✓ Found existing enriched ATAC peaks (checkpoint hit):")
+            print(f"    DataFrame:  {pkl_path_df}")
+            print(f"    Dictionary: {pkl_path_dict}")
+            print("  ⏭ Skipping motif analysis (already computed).")
+            return pkl_path_dict
+
     # ------------------------------------------------------------------
     # Stage 1: BED → TSS-annotated CSV
     # ------------------------------------------------------------------
     ref_genome = _get_ref_genome(species)
     _ensure_genome_installed(ref_genome)
 
-    print(f"\n  [3.5.1] Annotating BED peaks with TSS info...")
-    tss_df = _annotate_bed_peaks(bed_path, ref_genome)
-
-    # Save annotated peaks as CSV
-    csv_path = os.path.join(atac_output_dir, "tss_annotated_peaks.csv")
-    tss_df.to_csv(csv_path)
-    print(f"  ✓ TSS-annotated peaks saved to: {csv_path}")
-
-    # ------------------------------------------------------------------
-    # Stage 2: Annotated CSV → motif scan → filtered PKL
-    # ------------------------------------------------------------------
-    print(f"\n  [3.5.2] Loading annotated peaks for motif scanning...")
-    peaks = pd.read_csv(csv_path, index_col=0)
-    peaks.reset_index(drop=True, inplace=True)
-    print(f"  ✓ Loaded {len(peaks)} annotated peaks")
-
-    # Validate peak format
-    peaks = ma.check_peak_format(peaks, ref_genome, genomes_dir=None)
-
-    # Create TFinfo object
-    tfi = ma.TFinfo(
-        peak_data_frame=peaks,
-        ref_genome=ref_genome,
-        genomes_dir=None,
-    )
-
-    # Load motifs
-    from gimmemotifs.motif import default_motifs
-    import pickle
-
-    if species.lower() in ["human", "mouse"]:
-        motifs = default_motifs()
+    if not force and os.path.exists(csv_path):
+        print(f"\n  [3.5.1] Found existing TSS-annotated peaks CSV: {csv_path}")
+        peaks = pd.read_csv(csv_path, index_col=0)
+        peaks.reset_index(drop=True, inplace=True)
+        print(f"  ✓ Loaded {len(peaks)} annotated peaks from CSV")
     else:
-        print("  WARNING - Species not recognized, using default motifs.")
-        motifs = None
+        print(f"\n  [3.5.1] Annotating BED peaks with TSS info...")
+        tss_df = _annotate_bed_peaks(bed_path, ref_genome)
+        tss_df.to_csv(csv_path)
+        print(f"  ✓ TSS-annotated peaks saved to: {csv_path}")
+        peaks = tss_df
 
-    # Scan for motifs
-    print(f"  Scanning peaks for TF motifs (FPR={fpr})...")
-    tfi.scan(fpr=fpr, motifs=motifs, verbose=False, n_cpus=config.N_JOBS)
-    print("  ✓ Motif scanning complete")
+    # ------------------------------------------------------------------
+    # Stage 2: Annotated CSV → motif scan → TFinfo HDF5
+    # ------------------------------------------------------------------
+    if not force and os.path.exists(tfi_path):
+        print(f"\n  [3.5.2] Found existing TFinfo object: {tfi_path}")
+        print("  Loading TFinfo object without re-running motif scanning...")
+        tfi = ma.load_tfinfo(file_path=tfi_path)
+        print("  ✓ Loaded TFinfo object")
+    else:
+        print(f"\n  [3.5.2] Loading annotated peaks for motif scanning...")
+        peaks = pd.read_csv(csv_path, index_col=0)
+        peaks.reset_index(drop=True, inplace=True)
+        print(f"  ✓ Loaded {len(peaks)} annotated peaks")
 
-    # Save TFinfo object as HDF5
-    tfi_path = os.path.join(atac_output_dir, "motif_enriched_tfi.celloracle.tfinfo")
-    tfi.to_hdf5(file_path=tfi_path)
-    print(f"  ✓ TFinfo object saved to: {tfi_path}")
+        # Validate peak format
+        peaks = ma.check_peak_format(peaks, ref_genome, genomes_dir=None)
 
-    # Filter motifs
+        # Create TFinfo object
+        tfi = ma.TFinfo(
+            peak_data_frame=peaks,
+            ref_genome=ref_genome,
+            genomes_dir=None,
+        )
+
+        # Load motifs
+        from gimmemotifs.motif import default_motifs
+
+        if species.lower() in ["human", "mouse"]:
+            motifs = default_motifs()
+        else:
+            print("  WARNING - Species not recognized, using default motifs.")
+            motifs = None
+
+        # Scan for motifs
+        print(f"  Scanning peaks for TF motifs (FPR={fpr})...")
+        tfi.scan(fpr=fpr, motifs=motifs, verbose=False, n_cpus=config.N_JOBS)
+        print("  ✓ Motif scanning complete")
+
+        # Save TFinfo object as HDF5
+        tfi.to_hdf5(file_path=tfi_path)
+        print(f"  ✓ TFinfo object saved to: {tfi_path}")
+
+    # ------------------------------------------------------------------
+    # Stage 3: Filter motifs, generate DF & Dict PKL, save checkpoint
+    # ------------------------------------------------------------------
+    print(f"\n  [3.5.3] Filtering motifs and generating TF info matrix...")
     tfi.reset_filtering()
     tfi.filter_motifs_by_score(threshold=motif_score_threshold)
     print(f"  ✓ Filtered motifs (score threshold={motif_score_threshold})")
 
-    # Generate TF info dataframe
+    # Generate TF info dataframe and dictionary
     tfi.make_TFinfo_dataframe_and_dictionary(verbose=True)
     df = tfi.to_dataframe()
     df_dict = tfi.to_dictionary()
 
-    # Save result as pickle
-    pkl_path = os.path.join(atac_output_dir, "enriched_atac_peaks_df.pkl")
-    df.to_pickle(pkl_path)
-    print(f"  ✓ Enriched ATAC peaks saved to: {pkl_path}")
+    # Save DataFrame result as pickle
+    df.to_pickle(pkl_path_df)
+    print(f"  ✓ Enriched ATAC peaks DataFrame saved to: {pkl_path_df}")
     print(f"  TF info matrix shape: {df.shape}")
 
-    pkl_path_dict = os.path.join(atac_output_dir, "enriched_atac_peaks_dict.pkl")
+    # Save Dictionary result as pickle
     with open(pkl_path_dict, "wb") as f:
         pickle.dump(df_dict, f)
     print(f"  ✓ Enriched ATAC peaks dictionary saved to: {pkl_path_dict}")
+
+    # Save checkpoint if log_dir is provided
+    if log_dir:
+        from genecircuitry.pipeline.controller import compute_input_hash, write_checkpoint
+
+        if step_hash is None:
+            step_hash = compute_input_hash(
+                bed_path,
+                species=species,
+                fpr=fpr,
+                threshold=motif_score_threshold,
+            )
+        write_checkpoint(
+            log_dir,
+            "atac_peaks",
+            step_hash,
+            bed_path=bed_path,
+            pkl_path=pkl_path_dict,
+            df_pkl_path=pkl_path_df,
+            n_peaks=len(peaks),
+            tf_info_shape=list(df.shape),
+        )
+        print(f"  ✓ Checkpoint saved to: {log_dir}/atac_peaks.checkpoint")
 
     return pkl_path_dict

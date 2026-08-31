@@ -33,6 +33,7 @@ results/logs/
 ├── load.checkpoint
 ├── preprocessing.checkpoint
 ├── clustering.checkpoint
+├── atac_peaks.checkpoint
 ├── celloracle.checkpoint
 └── hotspot.checkpoint
 ```

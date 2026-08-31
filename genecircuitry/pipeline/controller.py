@@ -339,28 +339,33 @@ class PipelineController:
                 threshold=config.ATAC_MOTIF_SCORE_THRESHOLD,
             )
 
-            pkl_path = os.path.join(
-                config.OUTPUT_DIR, "celloracle", "enriched_atac_peaks.pkl"
+            dict_pkl_path = os.path.join(
+                config.OUTPUT_DIR, "celloracle", "enriched_atac_peaks_dict.pkl"
+            )
+            df_pkl_path = os.path.join(
+                config.OUTPUT_DIR, "celloracle", "enriched_atac_peaks_df.pkl"
             )
             if (
                 log_dir
                 and check_checkpoint(log_dir, "atac_peaks", step_hash)
-                and os.path.exists(pkl_path)
+                and os.path.exists(dict_pkl_path)
             ):
                 log_step(
                     "Controller.ATACPeaks",
                     "LOADED_FROM_CHECKPOINT",
-                    {"pkl_path": pkl_path},
+                    {"pkl_path": dict_pkl_path, "df_pkl_path": df_pkl_path},
                 )
-                self.atac_peaks_pkl = pkl_path
-                return pkl_path
+                print(f"  ✓ Loading enriched ATAC peaks from checkpoint: {dict_pkl_path}")
+                self.atac_peaks_pkl = dict_pkl_path
+                return dict_pkl_path
 
             from genecircuitry.atac_peaks_processing import process_atac_peaks
 
-            pkl_path = process_atac_peaks(
+            dict_pkl_path = process_atac_peaks(
                 bed_path=bed_path,
                 species=self.args.species,
                 output_dir=config.OUTPUT_DIR,
+                log_dir=log_dir,
             )
 
             # Save checkpoint
@@ -370,16 +375,17 @@ class PipelineController:
                     "atac_peaks",
                     step_hash,
                     bed_path=bed_path,
-                    pkl_path=pkl_path,
+                    pkl_path=dict_pkl_path,
+                    df_pkl_path=df_pkl_path,
                 )
 
-            self.atac_peaks_pkl = pkl_path
+            self.atac_peaks_pkl = dict_pkl_path
             log_step(
                 "Controller.ATACPeaks",
                 "COMPLETED",
-                {"pkl_path": pkl_path},
+                {"pkl_path": dict_pkl_path},
             )
-            return pkl_path
+            return dict_pkl_path
         except Exception as e:
             log_error("Controller.ATACPeaks", e)
             raise
