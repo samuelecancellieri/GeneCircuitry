@@ -86,7 +86,10 @@ def test_dimensionality_reduction_clustering_force(tmp_path, sample_adata_for_cl
 
     # With force=True, PCA is recalculated
     adata_force = dimensionality_reduction_clustering(adata.copy(), force=True)
-    assert not np.allclose(adata_force.obsm["X_pca"], dummy_pca)
+    assert (
+        adata_force.obsm["X_pca"].shape != dummy_pca.shape
+        or not np.allclose(adata_force.obsm["X_pca"], dummy_pca)
+    )
 
 
 def test_pipeline_controller_force_flag(tmp_path, sample_adata_for_clustering):
@@ -111,7 +114,10 @@ def test_pipeline_controller_force_flag(tmp_path, sample_adata_for_clustering):
     controller.adata_preprocessed = adata
 
     adata_clustered = controller.run_step_clustering()
-    assert not np.allclose(adata_clustered.obsm["X_pca"], dummy_pca)
+    assert (
+        adata_clustered.obsm["X_pca"].shape != dummy_pca.shape
+        or not np.allclose(adata_clustered.obsm["X_pca"], dummy_pca)
+    )
 
 
 def test_stratification_forces_dim_reduction(tmp_path, sample_adata_for_clustering):
@@ -155,6 +161,14 @@ def test_stratification_forces_dim_reduction(tmp_path, sample_adata_for_clusteri
     strat_adata = strat_result["adata"]
 
     # The stratified adata's PCA and UMAP should have been recomputed, NOT equal to dummy
-    assert not np.allclose(strat_adata.obsm["X_pca"], np.ones((strat_adata.n_obs, 5)) * 88.0)
-    assert not np.allclose(strat_adata.obsm["X_umap"], np.ones((strat_adata.n_obs, 2)) * 99.0)
+    dummy_pca_subset = np.ones((strat_adata.n_obs, 5)) * 88.0
+    dummy_umap_subset = np.ones((strat_adata.n_obs, 2)) * 99.0
+    assert (
+        strat_adata.obsm["X_pca"].shape != dummy_pca_subset.shape
+        or not np.allclose(strat_adata.obsm["X_pca"], dummy_pca_subset)
+    )
+    assert (
+        strat_adata.obsm["X_umap"].shape != dummy_umap_subset.shape
+        or not np.allclose(strat_adata.obsm["X_umap"], dummy_umap_subset)
+    )
 

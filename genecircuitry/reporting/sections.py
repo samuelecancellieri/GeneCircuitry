@@ -388,17 +388,13 @@ def create_clustering_section(
     metrics = {}
 
     # Check for clustering results
-    cluster_key = None
-    if "leiden" in adata.obs.columns:
-        cluster_key = "leiden"
-        n_clusters = len(adata.obs["leiden"].unique())
-        metrics["Clusters (Leiden)"] = n_clusters
-    elif "louvain" in adata.obs.columns:
-        cluster_key = "louvain"
+    active_key = None
+    if cluster_key and cluster_key in adata.obs.columns:
+        active_key = cluster_key
+        active_key = "louvain"
         n_clusters = len(adata.obs["louvain"].unique())
         metrics["Clusters (Louvain)"] = n_clusters
 
-    # Check embeddings
     if "X_pca" in adata.obsm:
         metrics["PCA Components"] = adata.obsm["X_pca"].shape[1]
 
@@ -407,22 +403,19 @@ def create_clustering_section(
 
     # Cluster sizes table
     tables = []
-    if cluster_key:
-        cluster_counts = adata.obs[cluster_key].value_counts().sort_index()
+    if active_key:
+        cluster_counts = adata.obs[active_key].value_counts().sort_index()
         rows = [
             [str(cluster), count, f"{100*count/adata.n_obs:.1f}%"]
             for cluster, count in cluster_counts.items()
         ]
-        tables.append(
-            {
-                "title": f"Cluster Sizes ({cluster_key.title()} Clustering)",
+                "title": f"Cluster Sizes ({active_key.title()} Clustering)",
                 "headers": ["Cluster", "Cell Count", "Percentage"],
                 "rows": rows,
             }
         )
 
     content = """
-    <p>Dimensionality reduction and clustering were performed to identify cell populations.</p>
 
     <h3>Dimensionality Reduction</h3>
     <ol>
@@ -1065,21 +1058,21 @@ def create_grn_deep_analysis_section(
 
 def create_stratified_clustering_section(
     stratification_results: List[Dict],
+    cluster_key: Optional[str] = None,
 ) -> ReportSection:
     """
     Create Clustering & Visualization section with tabs per stratification.
 
     Parameters
     ----------
-    stratification_results : list of dict
         Each dict has keys: 'name', 'output_dir', 'adata', etc.
+    cluster_key : str, optional
+        Clustering column name in adata.obs (default: None, autodetects).
     """
     content = """
     <p>Dimensionality reduction and clustering were performed independently for each
     stratified subset of the data.</p>
 
-    <h3>Methods</h3>
-    <ol>
         <li><strong>PCA:</strong> Principal Component Analysis for dimensionality reduction</li>
         <li><strong>Neighbor Graph:</strong> K-nearest neighbor graph construction</li>
         <li><strong>UMAP:</strong> Uniform Manifold Approximation and Projection for visualization</li>
@@ -1103,31 +1096,24 @@ def create_stratified_clustering_section(
             sub_metrics["Cells"] = adata.n_obs
             sub_metrics["Genes"] = adata.n_vars
 
-            cluster_key = None
-            if "leiden" in adata.obs.columns:
-                cluster_key = "leiden"
+            active_key = None
+            if cluster_key and cluster_key in adata.obs.columns:
+                active_key = cluster_key
+            elif "leiden" in adata.obs.columns:
+                active_key = "leiden"
             elif "louvain" in adata.obs.columns:
-                cluster_key = "louvain"
+                active_key = "louvain"
 
-            if cluster_key:
-                n_clusters = len(adata.obs[cluster_key].unique())
-                sub_metrics["Clusters"] = n_clusters
-
-                cluster_counts = adata.obs[cluster_key].value_counts().sort_index()
-                rows = [
-                    [str(c), count, f"{100 * count / adata.n_obs:.1f}%"]
+            if active_key:
+                n_clusters = len(adata.obs[active_key].unique())
                     for c, count in cluster_counts.items()
                 ]
-                tables.append(
                     {
-                        "title": f"Cluster Sizes ({cluster_key.title()})",
+                        "title": f"Cluster Sizes ({active_key.title()})",
                         "headers": ["Cluster", "Cell Count", "Percentage"],
-                        "rows": rows,
-                    }
                 )
 
             if "X_pca" in adata.obsm:
-                sub_metrics["PCA Components"] = adata.obsm["X_pca"].shape[1]
             if "X_umap" in adata.obsm:
                 sub_metrics["UMAP"] = "Yes"
 
@@ -1135,7 +1121,6 @@ def create_stratified_clustering_section(
 
         subsections.append(
             ReportSection(
-                title=str(name),
                 section_id=f"clustering-{_safe_id(name)}",
                 content="",
                 figures=figures,

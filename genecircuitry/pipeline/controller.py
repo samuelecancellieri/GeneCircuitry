@@ -384,12 +384,16 @@ class PipelineController:
             log_error("Controller.ATACPeaks", e)
             raise
 
-    def run_step_celloracle(self, adata, log_dir=None, hotspot_genes_path=None):
+    def run_step_celloracle(
+        self, adata, log_dir=None, hotspot_genes_path=None, cluster_key=None
+    ):
         """Execute Step 4: CellOracle."""
         log_step("Controller.CellOracle", "STARTED")
         try:
             if log_dir is None:
                 log_dir = self.log_dir
+            if cluster_key is None:
+                cluster_key = getattr(self.args, "cluster_key", "leiden")
 
             # Determine TF dictionary: ATAC peaks PKL takes
             # priority over --tf-dictionary CLI argument
@@ -404,7 +408,7 @@ class PipelineController:
 
             result = celloracle_pipeline(
                 adata,
-                cluster_key=self.args.cluster_key,
+                cluster_key=cluster_key,
                 species=self.args.species,
                 raw_count_layer=self.args.raw_count_layer,
                 embedding_name=self.args.embedding_grn,
@@ -420,19 +424,21 @@ class PipelineController:
             log_error("Controller.CellOracle", e)
             raise
 
-    def run_step_hotspot(self, adata, log_dir=None):
+    def run_step_hotspot(self, adata, log_dir=None, cluster_key=None):
         """Execute Step 5: Hotspot."""
         log_step("Controller.Hotspot", "STARTED")
         try:
             if log_dir is None:
                 log_dir = self.log_dir
+            if cluster_key is None:
+                cluster_key = getattr(self.args, "cluster_key", "leiden")
 
             result = hotspot_pipeline(
                 adata,
                 layer_key=self.args.raw_count_layer,
                 embedding_key=self.args.embedding_hotspot,
                 normalization_key=self.args.normalization_key,
-                cluster_key=self.args.cluster_key,
+                cluster_key=cluster_key,
                 skip_hotspot=self.args.skip_hotspot,
                 log_dir=log_dir,
             )
@@ -471,6 +477,8 @@ class PipelineController:
             if not os.path.exists(log_file):
                 log_file = None
 
+            cluster_key = getattr(self.args, "cluster_key", "leiden")
+
             outputs = generate_report(
                 output_dir=output_dir,
                 title=title,
@@ -480,6 +488,7 @@ class PipelineController:
                 hotspot_result=hotspot_result,
                 log_file=log_file,
                 formats=["html", "pdf"],
+                cluster_key=cluster_key,
             )
 
             log_step(
@@ -599,6 +608,7 @@ class PipelineController:
             hotspot_result,
             self.start_time,
             stratified_output_dir,
+            cluster_key=self.args.cluster_key,
         )
 
         # Run GRN deep analysis
@@ -761,6 +771,7 @@ class PipelineController:
                     hotspot_result,
                     self.start_time,
                     self.args.output,
+                    cluster_key=self.args.cluster_key,
                 )
 
             if "grn_analysis" in steps and not self.args.skip_celloracle:
@@ -852,6 +863,8 @@ class PipelineController:
                 if not os.path.exists(log_file):
                     log_file = None
 
+                cluster_key = getattr(self.args, "cluster_key", "leiden")
+
                 outputs = generate_stratified_report(
                     output_dir=self.args.output,
                     title="GeneCircuitry Analysis Report",
@@ -864,6 +877,7 @@ class PipelineController:
                     merged_scores=total_merged_scores,
                     log_file=log_file,
                     formats=["html", "pdf"],
+                    cluster_key=cluster_key,
                 )
                 if outputs.get("html"):
                     print(f"  ✓ Generated unified HTML report: {outputs['html']}")
@@ -1191,6 +1205,7 @@ def celloracle_pipeline(
     no_base_grn=False,
     hotspot_genes_path=None,
     log_dir=None,
+    **kwargs,
 ):
     """Run CellOracle GRN inference pipeline.
 
@@ -1202,6 +1217,9 @@ def celloracle_pipeline(
         standard highly-variable-gene selection.  This is the default workflow
         (Hotspot-first); pass ``None`` to use HVGs (legacy ``--use-hvgs`` mode).
     """
+    cluster_key = kwargs.get(
+        "cluster_column_name", kwargs.get("cluster_column", cluster_key)
+    )
     log_step(
         "CellOracle",
         "STARTED",
@@ -1400,8 +1418,12 @@ def hotspot_pipeline(
     cluster_key="leiden",
     skip_hotspot=False,
     log_dir=None,
+    **kwargs,
 ):
     """Run Hotspot gene module identification pipeline."""
+    cluster_key = kwargs.get(
+        "cluster_column_name", kwargs.get("cluster_column", cluster_key)
+    )
     log_step(
         "Hotspot", "STARTED", {"n_obs": adata.n_obs, "embedding_key": embedding_key}
     )
@@ -1532,8 +1554,19 @@ def hotspot_pipeline(
         return None
 
 
-def generate_summary(adata, celloracle_result, hotspot_result, start_time, output_dir):
+def generate_summary(
+    adata,
+    celloracle_result,
+    hotspot_result,
+    start_time,
+    output_dir,
+    cluster_key="leiden",
+    **kwargs,
+):
     """Generate analysis summary report."""
+    cluster_key = kwargs.get(
+        "cluster_column_name", kwargs.get("cluster_column", cluster_key)
+    )
     log_step("GenerateSummary", "STARTED")
 
     try:
@@ -1557,9 +1590,15 @@ def generate_summary(adata, celloracle_result, hotspot_result, start_time, outpu
         summary.append("=" * 70)
         summary.append(f"Final dataset: {adata.n_obs} cells × {adata.n_vars} genes")
 
-        if "leiden" in adata.obs.columns:
+        if cluster_key in adata.obs.columns:
+            n_clusters = len(adata.obs[cluster_key].unique())
+            summary.append(f"Clusters identified ({cluster_key}): {n_clusters}")
+        elif "leiden" in adata.obs.columns:
             n_clusters = len(adata.obs["leiden"].unique())
-            summary.append(f"Clusters identified: {n_clusters}")
+            summary.append(f"Clusters identified (leiden): {n_clusters}")
+        elif "louvain" in adata.obs.columns:
+            n_clusters = len(adata.obs["louvain"].unique())
+            summary.append(f"Clusters identified (louvain): {n_clusters}")
 
         # CellOracle results
         summary.append(f"\n{'='*70}")
@@ -1601,28 +1640,25 @@ def generate_summary(adata, celloracle_result, hotspot_result, start_time, outpu
         summary.append("Output Files")
         summary.append("=" * 70)
         summary.append(f"Preprocessed data: {output_dir}/preprocessed_adata.h5ad")
-        summary.append(f"Figures directory: {config.FIGURES_DIR}/")
+        summary.append(f"Figures directory: {output_dir}/figures/")
         summary.append(f"Results directory: {output_dir}/")
 
-        summary_text = "\n".join(summary)
-        print("\n" + summary_text)
-
         # Save summary to file
+        summary_text = "\n".join(summary)
         summary_path = f"{output_dir}/analysis_summary.txt"
         with open(summary_path, "w") as f:
             f.write(summary_text)
-        print(f"\n✓ Summary saved to: {summary_path}")
 
+        print(summary_text)
+        print(f"\n✓ Summary saved to: {summary_path}")
         log_step("GenerateSummary", "COMPLETED", {"summary_file": summary_path})
-        return summary_text
+
     except Exception as e:
         log_error("GenerateSummary", e)
         log_step(
-            "GenerateSummary",
-            "FAILED",
-            {"error": str(e), "error_type": type(e).__name__},
+            "GenerateSummary", "FAILED", {"error": str(e), "error_type": type(e).__name__}
         )
-        print(f"\n⚠ Summary generation failed ({type(e).__name__}): {e}")
+        print(f"⚠ Summary generation failed ({type(e).__name__}): {e}")
 
 
 def track_files(output_dir):
@@ -1794,9 +1830,12 @@ Examples:
     )
     parser.add_argument(
         "--cluster-key",
+        "--cluster-column",
+        "--cluster-column-name",
         type=str,
         default="leiden",
-        help="Clustering column name (default: leiden)",
+        dest="cluster_key",
+        help="Clustering column name in adata.obs (default: leiden)",
     )
     parser.add_argument(
         "--clusters",

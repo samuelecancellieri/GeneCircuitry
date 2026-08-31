@@ -81,12 +81,13 @@ def save_celloracle_results(
 # Move content from grn_celloracle_processing.py here
 def create_oracle_object(
     adata: AnnData,
-    cluster_column_name: str,
-    embedding_name: str,
+    cluster_column_name: str = "leiden",
+    embedding_name: str = "X_draw_graph_fa",
     species: str = "human",
     TG_to_TF_dictionary: Optional[str] = None,
     raw_count_layer: Optional[str] = None,
     no_base_grn: bool = False,
+    **kwargs,
 ):
     """
     Creates an Oracle object for CellOracle analysis.
@@ -112,6 +113,9 @@ def create_oracle_object(
         oracle (Oracle): An instance of the Oracle class.
 
     """
+    cluster_column_name = kwargs.get(
+        "cluster_key", kwargs.get("cluster_column", cluster_column_name)
+    )
 
     # Create a copy of the AnnData object to avoid modifying the original
     adata_cc = adata.copy()
@@ -124,6 +128,11 @@ def create_oracle_object(
             .astype(str)
             .apply(lambda x: x.replace(" ", "_").replace("/", "-"))
             .astype("category")
+        )
+    else:
+        raise ValueError(
+            f"Cluster column '{cluster_column_name}' not found in adata.obs. "
+            f"Available columns: {list(adata_cc.obs.columns)}"
         )
 
     # Create Oracle object
@@ -303,8 +312,9 @@ def run_KNN(oracle: co.Oracle, n_comps: int = 50):
 
 def run_links(
     oracle: co.Oracle,
-    cluster_column_name: str,
+    cluster_column_name: str = "leiden",
     p_cutoff: float = 0.001,
+    **kwargs,
 ):
     """
     Calculate and filter gene regulatory network (GRN) links using CellOracle.
@@ -334,6 +344,9 @@ def run_links(
     - A degree distribution plot is automatically saved to the figures directory
     - Network scores are computed to assess the quality of the inferred GRN
     """
+    cluster_column_name = kwargs.get(
+        "cluster_key", kwargs.get("cluster_column", cluster_column_name)
+    )
 
     # Calculate GRN links
     links = oracle.get_links(
@@ -350,11 +363,18 @@ def run_links(
     links.plot_degree_distributions(
         plot_model=True, save=config.FIGURES_DIR_GRN + "/grn_degree_distribution/"
     )
-    links.plot_scores_as_rank(
-        cluster=cluster_column_name,
-        n_gene=10,
-        save=config.FIGURES_DIR_GRN + "/grn_ranks/",
-    )
+
+    # Plot rank scores for each cluster unit
+    if hasattr(links, "cluster") and links.cluster:
+        for c in links.cluster:
+            try:
+                links.plot_scores_as_rank(
+                    cluster=str(c),
+                    n_gene=10,
+                    save=config.FIGURES_DIR_GRN + "/grn_ranks/",
+                )
+            except Exception as e:
+                print(f"  ⚠ Could not plot rank score for cluster '{c}': {e}")
 
     return links
 
@@ -388,13 +408,14 @@ def load_hotspot_genes(hotspot_genes_path: str) -> list:
 
 def perform_grn_pre_processing(
     adata: AnnData,
-    cluster_key: str,
+    cluster_key: str = "leiden",
     cell_downsample: int = 20000,
     top_genes: Optional[int] = None,
     gene_list: Optional[list] = None,
     n_neighbors: Optional[int] = None,
     n_pcs: Optional[int] = None,
     svd_solver: Optional[str] = None,
+    **kwargs,
 ) -> AnnData:
     """
     Perform preprocessing for GRN analysis on AnnData object.
@@ -407,7 +428,7 @@ def perform_grn_pre_processing(
     ----------
     adata : AnnData
         Annotated data matrix with cells as observations and genes as variables.
-    cluster_key : str, optional
+    cluster_key : str, default="leiden"
         Key in adata.obs to use for clustering over GRN.
     cell_downsample : int, default=20000
         Number of cells to downsample to (default: 20000).
@@ -454,6 +475,9 @@ def perform_grn_pre_processing(
     ...     adata, cluster_key='louvain', gene_list=hotspot_genes
     ... )
     """
+    cluster_key = kwargs.get(
+        "cluster_column_name", kwargs.get("cluster_column", cluster_key)
+    )
 
     # Use config defaults if not specified
     if top_genes is None:
@@ -473,6 +497,11 @@ def perform_grn_pre_processing(
         if not isinstance(adata_cc.obs[cluster_key].dtype, pd.CategoricalDtype):
             adata_cc.obs[cluster_key] = adata_cc.obs[cluster_key].astype("category")
             print(f"  Converted '{cluster_key}' to categorical")
+    else:
+        raise ValueError(
+            f"Cluster key '{cluster_key}' not found in adata.obs. "
+            f"Available columns: {list(adata_cc.obs.columns)}"
+        )
 
     if gene_list is not None:
         # Use provided gene list (e.g., Hotspot autocorrelated genes)

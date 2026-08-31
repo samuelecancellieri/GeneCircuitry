@@ -134,6 +134,7 @@ If checkpoint files exist for earlier steps, they are automatically skipped — 
 | `--skip-celloracle`                |       | Skip CellOracle GRN inference          |                        |
 | `--skip-hotspot`                   |       | Skip Hotspot module detection          |                        |
 | `--force-dim-reduction`            |       | Force re-run of PCA, UMAP, clustering  | `False`                |
+| `--cluster-key KEY`                |       | Clustering column name in `adata.obs` (aliases: `--cluster-column`, `--cluster-column-name`) | `leiden` |
 | `--cluster-key-stratification KEY` |       | `adata.obs` column for stratified runs | disabled               |
 | `--parallel`                       |       | Stratified runs in parallel            | sequential             |
 | `--n-jobs N`                       |       | Number of parallel workers             | `8`                    |

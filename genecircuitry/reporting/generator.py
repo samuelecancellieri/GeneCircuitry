@@ -1114,6 +1114,8 @@ def generate_report(
     log_file: Optional[str] = None,
     formats: List[str] = ["html", "pdf"],
     embed_images: bool = True,
+    cluster_key: Optional[str] = "leiden",
+    **kwargs,
 ) -> Dict[str, str]:
     """
     Generate comprehensive analysis report in specified formats.
@@ -1141,12 +1143,17 @@ def generate_report(
     embed_images : bool
         If True, embed images as base64 (larger file, self-contained).
         If False, use relative paths (smaller file, requires images in place).
+    cluster_key : str, optional
+        Clustering column name in adata.obs (default: "leiden").
 
     Returns
     -------
     dict
         Paths to generated report files
     """
+    cluster_key = kwargs.get(
+        "cluster_column_name", kwargs.get("cluster_column", cluster_key)
+    )
     from .sections import (
         create_data_summary_section,
         create_settings_section,
@@ -1171,7 +1178,9 @@ def generate_report(
     if adata is not None:
         generator.add_section(create_qc_section(adata, output_dir))
         generator.add_section(create_preprocessing_section(adata, output_dir))
-        generator.add_section(create_clustering_section(adata, output_dir))
+        generator.add_section(
+            create_clustering_section(adata, output_dir, cluster_key=cluster_key)
+        )
 
     if celloracle_result is not None:
         generator.add_section(create_celloracle_section(celloracle_result, output_dir))
@@ -1230,6 +1239,8 @@ def generate_stratified_report(
     log_file: Optional[str] = None,
     formats: List[str] = ["html", "pdf"],
     embed_images: bool = True,
+    cluster_key: Optional[str] = "leiden",
+    **kwargs,
 ) -> Dict[str, str]:
     """
     Generate a unified report with tabs for each stratification cluster.
@@ -1264,12 +1275,17 @@ def generate_stratified_report(
         Output formats ('html', 'pdf')
     embed_images : bool
         If True, embed images as base64 (self-contained).
+    cluster_key : str, optional
+        Clustering column name in adata.obs (default: "leiden").
 
     Returns
     -------
     dict
         Paths to generated report files
     """
+    cluster_key = kwargs.get(
+        "cluster_column_name", kwargs.get("cluster_column", cluster_key)
+    )
     from .sections import (
         create_data_summary_section,
         create_settings_section,
@@ -1322,7 +1338,9 @@ def generate_stratified_report(
 
         if has_clustering:
             generator.add_section(
-                create_stratified_clustering_section(stratification_results)
+                create_stratified_clustering_section(
+                    stratification_results, cluster_key=cluster_key
+                )
             )
         if has_celloracle:
             generator.add_section(

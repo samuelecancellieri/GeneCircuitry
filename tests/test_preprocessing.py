@@ -183,8 +183,14 @@ def test_perform_dimensionality_reduction_force(sample_adata):
     adata_out = perform_dimensionality_reduction_clustering(adata, force=True)
 
     # Embeddings should be recomputed and NOT equal to dummy
-    assert not np.allclose(adata_out.obsm["X_pca"], dummy_pca)
-    assert not np.allclose(adata_out.obsm["X_umap"], dummy_umap)
+    assert (
+        adata_out.obsm["X_pca"].shape != dummy_pca.shape
+        or not np.allclose(adata_out.obsm["X_pca"], dummy_pca)
+    )
+    assert (
+        adata_out.obsm["X_umap"].shape != dummy_umap.shape
+        or not np.allclose(adata_out.obsm["X_umap"], dummy_umap)
+    )
     assert "leiden" in adata_out.obs.columns
 
 
@@ -206,5 +212,8 @@ def test_perform_dimensionality_reduction_force_alias(sample_adata):
     adata_out = perform_dimensionality_reduction_clustering(
         adata, force_dim_reduction=True
     )
-    assert not np.allclose(adata_out.obsm["X_pca"], dummy_pca)
+    assert (
+        adata_out.obsm["X_pca"].shape != dummy_pca.shape
+        or not np.allclose(adata_out.obsm["X_pca"], dummy_pca)
+    )
 
