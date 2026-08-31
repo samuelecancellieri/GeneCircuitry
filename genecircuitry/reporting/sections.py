@@ -381,6 +381,7 @@ def create_preprocessing_section(
 def create_clustering_section(
     adata,
     output_dir: str,
+    cluster_key: Optional[str] = None,
 ) -> ReportSection:
     """
     Create Clustering & Visualization section.
@@ -391,6 +392,13 @@ def create_clustering_section(
     active_key = None
     if cluster_key and cluster_key in adata.obs.columns:
         active_key = cluster_key
+        n_clusters = len(adata.obs[cluster_key].unique())
+        metrics[f"Clusters ({cluster_key})"] = n_clusters
+    elif "leiden" in adata.obs.columns:
+        active_key = "leiden"
+        n_clusters = len(adata.obs["leiden"].unique())
+        metrics["Clusters (Leiden)"] = n_clusters
+    elif "louvain" in adata.obs.columns:
         active_key = "louvain"
         n_clusters = len(adata.obs["louvain"].unique())
         metrics["Clusters (Louvain)"] = n_clusters
@@ -409,6 +417,8 @@ def create_clustering_section(
             [str(cluster), count, f"{100*count/adata.n_obs:.1f}%"]
             for cluster, count in cluster_counts.items()
         ]
+        tables.append(
+            {
                 "title": f"Cluster Sizes ({active_key.title()} Clustering)",
                 "headers": ["Cluster", "Cell Count", "Percentage"],
                 "rows": rows,
@@ -416,6 +426,7 @@ def create_clustering_section(
         )
 
     content = """
+    <p>Dimensionality reduction and clustering were performed to identify cell populations.</p>
 
     <h3>Dimensionality Reduction</h3>
     <ol>
@@ -1065,6 +1076,7 @@ def create_stratified_clustering_section(
 
     Parameters
     ----------
+    stratification_results : list of dict
         Each dict has keys: 'name', 'output_dir', 'adata', etc.
     cluster_key : str, optional
         Clustering column name in adata.obs (default: None, autodetects).
@@ -1073,6 +1085,8 @@ def create_stratified_clustering_section(
     <p>Dimensionality reduction and clustering were performed independently for each
     stratified subset of the data.</p>
 
+    <h3>Methods</h3>
+    <ol>
         <li><strong>PCA:</strong> Principal Component Analysis for dimensionality reduction</li>
         <li><strong>Neighbor Graph:</strong> K-nearest neighbor graph construction</li>
         <li><strong>UMAP:</strong> Uniform Manifold Approximation and Projection for visualization</li>
@@ -1106,14 +1120,23 @@ def create_stratified_clustering_section(
 
             if active_key:
                 n_clusters = len(adata.obs[active_key].unique())
+                sub_metrics["Clusters"] = n_clusters
+
+                cluster_counts = adata.obs[active_key].value_counts().sort_index()
+                rows = [
+                    [str(c), count, f"{100 * count / adata.n_obs:.1f}%"]
                     for c, count in cluster_counts.items()
                 ]
+                tables.append(
                     {
                         "title": f"Cluster Sizes ({active_key.title()})",
                         "headers": ["Cluster", "Cell Count", "Percentage"],
+                        "rows": rows,
+                    }
                 )
 
             if "X_pca" in adata.obsm:
+                sub_metrics["PCA Components"] = adata.obsm["X_pca"].shape[1]
             if "X_umap" in adata.obsm:
                 sub_metrics["UMAP"] = "Yes"
 
@@ -1121,6 +1144,7 @@ def create_stratified_clustering_section(
 
         subsections.append(
             ReportSection(
+                title=str(name),
                 section_id=f"clustering-{_safe_id(name)}",
                 content="",
                 figures=figures,
