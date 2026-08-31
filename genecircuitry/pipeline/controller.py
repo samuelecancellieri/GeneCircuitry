@@ -280,7 +280,7 @@ class PipelineController:
             log_error("Controller.Stratification", e)
             raise
 
-    def run_step_clustering(self, adata=None, log_dir=None):
+    def run_step_clustering(self, adata=None, log_dir=None, force=None):
         """Execute Step 3: Clustering."""
         log_step("Controller.Clustering", "STARTED")
         try:
@@ -290,9 +290,16 @@ class PipelineController:
                 raise ValueError("No data available for clustering.")
             if log_dir is None:
                 log_dir = self.log_dir
+            if force is None:
+                force = getattr(self.args, "force_dim_reduction", False) or getattr(
+                    self.args, "force_dimensionality_reduction", False
+                ) or config.FORCE_DIM_REDUCTION
 
             result = dimensionality_reduction_clustering(
-                adata, cluster_key=self.args.cluster_key, log_dir=log_dir
+                adata,
+                cluster_key=self.args.cluster_key,
+                log_dir=log_dir,
+                force=force,
             )
             log_step("Controller.Clustering", "COMPLETED")
             return result
@@ -553,7 +560,10 @@ class PipelineController:
 
         # Run pipeline steps
         adata_clustered = dimensionality_reduction_clustering(
-            adata_cluster, cluster_key=self.args.cluster_key, log_dir=stratified_log_dir
+            adata_cluster,
+            cluster_key=self.args.cluster_key,
+            log_dir=stratified_log_dir,
+            force=True,
         )
 
         use_hvgs = getattr(self.args, "use_hvgs", False)
@@ -1074,12 +1084,24 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
         return [], []  # Return empty lists for compatibility
 
 
-def dimensionality_reduction_clustering(adata, cluster_key="leiden", log_dir=None):
+def dimensionality_reduction_clustering(
+    adata, cluster_key="leiden", log_dir=None, force=False, **kwargs
+):
     """Perform dimensionality reduction and clustering."""
+    force = (
+        force
+        or kwargs.get("force_dim_reduction", False)
+        or kwargs.get("force_dimensionality_reduction", False)
+    )
     log_step(
         "DimReduction_Clustering",
         "STARTED",
-        {"n_obs": adata.n_obs, "n_vars": adata.n_vars, "cluster_key": cluster_key},
+        {
+            "n_obs": adata.n_obs,
+            "n_vars": adata.n_vars,
+            "cluster_key": cluster_key,
+            "force": force,
+        },
     )
 
     print(f"\n{'='*70}")
@@ -1100,7 +1122,8 @@ def dimensionality_reduction_clustering(adata, cluster_key="leiden", log_dir=Non
 
         checkpoint_file = f"{config.OUTPUT_DIR}/clustered_adata.h5ad"
         if (
-            log_dir
+            not force
+            and log_dir
             and check_checkpoint(log_dir, "clustering", step_hash)
             and os.path.exists(checkpoint_file)
         ):
@@ -1117,7 +1140,9 @@ def dimensionality_reduction_clustering(adata, cluster_key="leiden", log_dir=Non
 
         # Perform dimensionality reduction and clustering
         log_step("DimReduction_Clustering.Processing", "STARTED")
-        adata = perform_dimensionality_reduction_clustering(adata)
+        adata = perform_dimensionality_reduction_clustering(
+            adata, cluster_key=cluster_key, force=force
+        )
         # Ensure cluster_key is categorical (in addition to default columns)
         adata = ensure_categorical_obs(adata, columns=[cluster_key])
         log_step("DimReduction_Clustering.Processing", "COMPLETED")
@@ -1866,6 +1891,14 @@ Examples:
         help="Skip quality control (use if already performed)",
     )
     parser.add_argument(
+        "--force-dim-reduction",
+        "--force-dimensionality-reduction",
+        action="store_true",
+        default=False,
+        dest="force_dim_reduction",
+        help="Force re-run of dimensionality reduction and clustering even if results already exist",
+    )
+    parser.add_argument(
         "--skip-celloracle",
         action="store_true",
         default=False,
@@ -1993,6 +2026,8 @@ Examples:
         _config_overrides["QC_MIN_GENES"] = args.min_genes
     if "min_counts" in _explicit_args:
         _config_overrides["QC_MIN_COUNTS"] = args.min_counts
+    if "force_dim_reduction" in _explicit_args:
+        _config_overrides["FORCE_DIM_REDUCTION"] = args.force_dim_reduction
     config.update_config(**_config_overrides)
 
     print(f"Random seed: {args.seed}")

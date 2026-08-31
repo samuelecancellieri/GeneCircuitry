@@ -116,3 +116,95 @@ def test_plot_qc_scatter(sample_adata):
 
     # Test scatter plot
     plot_qc_scatter_pre_filter(adata_qc, skip_existing=False)
+
+
+def test_perform_dimensionality_reduction_basic(sample_adata):
+    """Test standard dimensionality reduction and clustering pipeline"""
+    from genecircuitry.preprocessing import (
+        perform_qc,
+        perform_normalization,
+        perform_dimensionality_reduction_clustering,
+    )
+
+    adata = perform_qc(sample_adata, min_genes=1, min_counts=1, min_cells=1, plot=False)
+    adata.X = (adata.X.astype(np.float32) + 1.0) * 50.0
+    adata = perform_normalization(adata)
+    adata = perform_dimensionality_reduction_clustering(adata, cluster_key="leiden")
+
+    assert "highly_variable" in adata.var.columns
+    assert "X_pca" in adata.obsm
+    assert "neighbors" in adata.uns
+    assert "X_umap" in adata.obsm
+    assert "leiden" in adata.obs.columns
+
+
+def test_perform_dimensionality_reduction_skip_existing(sample_adata):
+    """Test that existing embeddings are preserved when force=False"""
+    from genecircuitry.preprocessing import (
+        perform_qc,
+        perform_normalization,
+        perform_dimensionality_reduction_clustering,
+    )
+
+    adata = perform_qc(sample_adata, min_genes=1, min_counts=1, min_cells=1, plot=False)
+    adata.X = (adata.X.astype(np.float32) + 1.0) * 50.0
+    adata = perform_normalization(adata)
+
+    # Inject dummy PCA embedding
+    dummy_pca = np.ones((adata.n_obs, 5), dtype=np.float32) * 42.0
+    adata.obsm["X_pca"] = dummy_pca.copy()
+
+    # Run without force
+    adata_out = perform_dimensionality_reduction_clustering(adata, force=False)
+
+    # PCA should remain unchanged (dummy)
+    np.testing.assert_array_equal(adata_out.obsm["X_pca"], dummy_pca)
+
+
+def test_perform_dimensionality_reduction_force(sample_adata):
+    """Test that existing embeddings are overwritten when force=True"""
+    from genecircuitry.preprocessing import (
+        perform_qc,
+        perform_normalization,
+        perform_dimensionality_reduction_clustering,
+    )
+
+    adata = perform_qc(sample_adata, min_genes=1, min_counts=1, min_cells=1, plot=False)
+    adata.X = (adata.X.astype(np.float32) + 1.0) * 50.0
+    adata = perform_normalization(adata)
+
+    # Inject dummy PCA and UMAP embeddings
+    dummy_pca = np.ones((adata.n_obs, 5), dtype=np.float32) * 42.0
+    dummy_umap = np.ones((adata.n_obs, 2), dtype=np.float32) * 99.0
+    adata.obsm["X_pca"] = dummy_pca.copy()
+    adata.obsm["X_umap"] = dummy_umap.copy()
+
+    # Run with force=True
+    adata_out = perform_dimensionality_reduction_clustering(adata, force=True)
+
+    # Embeddings should be recomputed and NOT equal to dummy
+    assert not np.allclose(adata_out.obsm["X_pca"], dummy_pca)
+    assert not np.allclose(adata_out.obsm["X_umap"], dummy_umap)
+    assert "leiden" in adata_out.obs.columns
+
+
+def test_perform_dimensionality_reduction_force_alias(sample_adata):
+    """Test that force_dim_reduction kwarg works as an alias"""
+    from genecircuitry.preprocessing import (
+        perform_qc,
+        perform_normalization,
+        perform_dimensionality_reduction_clustering,
+    )
+
+    adata = perform_qc(sample_adata, min_genes=1, min_counts=1, min_cells=1, plot=False)
+    adata.X = (adata.X.astype(np.float32) + 1.0) * 50.0
+    adata = perform_normalization(adata)
+
+    dummy_pca = np.ones((adata.n_obs, 5), dtype=np.float32) * 42.0
+    adata.obsm["X_pca"] = dummy_pca.copy()
+
+    adata_out = perform_dimensionality_reduction_clustering(
+        adata, force_dim_reduction=True
+    )
+    assert not np.allclose(adata_out.obsm["X_pca"], dummy_pca)
+

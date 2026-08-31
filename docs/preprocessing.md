@@ -139,11 +139,10 @@ from genecircuitry.preprocessing import perform_dimensionality_reduction_cluster
 
 adata = perform_dimensionality_reduction_clustering(
     adata,
-    n_comps=None,       # int   — PCA components (config.PCA_N_COMPS = 50)
-    n_neighbors=None,   # int   — KNN neighbors (config.NEIGHBORS_N_NEIGHBORS = 15)
-    n_pcs=None,         # int   — PCs for neighbor graph (config.NEIGHBORS_N_PCS = 40)
-    resolution=None,    # float — Leiden resolution (config.LEIDEN_RESOLUTION = 0.5)
+    cluster_key="leiden", # str  — column for cluster labels (default: "leiden")
+    force=False,          # bool — force re-run even if embeddings exist (default: False)
 )
+
 ```
 
 **What it adds:**

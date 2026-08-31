@@ -142,6 +142,9 @@ LEIDEN_RESOLUTION = 1.0
 LOUVAIN_RESOLUTION = 1.0
 """Resolution parameter for Louvain clustering"""
 
+FORCE_DIM_REDUCTION = False
+"""Whether to force re-run of dimensionality reduction and clustering"""
+
 
 # ============================================================================
 # UMAP Configuration
@@ -385,6 +388,7 @@ def get_config():
         # Clustering
         "LEIDEN_RESOLUTION": LEIDEN_RESOLUTION,
         "LOUVAIN_RESOLUTION": LOUVAIN_RESOLUTION,
+        "FORCE_DIM_REDUCTION": FORCE_DIM_REDUCTION,
         # UMAP
         "UMAP_MIN_DIST": UMAP_MIN_DIST,
         "UMAP_SPREAD": UMAP_SPREAD,

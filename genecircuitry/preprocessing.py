@@ -315,6 +315,8 @@ def perform_dimensionality_reduction_clustering(
     adata: AnnData,
     cluster_key: str = "leiden",
     skip_dimensionality_reduction: bool = False,
+    force: bool = False,
+    **kwargs,
 ) -> AnnData:
     """
     Perform dimensionality reduction and clustering on AnnData object.
@@ -322,8 +324,9 @@ def perform_dimensionality_reduction_clustering(
     This function identifies highly variable genes, computes PCA, constructs a
     neighborhood graph, computes UMAP embedding, and performs Leiden clustering.
     If `skip_dimensionality_reduction` is True, all steps are skipped.
-    Additionally, each step checks whether the corresponding result is already
+    If `force` is False, each step checks whether the corresponding result is already
     present in `adata` and skips that individual step if already completed.
+    If `force` is True, all dimensionality reduction and clustering steps are re-run.
 
     Parameters
     ----------
@@ -334,13 +337,23 @@ def perform_dimensionality_reduction_clustering(
         is already present.
     skip_dimensionality_reduction : bool, default=False
         Whether to skip all dimensionality reduction and clustering steps.
+    force : bool, default=False
+        Whether to force re-computation of dimensionality reduction and clustering
+        steps even if results already exist in `adata`.
 
     Returns
     -------
     AnnData
         Annotated data matrix with PCA, UMAP, and clustering results.
     """
+    force = (
+        force
+        or kwargs.get("force_dim_reduction", False)
+        or kwargs.get("force_dimensionality_reduction", False)
+    )
     adata_cc = adata.copy()
+    if hasattr(adata_cc.X, "dtype") and not np.issubdtype(adata_cc.X.dtype, np.floating):
+        adata_cc.X = adata_cc.X.astype(np.float32)
 
     if skip_dimensionality_reduction:
         print("\nSkipping dimensionality reduction and clustering (as requested)...")
@@ -350,7 +363,7 @@ def perform_dimensionality_reduction_clustering(
     print("\nPerforming dimensionality reduction and clustering...")
 
     # Step 1: Highly Variable Genes (HVG)
-    if "highly_variable" in adata_cc.var.columns:
+    if not force and "highly_variable" in adata_cc.var.columns:
         n_hvgs = int(adata_cc.var["highly_variable"].sum())
         print(
             f"  - Highly variable genes already identified ({n_hvgs} HVGs found in .var['highly_variable']). Skipping HVG selection."
@@ -364,7 +377,7 @@ def perform_dimensionality_reduction_clustering(
         print(f"Identified top {config.HVGS_N_TOP_GENES} highly variable genes")
 
     # Step 2: PCA
-    if "X_pca" in adata_cc.obsm:
+    if not force and "X_pca" in adata_cc.obsm:
         n_comps = adata_cc.obsm["X_pca"].shape[1]
         print(
             f"  - PCA already computed ({n_comps} components found in .obsm['X_pca']). Skipping PCA."
@@ -377,8 +390,9 @@ def perform_dimensionality_reduction_clustering(
         print(f"Computed PCA with {n_comps} components")
 
     # Step 3: Neighborhood graph
-    if "neighbors" in adata_cc.uns or (
-        "connectivities" in adata_cc.obsp and "distances" in adata_cc.obsp
+    if not force and (
+        "neighbors" in adata_cc.uns
+        or ("connectivities" in adata_cc.obsp and "distances" in adata_cc.obsp)
     ):
         print(
             "  - Neighborhood graph already constructed (found in .uns['neighbors'] / .obsp). Skipping neighbors."
@@ -399,7 +413,7 @@ def perform_dimensionality_reduction_clustering(
         )
 
     # Step 4: UMAP
-    if "X_umap" in adata_cc.obsm:
+    if not force and "X_umap" in adata_cc.obsm:
         print(
             "  - UMAP embedding already computed (found in .obsm['X_umap']). Skipping UMAP."
         )
@@ -413,7 +427,7 @@ def perform_dimensionality_reduction_clustering(
         print("Computed UMAP embedding")
 
     # Step 5: Clustering
-    if cluster_key in adata_cc.obs.columns:
+    if not force and cluster_key in adata_cc.obs.columns:
         n_clusters = len(adata_cc.obs[cluster_key].unique())
         print(
             f"  - Clustering '{cluster_key}' already exists ({n_clusters} clusters found in .obs['{cluster_key}']). Skipping clustering."
