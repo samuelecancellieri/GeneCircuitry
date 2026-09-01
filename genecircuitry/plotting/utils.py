@@ -355,6 +355,7 @@ def save_plot(
 
     return True
 
+
 def get_plot_registry(output_dir: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
     """
     Get the current plot registry.
@@ -478,8 +479,7 @@ def run_parallel_tasks(
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         future_to_idx = {
-            executor.submit(worker_fn, task): idx
-            for idx, task in enumerate(tasks)
+            executor.submit(worker_fn, task): idx for idx, task in enumerate(tasks)
         }
         for future in concurrent.futures.as_completed(future_to_idx):
             idx = future_to_idx[future]

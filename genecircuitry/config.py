@@ -207,13 +207,20 @@ HOTSPOT_TOP_GENES = 5000
 # ============================================================================
 
 ENRICHMENT_GENE_SETS = ["MSigDB_Hallmark_2020"]
-"""Gene set libraries for ORA enrichment analysis (e.g. gseapy enrichr).
-Users can extend this list with additional libraries such as:
-- "Reactome_Pathways_2024"
-- "KEGG_2021_Human"
-- "GO_Biological_Process_2023"
-- "GO_Molecular_Function_2023"
+"""Gene set libraries for local ORA enrichment analysis.
+Can be bundled libraries (e.g. "MSigDB_Hallmark_2020"), local .gmt file paths,
+dictionaries, or downloadable Enrichr libraries cached to disk (e.g. "KEGG_2021_Human").
 """
+
+ENRICHMENT_BACKGROUND = None
+"""Background universe for hypergeometric ORA testing.
+- None: Union of genes in the gene set library
+- int: Total number of genes tested (e.g. 20000)
+- list/set: Specific background gene symbols
+"""
+
+ENRICHMENT_SPECIES = "human"
+"""Default species/organism for gene set enrichment ("human" or "mouse")"""
 
 # ============================================================================
 # ATAC Peaks Processing Configuration
@@ -417,6 +424,8 @@ def get_config():
         "HOTSPOT_TOP_GENES": HOTSPOT_TOP_GENES,
         # Enrichment
         "ENRICHMENT_GENE_SETS": ENRICHMENT_GENE_SETS,
+        "ENRICHMENT_BACKGROUND": ENRICHMENT_BACKGROUND,
+        "ENRICHMENT_SPECIES": ENRICHMENT_SPECIES,
         # ATAC Peaks
         "ATAC_MOTIF_SCAN_FPR": ATAC_MOTIF_SCAN_FPR,
         "ATAC_MOTIF_SCORE_THRESHOLD": ATAC_MOTIF_SCORE_THRESHOLD,

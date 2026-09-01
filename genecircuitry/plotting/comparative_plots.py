@@ -53,7 +53,9 @@ def plot_comparative_module_activity(
         True if generated, False if skipped.
     """
     suffix = _clean_save_suffix(save_name)
-    filepath = f"{config.FIGURES_DIR_COMPARATIVE}/comparative_module_activity{suffix}.png"
+    filepath = (
+        f"{config.FIGURES_DIR_COMPARATIVE}/comparative_module_activity{suffix}.png"
+    )
 
     if plot_exists(filepath, skip_existing):
         return False
@@ -124,7 +126,9 @@ def plot_comparative_pathway_enrichment(
         True if generated, False if skipped.
     """
     suffix = _clean_save_suffix(save_name)
-    filepath = f"{config.FIGURES_DIR_COMPARATIVE}/comparative_pathway_enrichment{suffix}.png"
+    filepath = (
+        f"{config.FIGURES_DIR_COMPARATIVE}/comparative_pathway_enrichment{suffix}.png"
+    )
 
     if plot_exists(filepath, skip_existing):
         return False
@@ -143,7 +147,9 @@ def plot_comparative_pathway_enrichment(
         return False
 
     # Calculate -log10 p-value
-    plot_data["neg_log_p"] = -np.log10(np.clip(plot_data["adjusted_p_value"], 1e-30, 1.0))
+    plot_data["neg_log_p"] = -np.log10(
+        np.clip(plot_data["adjusted_p_value"], 1e-30, 1.0)
+    )
     plot_data["label"] = plot_data["module"] + ": " + plot_data["term"]
 
     if figsize is None:
@@ -164,8 +170,12 @@ def plot_comparative_pathway_enrichment(
     ax.set_yticklabels(plot_data["label"], fontsize=9)
     ax.invert_yaxis()
     ax.set_xlabel("-log10(Adjusted P-value)", fontsize=11)
-    ax.set_title("Top Biological Pathways Enriched in Co-expression Modules", fontsize=13, pad=12)
-    ax.axvline(x=-np.log10(0.05), color="red", linestyle="--", linewidth=1, label="p = 0.05")
+    ax.set_title(
+        "Top Biological Pathways Enriched in Co-expression Modules", fontsize=13, pad=12
+    )
+    ax.axvline(
+        x=-np.log10(0.05), color="red", linestyle="--", linewidth=1, label="p = 0.05"
+    )
     ax.legend(loc="lower right")
 
     plt.tight_layout()
@@ -205,7 +215,9 @@ def plot_tf_module_regulatory_matrix(
         True if generated, False if skipped.
     """
     suffix = _clean_save_suffix(save_name)
-    filepath = f"{config.FIGURES_DIR_COMPARATIVE}/tf_module_regulatory_matrix{suffix}.png"
+    filepath = (
+        f"{config.FIGURES_DIR_COMPARATIVE}/tf_module_regulatory_matrix{suffix}.png"
+    )
 
     if plot_exists(filepath, skip_existing):
         return False
@@ -231,7 +243,9 @@ def plot_tf_module_regulatory_matrix(
         ax=ax,
     )
 
-    ax.set_title("TF-to-Module Regulatory Mapping (Target Overlap)", fontsize=13, pad=12)
+    ax.set_title(
+        "TF-to-Module Regulatory Mapping (Target Overlap)", fontsize=13, pad=12
+    )
     ax.set_xlabel("Co-expression Module", fontsize=11)
     ax.set_ylabel("Transcription Factor (TF)", fontsize=11)
     plt.xticks(rotation=45, ha="right")
@@ -285,7 +299,9 @@ def plot_comparative_tf_centrality(
         return False
 
     # Sort TFs by mean centrality
-    sorted_df = tf_pivot_df.loc[tf_pivot_df.mean(axis=1).sort_values(ascending=False).index]
+    sorted_df = tf_pivot_df.loc[
+        tf_pivot_df.mean(axis=1).sort_values(ascending=False).index
+    ]
 
     if figsize is None:
         n_rows, n_cols = sorted_df.shape
@@ -389,7 +405,9 @@ def plot_differential_tf_targets(
     ax.set_yticklabels(plot_df["tf"], fontsize=10)
     ax.invert_yaxis()
     ax.set_xlabel("Number of Target Genes", fontsize=11)
-    ax.set_title("TF Target Gene Conservation vs. Rewiring Across Groups", fontsize=13, pad=12)
+    ax.set_title(
+        "TF Target Gene Conservation vs. Rewiring Across Groups", fontsize=13, pad=12
+    )
     ax.legend(loc="lower right")
 
     plt.tight_layout()
@@ -430,7 +448,9 @@ def plot_comparative_summary_dashboard(
         True if generated, False if skipped.
     """
     suffix = _clean_save_suffix(save_name)
-    filepath = f"{config.FIGURES_DIR_COMPARATIVE}/comparative_summary_dashboard{suffix}.png"
+    filepath = (
+        f"{config.FIGURES_DIR_COMPARATIVE}/comparative_summary_dashboard{suffix}.png"
+    )
 
     if plot_exists(filepath, skip_existing):
         return False
@@ -459,11 +479,15 @@ def plot_comparative_summary_dashboard(
             cbar_kws={"label": "Mean Score"},
             ax=axes[0, 0],
         )
-        axes[0, 0].set_title("A. Co-expression Module Activity", fontsize=12, fontweight="bold")
+        axes[0, 0].set_title(
+            "A. Co-expression Module Activity", fontsize=12, fontweight="bold"
+        )
         axes[0, 0].tick_params(axis="x", rotation=30)
     else:
         axes[0, 0].text(0.5, 0.5, "No Module Activity Data", ha="center", va="center")
-        axes[0, 0].set_title("A. Co-expression Module Activity", fontsize=12, fontweight="bold")
+        axes[0, 0].set_title(
+            "A. Co-expression Module Activity", fontsize=12, fontweight="bold"
+        )
 
     # Panel B: TF Centrality
     if tf_pivot_df is not None and not tf_pivot_df.empty:
@@ -477,11 +501,15 @@ def plot_comparative_summary_dashboard(
             cbar_kws={"label": "Centrality"},
             ax=axes[0, 1],
         )
-        axes[0, 1].set_title("B. Transcription Factor Centrality", fontsize=12, fontweight="bold")
+        axes[0, 1].set_title(
+            "B. Transcription Factor Centrality", fontsize=12, fontweight="bold"
+        )
         axes[0, 1].tick_params(axis="x", rotation=30)
     else:
         axes[0, 1].text(0.5, 0.5, "No TF Centrality Data", ha="center", va="center")
-        axes[0, 1].set_title("B. Transcription Factor Centrality", fontsize=12, fontweight="bold")
+        axes[0, 1].set_title(
+            "B. Transcription Factor Centrality", fontsize=12, fontweight="bold"
+        )
 
     # Panel C: TF-to-Module Regulation
     if tf_mod_matrix is not None and not tf_mod_matrix.empty:
@@ -494,16 +522,22 @@ def plot_comparative_summary_dashboard(
             cbar_kws={"label": "Target Count"},
             ax=axes[1, 0],
         )
-        axes[1, 0].set_title("C. TF-to-Module Regulation", fontsize=12, fontweight="bold")
+        axes[1, 0].set_title(
+            "C. TF-to-Module Regulation", fontsize=12, fontweight="bold"
+        )
         axes[1, 0].tick_params(axis="x", rotation=30)
     else:
         axes[1, 0].text(0.5, 0.5, "No TF-to-Module Data", ha="center", va="center")
-        axes[1, 0].set_title("C. TF-to-Module Regulation", fontsize=12, fontweight="bold")
+        axes[1, 0].set_title(
+            "C. TF-to-Module Regulation", fontsize=12, fontweight="bold"
+        )
 
     # Panel D: Top Functional Pathways
     if enrichment_df is not None and not enrichment_df.empty:
         top_enr = enrichment_df.head(12).copy()
-        top_enr["neg_log_p"] = -np.log10(np.clip(top_enr["adjusted_p_value"], 1e-30, 1.0))
+        top_enr["neg_log_p"] = -np.log10(
+            np.clip(top_enr["adjusted_p_value"], 1e-30, 1.0)
+        )
         top_enr["label"] = top_enr["module"] + ": " + top_enr["term"]
         y_pos = range(len(top_enr))
         axes[1, 1].barh(
@@ -517,12 +551,23 @@ def plot_comparative_summary_dashboard(
         axes[1, 1].set_yticklabels(top_enr["label"], fontsize=8)
         axes[1, 1].invert_yaxis()
         axes[1, 1].set_xlabel("-log10(Adjusted P-value)", fontsize=10)
-        axes[1, 1].set_title("D. Top Enriched Module Pathways", fontsize=12, fontweight="bold")
+        axes[1, 1].set_title(
+            "D. Top Enriched Module Pathways", fontsize=12, fontweight="bold"
+        )
     else:
-        axes[1, 1].text(0.5, 0.5, "No Pathway Enrichment Data", ha="center", va="center")
-        axes[1, 1].set_title("D. Top Enriched Module Pathways", fontsize=12, fontweight="bold")
+        axes[1, 1].text(
+            0.5, 0.5, "No Pathway Enrichment Data", ha="center", va="center"
+        )
+        axes[1, 1].set_title(
+            "D. Top Enriched Module Pathways", fontsize=12, fontweight="bold"
+        )
 
-    fig.suptitle("GeneCircuitry Comparative Analysis Dashboard", fontsize=16, fontweight="bold", y=0.99)
+    fig.suptitle(
+        "GeneCircuitry Comparative Analysis Dashboard",
+        fontsize=16,
+        fontweight="bold",
+        y=0.99,
+    )
     plt.tight_layout()
 
     return save_plot(
@@ -586,7 +631,10 @@ def generate_all_comparative_plots(
     tf_summary_df = comparative_results.get("tf_summary")
     if tf_pivot_df is not None and not tf_pivot_df.empty:
         results["tf_centrality"] = plot_comparative_tf_centrality(
-            tf_pivot_df, tf_summary_df=tf_summary_df, save_name=save_name, skip_existing=skip_existing
+            tf_pivot_df,
+            tf_summary_df=tf_summary_df,
+            save_name=save_name,
+            skip_existing=skip_existing,
         )
 
     # 5. Differential TF Targets
@@ -602,6 +650,8 @@ def generate_all_comparative_plots(
     )
 
     generated = sum(1 for status in results.values() if status)
-    print(f"  Comparative plots: {generated} generated, {len(results) - generated} skipped/unchanged")
+    print(
+        f"  Comparative plots: {generated} generated, {len(results) - generated} skipped/unchanged"
+    )
 
     return results

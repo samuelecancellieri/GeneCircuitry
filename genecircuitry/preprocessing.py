@@ -354,7 +354,9 @@ def perform_dimensionality_reduction_clustering(
         or kwargs.get("force_dimensionality_reduction", False)
     )
     adata_cc = adata.copy()
-    if hasattr(adata_cc.X, "dtype") and not np.issubdtype(adata_cc.X.dtype, np.floating):
+    if hasattr(adata_cc.X, "dtype") and not np.issubdtype(
+        adata_cc.X.dtype, np.floating
+    ):
         adata_cc.X = adata_cc.X.astype(np.float32)
 
     if skip_dimensionality_reduction:

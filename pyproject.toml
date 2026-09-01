@@ -78,6 +78,10 @@ where = ["."]
 include = ["genecircuitry*"]
 exclude = ["tests*", "docs*", "examples*", "output*"]
 
+[tool.setuptools.package-data]
+genecircuitry = ["data/gene_sets/*.gmt"]
+
+
 [tool.black]
 line-length = 88
 target-version = ['py39', 'py310']

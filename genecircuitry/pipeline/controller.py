@@ -47,7 +47,6 @@ from genecircuitry.preprocessing import (
 )
 from genecircuitry.reporting import generate_report, generate_stratified_report
 
-
 # Global logger instances
 pipeline_logger = None
 error_logger = None
@@ -298,9 +297,11 @@ class PipelineController:
             if log_dir is None:
                 log_dir = self.log_dir
             if force is None:
-                force = getattr(self.args, "force_dim_reduction", False) or getattr(
-                    self.args, "force_dimensionality_reduction", False
-                ) or config.FORCE_DIM_REDUCTION
+                force = (
+                    getattr(self.args, "force_dim_reduction", False)
+                    or getattr(self.args, "force_dimensionality_reduction", False)
+                    or config.FORCE_DIM_REDUCTION
+                )
 
             cluster_key = getattr(self.args, "cluster_key", "leiden")
             parsed = parse_cluster_keys(cluster_key)
@@ -369,7 +370,9 @@ class PipelineController:
                     "LOADED_FROM_CHECKPOINT",
                     {"pkl_path": dict_pkl_path, "df_pkl_path": df_pkl_path},
                 )
-                print(f"  ✓ Loading enriched ATAC peaks from checkpoint: {dict_pkl_path}")
+                print(
+                    f"  ✓ Loading enriched ATAC peaks from checkpoint: {dict_pkl_path}"
+                )
                 self.atac_peaks_pkl = dict_pkl_path
                 return dict_pkl_path
 
@@ -826,7 +829,9 @@ class PipelineController:
                     self.args.output, "celloracle", "grn_filtered_links.pkl"
                 )
                 if os.path.exists(grn_score_file) and os.path.exists(grn_links_file):
-                    self.run_step_grn_analysis(grn_score_path=grn_score_file, grn_links_path=grn_links_file)
+                    self.run_step_grn_analysis(
+                        grn_score_path=grn_score_file, grn_links_path=grn_links_file
+                    )
 
             # Step: Comparative analysis across clusters
             if "comparative" in steps:
@@ -887,7 +892,9 @@ class PipelineController:
             Dictionary of computed comparative analysis results.
         """
         from genecircuitry.comparative_analysis import run_comparative_analysis
-        from genecircuitry.plotting.comparative_plots import generate_all_comparative_plots
+        from genecircuitry.plotting.comparative_plots import (
+            generate_all_comparative_plots,
+        )
 
         if output_dir is None:
             output_dir = getattr(self.args, "output", config.OUTPUT_DIR)
@@ -896,15 +903,21 @@ class PipelineController:
 
         # Automatically resolve scores and links if not provided
         if score_df is None:
-            co_score_path = os.path.join(output_dir, "celloracle", "grn_merged_scores.csv")
+            co_score_path = os.path.join(
+                output_dir, "celloracle", "grn_merged_scores.csv"
+            )
             if os.path.exists(co_score_path):
                 import pandas as pd
+
                 score_df = pd.read_csv(co_score_path)
 
         if links_df is None:
-            co_links_path = os.path.join(output_dir, "celloracle", "grn_filtered_links.pkl")
+            co_links_path = os.path.join(
+                output_dir, "celloracle", "grn_filtered_links.pkl"
+            )
             if os.path.exists(co_links_path):
                 import pickle
+
                 with open(co_links_path, "rb") as f:
                     links_df = pickle.load(f)
 
@@ -953,7 +966,9 @@ class PipelineController:
             FIGURES_DIR_QC=os.path.join(self.args.output, "figures", "qc"),
             FIGURES_DIR_GRN=os.path.join(self.args.output, "figures", "grn"),
             FIGURES_DIR_HOTSPOT=os.path.join(self.args.output, "figures", "hotspot"),
-            FIGURES_DIR_COMPARATIVE=os.path.join(self.args.output, "figures", "comparative"),
+            FIGURES_DIR_COMPARATIVE=os.path.join(
+                self.args.output, "figures", "comparative"
+            ),
         )
 
         if self.adata_stratification_list and not self.args.skip_celloracle:
@@ -995,7 +1010,9 @@ class PipelineController:
                 )
             except Exception as e:
                 log_error("Controller.ComparativeAnalysis.Stratified", e)
-                print(f"  ⚠ Cross-stratification comparative analysis failed ({type(e).__name__}): {e}")
+                print(
+                    f"  ⚠ Cross-stratification comparative analysis failed ({type(e).__name__}): {e}"
+                )
 
         # Generate unified report with stratification tabs
         if self.adata_stratification_list and self.stratification_results:
@@ -1226,7 +1243,12 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
     adata_list = list()
     adata_stratification_list = list()
 
-    if clusters is None or clusters == "all" or clusters == ["all"] or clusters == ("all",):
+    if (
+        clusters is None
+        or clusters == "all"
+        or clusters == ["all"]
+        or clusters == ("all",)
+    ):
         requested_clusters = None
     elif isinstance(clusters, (str, bytes)):
         c_str = clusters.decode() if isinstance(clusters, bytes) else clusters
@@ -1354,7 +1376,8 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
                                 target_val == str(v)
                                 or target_val_san == v_san
                                 or target_val == str(v).replace(" ", "_")
-                                or target_val_san == sanitize_identifier(str(v).replace(" ", "_"))
+                                or target_val_san
+                                == sanitize_identifier(str(v).replace(" ", "_"))
                             ):
                                 matched = True
                                 break
@@ -1465,7 +1488,11 @@ def dimensionality_reduction_clustering(
         log_step("DimReduction_Clustering.Processing", "COMPLETED")
 
         # Get cluster count
-        n_clusters = len(adata.obs[cluster_key].unique()) if cluster_key in adata.obs.columns else 0
+        n_clusters = (
+            len(adata.obs[cluster_key].unique())
+            if cluster_key in adata.obs.columns
+            else 0
+        )
         print(f"✓ Identified {n_clusters} clusters")
 
         # Save checkpoint
@@ -1616,9 +1643,7 @@ def celloracle_pipeline(
                             "path": hotspot_genes_path,
                         },
                     )
-                    print(
-                        f"  ⚠ Hotspot genes file not found: {hotspot_genes_path}"
-                    )
+                    print(f"  ⚠ Hotspot genes file not found: {hotspot_genes_path}")
                     print(
                         "    Falling back to HVG selection for CellOracle preprocessing."
                     )
@@ -1972,7 +1997,9 @@ def generate_summary(
     except Exception as e:
         log_error("GenerateSummary", e)
         log_step(
-            "GenerateSummary", "FAILED", {"error": str(e), "error_type": type(e).__name__}
+            "GenerateSummary",
+            "FAILED",
+            {"error": str(e), "error_type": type(e).__name__},
         )
         print(f"⚠ Summary generation failed ({type(e).__name__}): {e}")
 
@@ -2314,14 +2341,16 @@ Examples:
         _sentinel_parser.add_argument(
             *action.option_strings,
             dest=action.dest,
-            nargs=action.nargs if action.nargs else (None if action.const is None else "?"),
+            nargs=(
+                action.nargs
+                if action.nargs
+                else (None if action.const is None else "?")
+            ),
             default=_sentinel,
             const=action.const,
         )
     _sentinel_args, _ = _sentinel_parser.parse_known_args()
-    _explicit_args = {
-        k for k, v in vars(_sentinel_args).items() if v is not _sentinel
-    }
+    _explicit_args = {k for k, v in vars(_sentinel_args).items() if v is not _sentinel}
 
     # Print header
     print("\n" + "=" * 70)
@@ -2340,7 +2369,9 @@ Examples:
     if args.config:
         try:
             loaded = config.load_config_file(args.config)
-            print(f"  Loaded {len(loaded)} parameter(s) from config file: {args.config}")
+            print(
+                f"  Loaded {len(loaded)} parameter(s) from config file: {args.config}"
+            )
         except (FileNotFoundError, ValueError, ImportError) as e:
             print(f"\nError loading config file: {e}")
             return 1
@@ -2402,12 +2433,8 @@ Examples:
 
     # Print active workflow mode
     if args.use_hvgs:
-        print(
-            "\nWorkflow mode: LEGACY (--use-hvgs)"
-        )
-        print(
-            "  Order: Load → Preprocess → Cluster → CellOracle (HVGs) → Hotspot"
-        )
+        print("\nWorkflow mode: LEGACY (--use-hvgs)")
+        print("  Order: Load → Preprocess → Cluster → CellOracle (HVGs) → Hotspot")
         log_step("Pipeline", "WORKFLOW_MODE", {"mode": "legacy_hvgs"})
     else:
         print("\nWorkflow mode: DEFAULT (Hotspot-first)")

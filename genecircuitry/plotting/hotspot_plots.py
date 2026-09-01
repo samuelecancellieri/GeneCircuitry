@@ -65,7 +65,9 @@ def plot_hotspot_local_correlations(
     )
 
 
-def _enrich_single_module_worker(task: Dict[str, Any]) -> Tuple[int, Optional[pd.DataFrame]]:
+def _enrich_single_module_worker(
+    task: Dict[str, Any],
+) -> Tuple[int, Optional[pd.DataFrame]]:
     """Worker function for single module ORA enrichment."""
     module = task["module"]
     genes = task["genes"]
@@ -185,7 +187,11 @@ def _get_module_enrichment_labels(
             if "Combined_Score" in df_res.columns:
                 top_term = df_res.nlargest(1, "Combined_Score")["Term"].iloc[0]
             else:
-                adj_col = "Adjusted_P-value" if "Adjusted_P-value" in df_res.columns else "Adjusted P-value"
+                adj_col = (
+                    "Adjusted_P-value"
+                    if "Adjusted_P-value" in df_res.columns
+                    else "Adjusted P-value"
+                )
                 top_term = df_res.nsmallest(1, adj_col)["Term"].iloc[0]
             top_term = top_term.replace("HALLMARK_", "").replace("_", " ").title()
             if len(top_term) > max_label_length:
@@ -316,9 +322,9 @@ def plot_hotspot_annotation(
                         if "Adjusted_P-value" in module_df.columns
                         else "Adjusted P-value"
                     )
-                    top_terms = module_df.nsmallest(
-                        top_n_annotations, adj_col
-                    )["Term"].tolist()
+                    top_terms = module_df.nsmallest(top_n_annotations, adj_col)[
+                        "Term"
+                    ].tolist()
                 top_terms = [
                     t.replace("HALLMARK_", "").replace("_", " ").title()
                     for t in top_terms
@@ -490,9 +496,7 @@ def _plot_hotspot_violin_single_worker(task: Dict[str, Any]) -> Tuple[str, bool]
         return ("per_cluster", saved)
 
     elif variant == "all_clusters":
-        filepath = (
-            f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_all_clusters.png"
-        )
+        filepath = f"{config.FIGURES_DIR_HOTSPOT}/hotspot_module_scores_violin_all_clusters.png"
         if plot_exists(filepath, skip_existing):
             return ("all_clusters", False)
 
@@ -686,12 +690,18 @@ def plot_module_scores_violin(
         return results
 
     # Check and resolve cluster key if multi-key
-    if not isinstance(cluster_key, str) or "," in cluster_key or cluster_key not in adata.obs.columns:
+    if (
+        not isinstance(cluster_key, str)
+        or "," in cluster_key
+        or cluster_key not in adata.obs.columns
+    ):
         try:
             from ..preprocessing import resolve_cluster_key
+
             adata, cluster_key = resolve_cluster_key(adata, cluster_key)
         except Exception:
             from ..preprocessing import resolve_cluster_key_name
+
             cluster_key = resolve_cluster_key_name(cluster_key)
 
     if cluster_key not in adata.obs.columns:
@@ -714,9 +724,7 @@ def plot_module_scores_violin(
         return results
 
     # Get module enrichment annotations
-    module_labels = _get_module_enrichment_labels(
-        hotspot_obj, gene_sets, n_jobs=n_jobs
-    )
+    module_labels = _get_module_enrichment_labels(hotspot_obj, gene_sets, n_jobs=n_jobs)
 
     # Create combined dataframe
     scores_df = module_scores.loc[common_cells].copy()

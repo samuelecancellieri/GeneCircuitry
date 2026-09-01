@@ -20,7 +20,6 @@ from .logging_utils import log_error, log_warning
 
 from . import enrichment_analysis as ea
 
-
 # ---------------------------------------------------------------------------
 # Analysis helpers (non-plotting)
 # ---------------------------------------------------------------------------

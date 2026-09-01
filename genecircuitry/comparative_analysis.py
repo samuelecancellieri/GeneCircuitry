@@ -19,11 +19,56 @@ from . import config
 from .logging_utils import log_error, log_warning, log_info
 
 
+def _normalize_stratification_results(
+    stratification_results: Optional[Union[Dict[str, Any], List[Any], Tuple[Any, ...]]],
+) -> List[Tuple[str, Dict[str, Any]]]:
+    """
+    Normalize stratification_results whether passed as a dict, list of dicts, or list of tuples.
+    Returns a list of (strat_name, data_dict) tuples.
+    """
+    if not stratification_results:
+        return []
+
+    items = []
+    if isinstance(stratification_results, dict):
+        for k, v in stratification_results.items():
+            if isinstance(v, dict):
+                items.append((str(k), v))
+            else:
+                items.append(
+                    (
+                        str(k),
+                        {
+                            "adata": getattr(v, "adata", None),
+                            "hotspot": getattr(v, "hotspot", None),
+                        },
+                    )
+                )
+    elif isinstance(stratification_results, (list, tuple)):
+        for item in stratification_results:
+            if isinstance(item, dict):
+                name = str(
+                    item.get("name", item.get("stratification", f"Group_{len(items)}"))
+                )
+                items.append((name, item))
+            elif isinstance(item, tuple) and len(item) == 2:
+                items.append(
+                    (
+                        str(item[0]),
+                        item[1] if isinstance(item[1], dict) else {"adata": item[1]},
+                    )
+                )
+            elif hasattr(item, "name"):
+                items.append((str(item.name), {"adata": getattr(item, "adata", None)}))
+
+    return items
+
+
 def compute_module_activity_matrix(
     adata: Optional[AnnData] = None,
     cluster_key: str = "leiden",
     hotspot_obj: Any = None,
-    stratification_results: Optional[Dict[str, Any]] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
 ) -> pd.DataFrame:
     """
     Compute mean co-expression module activity scores per cluster or stratification.
@@ -36,8 +81,8 @@ def compute_module_activity_matrix(
         Observation column specifying cell clusters.
     hotspot_obj : Hotspot, optional
         Hotspot object with computed module scores.
-    stratification_results : dict, optional
-        Dictionary mapping stratification names to their respective results/AnnData objects.
+    stratification_results : dict or list, optional
+        Stratified analysis results (dictionary or list of per-stratification dicts).
 
     Returns
     -------
@@ -47,25 +92,58 @@ def compute_module_activity_matrix(
     activity_dict: Dict[str, pd.Series] = {}
 
     # Case 1: Stratified results provided
-    if stratification_results:
-        for strat_name, s_data in stratification_results.items():
-            s_adata = s_data.get("adata") if isinstance(s_data, dict) else getattr(s_data, "adata", None)
-            s_hs = s_data.get("hotspot") if isinstance(s_data, dict) else getattr(s_data, "hotspot", None)
+    strat_items = _normalize_stratification_results(stratification_results)
+    if strat_items:
+        for strat_name, s_data in strat_items:
+            s_adata = (
+                s_data.get("adata")
+                if isinstance(s_data, dict)
+                else getattr(s_data, "adata", None)
+            )
+            s_hs = (
+                s_data.get("hotspot_result") or s_data.get("hotspot")
+                if isinstance(s_data, dict)
+                else getattr(s_data, "hotspot_result", getattr(s_data, "hotspot", None))
+            )
 
             if s_adata is not None:
                 # Find module score columns in s_adata.obs
-                mod_cols = [c for c in s_adata.obs.columns if str(c).startswith("Module_") or (isinstance(c, (int, np.integer)) and f"Module_{c}" in s_adata.obs.columns)]
-                if not mod_cols and s_hs is not None and hasattr(s_hs, "module_scores") and s_hs.module_scores is not None:
+                mod_cols = [
+                    c
+                    for c in s_adata.obs.columns
+                    if str(c).startswith("Module_")
+                    or (
+                        isinstance(c, (int, np.integer))
+                        and f"Module_{c}" in s_adata.obs.columns
+                    )
+                ]
+                if (
+                    not mod_cols
+                    and s_hs is not None
+                    and hasattr(s_hs, "module_scores")
+                    and s_hs.module_scores is not None
+                ):
                     # Use hotspot module_scores directly
                     hs_scores = s_hs.module_scores
                     for m_col in hs_scores.columns:
-                        col_name = f"Module_{m_col}" if not str(m_col).startswith("Module_") else str(m_col)
+                        col_name = (
+                            f"Module_{m_col}"
+                            if not str(m_col).startswith("Module_")
+                            else str(m_col)
+                        )
                         activity_dict[f"{strat_name}"] = hs_scores.mean(axis=0)
                     continue
 
                 if mod_cols:
                     mean_scores = s_adata.obs[mod_cols].mean(axis=0)
-                    mean_scores.index = [str(c).replace("Module_", "Module ") if not str(c).startswith("Module ") else str(c) for c in mean_scores.index]
+                    mean_scores.index = [
+                        (
+                            str(c).replace("Module_", "Module ")
+                            if not str(c).startswith("Module ")
+                            else str(c)
+                        )
+                        for c in mean_scores.index
+                    ]
                     activity_dict[str(strat_name)] = mean_scores
 
         if activity_dict:
@@ -77,27 +155,43 @@ def compute_module_activity_matrix(
     if adata is not None:
         # Check if module columns exist in adata.obs
         mod_cols = [c for c in adata.obs.columns if str(c).startswith("Module_")]
-        
+
         # If not in obs, check if hotspot_obj has them
-        if not mod_cols and hotspot_obj is not None and hasattr(hotspot_obj, "module_scores") and hotspot_obj.module_scores is not None:
+        if (
+            not mod_cols
+            and hotspot_obj is not None
+            and hasattr(hotspot_obj, "module_scores")
+            and hotspot_obj.module_scores is not None
+        ):
             hs_scores = hotspot_obj.module_scores.copy()
             hs_cols = []
             for col in hs_scores.columns:
-                cname = f"Module_{col}" if not str(col).startswith("Module_") else str(col)
-                adata.obs[cname] = hs_scores[col].values if len(hs_scores) == len(adata) else np.nan
+                cname = (
+                    f"Module_{col}" if not str(col).startswith("Module_") else str(col)
+                )
+                adata.obs[cname] = (
+                    hs_scores[col].values if len(hs_scores) == len(adata) else np.nan
+                )
                 hs_cols.append(cname)
             mod_cols = hs_cols
 
         if mod_cols and cluster_key in adata.obs.columns:
             # Group by cluster and compute mean module scores
             grouped = adata.obs.groupby(cluster_key, observed=False)[mod_cols].mean().T
-            grouped.index = [str(c).replace("Module_", "Module ") for c in grouped.index]
-            grouped.columns = [f"Cluster {c}" if not str(c).startswith("Cluster") else str(c) for c in grouped.columns]
+            grouped.index = [
+                str(c).replace("Module_", "Module ") for c in grouped.index
+            ]
+            grouped.columns = [
+                f"Cluster {c}" if not str(c).startswith("Cluster") else str(c)
+                for c in grouped.columns
+            ]
             grouped.index.name = "Module"
             return grouped
         elif mod_cols:
             mean_all = adata.obs[mod_cols].mean(axis=0).to_frame(name="All Cells")
-            mean_all.index = [str(c).replace("Module_", "Module ") for c in mean_all.index]
+            mean_all.index = [
+                str(c).replace("Module_", "Module ") for c in mean_all.index
+            ]
             mean_all.index.name = "Module"
             return mean_all
 
@@ -136,20 +230,29 @@ def compute_module_pathway_enrichments(
     # Extract module -> gene list mapping
     module_genes_map: Dict[str, List[str]] = {}
 
-    if hasattr(modules_dict_or_df, "modules") and modules_dict_or_df.modules is not None:
+    if (
+        hasattr(modules_dict_or_df, "modules")
+        and modules_dict_or_df.modules is not None
+    ):
         mod_series = modules_dict_or_df.modules
         for m in mod_series.unique():
             if m != -1 and m != "-1":
-                module_genes_map[f"Module {m}"] = mod_series[mod_series == m].index.tolist()
+                module_genes_map[f"Module {m}"] = mod_series[
+                    mod_series == m
+                ].index.tolist()
     elif isinstance(modules_dict_or_df, pd.Series):
         for m in modules_dict_or_df.unique():
             if m != -1 and m != "-1":
-                module_genes_map[f"Module {m}"] = modules_dict_or_df[modules_dict_or_df == m].index.tolist()
+                module_genes_map[f"Module {m}"] = modules_dict_or_df[
+                    modules_dict_or_df == m
+                ].index.tolist()
     elif isinstance(modules_dict_or_df, pd.DataFrame):
         if "module" in modules_dict_or_df.columns:
             for m in modules_dict_or_df["module"].unique():
                 if m != -1 and m != "-1":
-                    module_genes_map[f"Module {m}"] = modules_dict_or_df[modules_dict_or_df["module"] == m].index.tolist()
+                    module_genes_map[f"Module {m}"] = modules_dict_or_df[
+                        modules_dict_or_df["module"] == m
+                    ].index.tolist()
     elif isinstance(modules_dict_or_df, dict):
         for k, v in modules_dict_or_df.items():
             mod_name = f"Module {k}" if not str(k).startswith("Module") else str(k)
@@ -157,7 +260,16 @@ def compute_module_pathway_enrichments(
                 module_genes_map[mod_name] = list(v)
 
     if not module_genes_map:
-        return pd.DataFrame(columns=["module", "term", "adjusted_p_value", "combined_score", "overlap_genes", "gene_count"])
+        return pd.DataFrame(
+            columns=[
+                "module",
+                "term",
+                "adjusted_p_value",
+                "combined_score",
+                "overlap_genes",
+                "gene_count",
+            ]
+        )
 
     # Run enrichment for each module
     rows = []
@@ -177,19 +289,32 @@ def compute_module_pathway_enrichments(
                     df_res = enr.results.copy()
                     # Clean up column names
                     df_res.columns = [c.replace(" ", "_") for c in df_res.columns]
-                    sort_col = "Adjusted_P-value" if "Adjusted_P-value" in df_res.columns else "P-value"
+                    sort_col = (
+                        "Adjusted_P-value"
+                        if "Adjusted_P-value" in df_res.columns
+                        else "P-value"
+                    )
                     df_res = df_res.sort_values(sort_col).head(top_n_terms)
 
                     for _, r in df_res.iterrows():
-                        term_clean = str(r.get("Term", "")).replace("HALLMARK_", "").replace("_", " ").title()
-                        rows.append({
-                            "module": mod_name,
-                            "term": term_clean,
-                            "adjusted_p_value": float(r.get("Adjusted_P-value", r.get("P-value", 1.0))),
-                            "combined_score": float(r.get("Combined_Score", 0.0)),
-                            "overlap_genes": str(r.get("Genes", "")),
-                            "gene_count": len(genes),
-                        })
+                        term_clean = (
+                            str(r.get("Term", ""))
+                            .replace("HALLMARK_", "")
+                            .replace("_", " ")
+                            .title()
+                        )
+                        rows.append(
+                            {
+                                "module": mod_name,
+                                "term": term_clean,
+                                "adjusted_p_value": float(
+                                    r.get("Adjusted_P-value", r.get("P-value", 1.0))
+                                ),
+                                "combined_score": float(r.get("Combined_Score", 0.0)),
+                                "overlap_genes": str(r.get("Genes", "")),
+                                "gene_count": len(genes),
+                            }
+                        )
             except Exception as e:
                 log_warning(
                     "ComparativeAnalysis.ModuleEnrichment",
@@ -204,14 +329,16 @@ def compute_module_pathway_enrichments(
     if not rows:
         # Fallback with gene count summary
         for mod_name, genes in module_genes_map.items():
-            rows.append({
-                "module": mod_name,
-                "term": f"{len(genes)} core genes",
-                "adjusted_p_value": 1.0,
-                "combined_score": 0.0,
-                "overlap_genes": ", ".join(genes[:5]),
-                "gene_count": len(genes),
-            })
+            rows.append(
+                {
+                    "module": mod_name,
+                    "term": f"{len(genes)} core genes",
+                    "adjusted_p_value": 1.0,
+                    "combined_score": 0.0,
+                    "overlap_genes": ", ".join(genes[:5]),
+                    "gene_count": len(genes),
+                }
+            )
 
     return pd.DataFrame(rows)
 
@@ -249,7 +376,11 @@ def compute_tf_centrality_matrix(
         score_df = score_df.copy()
         # If stratification has multiple values, combine
         if score_df["stratification"].nunique() > 1:
-            score_df["_group"] = score_df["stratification"].astype(str) + " - " + score_df["cluster"].astype(str)
+            score_df["_group"] = (
+                score_df["stratification"].astype(str)
+                + " - "
+                + score_df["cluster"].astype(str)
+            )
         else:
             score_df["_group"] = score_df["cluster"].astype(str)
     elif "cluster" in score_df.columns:
@@ -264,7 +395,11 @@ def compute_tf_centrality_matrix(
 
     # Select fallback score if not found
     if score not in score_df.columns:
-        num_cols = [c for c in score_df.columns if pd.api.types.is_numeric_dtype(score_df[c]) and c != "_group"]
+        num_cols = [
+            c
+            for c in score_df.columns
+            if pd.api.types.is_numeric_dtype(score_df[c]) and c != "_group"
+        ]
         score = num_cols[0] if num_cols else score_df.columns[0]
 
     gene_col = "gene" if "gene" in score_df.columns else score_df.index.name or "index"
@@ -300,16 +435,20 @@ def compute_tf_centrality_matrix(
 
         classification = "Global Master" if non_zero_ratio >= 0.6 else "Group-Specific"
 
-        summary_rows.append({
-            "gene": tf_name,
-            "mean_centrality": mean_val,
-            "max_centrality": max_val,
-            "top_group": max_grp,
-            "specificity_cv": cv,
-            "classification": classification,
-        })
+        summary_rows.append(
+            {
+                "gene": tf_name,
+                "mean_centrality": mean_val,
+                "max_centrality": max_val,
+                "top_group": max_grp,
+                "specificity_cv": cv,
+                "classification": classification,
+            }
+        )
 
-    tf_summary_df = pd.DataFrame(summary_rows).sort_values("mean_centrality", ascending=False)
+    tf_summary_df = pd.DataFrame(summary_rows).sort_values(
+        "mean_centrality", ascending=False
+    )
     pivot_df.index.name = "TF"
 
     return pivot_df, tf_summary_df
@@ -348,7 +487,10 @@ def compute_tf_to_module_mapping(
 
     # Extract module -> gene list mapping
     gene_to_module: Dict[str, str] = {}
-    if hasattr(modules_dict_or_df, "modules") and modules_dict_or_df.modules is not None:
+    if (
+        hasattr(modules_dict_or_df, "modules")
+        and modules_dict_or_df.modules is not None
+    ):
         for g, m in modules_dict_or_df.modules.items():
             if m != -1 and m != "-1":
                 gene_to_module[str(g)] = f"Module {m}"
@@ -356,7 +498,10 @@ def compute_tf_to_module_mapping(
         for g, m in modules_dict_or_df.items():
             if m != -1 and m != "-1":
                 gene_to_module[str(g)] = f"Module {m}"
-    elif isinstance(modules_dict_or_df, pd.DataFrame) and "module" in modules_dict_or_df.columns:
+    elif (
+        isinstance(modules_dict_or_df, pd.DataFrame)
+        and "module" in modules_dict_or_df.columns
+    ):
         for g, row in modules_dict_or_df.iterrows():
             m = row["module"]
             if m != -1 and m != "-1":
@@ -382,9 +527,11 @@ def compute_tf_to_module_mapping(
 
     # Count targets per TF per module
     mapped_links = filtered_links.dropna(subset=["module"])
-    
+
     if mapped_links.empty:
-        empty = pd.DataFrame(index=top_tfs, columns=sorted(list(set(gene_to_module.values())))).fillna(0)
+        empty = pd.DataFrame(
+            index=top_tfs, columns=sorted(list(set(gene_to_module.values())))
+        ).fillna(0)
         empty.index.name = "TF"
         return empty, pd.DataFrame()
 
@@ -407,13 +554,15 @@ def compute_tf_to_module_mapping(
         for mod in matrix_df.columns:
             n_in_mod = int(matrix_df.loc[tf, mod]) if tf in matrix_df.index else 0
             if n_in_mod > 0:
-                summary_rows.append({
-                    "tf": tf,
-                    "module": mod,
-                    "target_count": n_in_mod,
-                    "total_tf_targets": total_targets,
-                    "module_target_ratio": n_in_mod / total_targets,
-                })
+                summary_rows.append(
+                    {
+                        "tf": tf,
+                        "module": mod,
+                        "target_count": n_in_mod,
+                        "total_tf_targets": total_targets,
+                        "module_target_ratio": n_in_mod / total_targets,
+                    }
+                )
 
     mapping_df = pd.DataFrame(summary_rows).sort_values("target_count", ascending=False)
     return matrix_df, mapping_df
@@ -443,13 +592,25 @@ def compute_differential_tf_targets(
         Summary table comparing target conservation across groups for each TF.
     """
     if links_df is None or links_df.empty:
-        return pd.DataFrame(columns=["tf", "group_count", "shared_targets_count", "specific_targets_count", "conservation_ratio"])
+        return pd.DataFrame(
+            columns=[
+                "tf",
+                "group_count",
+                "shared_targets_count",
+                "specific_targets_count",
+                "conservation_ratio",
+            ]
+        )
 
     # Determine group column
     if "stratification" in links_df.columns and "cluster" in links_df.columns:
         if links_df["stratification"].nunique() > 1:
             links_df = links_df.copy()
-            links_df["_group"] = links_df["stratification"].astype(str) + " - " + links_df["cluster"].astype(str)
+            links_df["_group"] = (
+                links_df["stratification"].astype(str)
+                + " - "
+                + links_df["cluster"].astype(str)
+            )
         else:
             links_df = links_df.copy()
             links_df["_group"] = links_df["cluster"].astype(str)
@@ -460,11 +621,27 @@ def compute_differential_tf_targets(
         links_df = links_df.copy()
         links_df["_group"] = links_df["stratification"].astype(str)
     else:
-        return pd.DataFrame(columns=["tf", "group_count", "shared_targets_count", "specific_targets_count", "conservation_ratio"])
+        return pd.DataFrame(
+            columns=[
+                "tf",
+                "group_count",
+                "shared_targets_count",
+                "specific_targets_count",
+                "conservation_ratio",
+            ]
+        )
 
     groups = links_df["_group"].unique()
     if len(groups) < 2:
-        return pd.DataFrame(columns=["tf", "group_count", "shared_targets_count", "specific_targets_count", "conservation_ratio"])
+        return pd.DataFrame(
+            columns=[
+                "tf",
+                "group_count",
+                "shared_targets_count",
+                "specific_targets_count",
+                "conservation_ratio",
+            ]
+        )
 
     if top_tfs is None:
         top_tfs = links_df["source"].value_counts().head(top_n_tfs).index.tolist()
@@ -487,18 +664,22 @@ def compute_differential_tf_targets(
             # Targets present in only one group
             specific = set()
             for grp, targets in group_targets.items():
-                other_targets = set.union(*[t for g, t in group_targets.items() if g != grp])
+                other_targets = set.union(
+                    *[t for g, t in group_targets.items() if g != grp]
+                )
                 specific.update(targets - other_targets)
 
-            rows.append({
-                "tf": tf,
-                "group_count": len(group_targets),
-                "total_targets": len(all_targets),
-                "shared_targets_count": len(shared),
-                "specific_targets_count": len(specific),
-                "conservation_ratio": len(shared) / max(1, len(all_targets)),
-                "sample_shared_targets": ", ".join(list(shared)[:5]),
-            })
+            rows.append(
+                {
+                    "tf": tf,
+                    "group_count": len(group_targets),
+                    "total_targets": len(all_targets),
+                    "shared_targets_count": len(shared),
+                    "specific_targets_count": len(specific),
+                    "conservation_ratio": len(shared) / max(1, len(all_targets)),
+                    "sample_shared_targets": ", ".join(list(shared)[:5]),
+                }
+            )
 
     return pd.DataFrame(rows).sort_values("conservation_ratio", ascending=False)
 
@@ -508,7 +689,7 @@ def run_comparative_analysis(
     score_df: Optional[pd.DataFrame] = None,
     links_df: Optional[pd.DataFrame] = None,
     hotspot_obj: Any = None,
-    stratification_results: Optional[Dict[str, Any]] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
     cluster_key: str = "leiden",
     output_dir: Optional[str] = None,
     gene_sets: Optional[List[str]] = None,
@@ -530,7 +711,7 @@ def run_comparative_analysis(
         GRN regulatory links DataFrame.
     hotspot_obj : Hotspot, optional
         Hotspot object.
-    stratification_results : dict, optional
+    stratification_results : dict or list, optional
         Stratified analysis results.
     cluster_key : str, default="leiden"
         Cluster key in `adata.obs`.
@@ -553,8 +734,67 @@ def run_comparative_analysis(
     if save_tables:
         os.makedirs(comp_dir, exist_ok=True)
 
-    log_info("ComparativeAnalysis", "Running comparative analysis across clusters/stratifications...")
+    log_info(
+        "ComparativeAnalysis",
+        "Running comparative analysis across clusters/stratifications...",
+    )
     print("\nRunning Comparative Analysis...")
+
+    strat_items = _normalize_stratification_results(stratification_results)
+
+    # In stratified mode, auto-gather missing inputs from stratification_results
+    if strat_items:
+        if hotspot_obj is None:
+            for _, s_data in strat_items:
+                s_hs = s_data.get("hotspot_result") or s_data.get("hotspot")
+                if (
+                    s_hs is not None
+                    and hasattr(s_hs, "modules")
+                    and s_hs.modules is not None
+                ):
+                    hotspot_obj = s_hs
+                    break
+
+        if links_df is None:
+            collected_links = []
+            for s_name, s_data in strat_items:
+                s_out = s_data.get("output_dir")
+                if s_out:
+                    links_path = os.path.join(
+                        s_out, "celloracle", "grn_filtered_links.pkl"
+                    )
+                    if os.path.exists(links_path):
+                        try:
+                            import pickle
+
+                            with open(links_path, "rb") as f:
+                                df_l = pickle.load(f)
+                                if isinstance(df_l, pd.DataFrame):
+                                    df_l = df_l.copy()
+                                    df_l["stratification"] = str(s_name)
+                                    collected_links.append(df_l)
+                        except Exception:
+                            pass
+            if collected_links:
+                links_df = pd.concat(collected_links, ignore_index=True)
+
+        if score_df is None:
+            collected_scores = []
+            for s_name, s_data in strat_items:
+                s_out = s_data.get("output_dir")
+                if s_out:
+                    score_path = os.path.join(
+                        s_out, "celloracle", "grn_merged_scores.csv"
+                    )
+                    if os.path.exists(score_path):
+                        try:
+                            df_s = pd.read_csv(score_path)
+                            df_s["stratification"] = str(s_name)
+                            collected_scores.append(df_s)
+                        except Exception:
+                            pass
+            if collected_scores:
+                score_df = pd.concat(collected_scores, ignore_index=True)
 
     results: Dict[str, Any] = {}
 
@@ -576,14 +816,20 @@ def run_comparative_analysis(
 
     # 2. Module Pathway Enrichment
     try:
-        mod_source = hotspot_obj if hotspot_obj is not None else (adata.obs if adata is not None else None)
+        mod_source = (
+            hotspot_obj
+            if hotspot_obj is not None
+            else (adata.obs if adata is not None else None)
+        )
         enrichment_df = compute_module_pathway_enrichments(
             modules_dict_or_df=mod_source,
             gene_sets=gene_sets,
         )
         results["module_enrichment"] = enrichment_df
         if save_tables and not enrichment_df.empty:
-            enrichment_df.to_csv(os.path.join(comp_dir, "module_pathway_enrichment.csv"), index=False)
+            enrichment_df.to_csv(
+                os.path.join(comp_dir, "module_pathway_enrichment.csv"), index=False
+            )
             print("  ✓ Computed module pathway enrichments")
     except Exception as e:
         log_error("ComparativeAnalysis.ModuleEnrichment", e)
@@ -596,7 +842,9 @@ def run_comparative_analysis(
         results["tf_summary"] = tf_summary
         if save_tables and not tf_pivot.empty:
             tf_pivot.to_csv(os.path.join(comp_dir, "tf_centrality_matrix.csv"))
-            tf_summary.to_csv(os.path.join(comp_dir, "tf_specificity_summary.csv"), index=False)
+            tf_summary.to_csv(
+                os.path.join(comp_dir, "tf_specificity_summary.csv"), index=False
+            )
             print("  ✓ Computed TF centrality & specificity matrix")
     except Exception as e:
         log_error("ComparativeAnalysis.TFCentrality", e)
@@ -605,7 +853,11 @@ def run_comparative_analysis(
 
     # 4. TF-to-Module Mapping
     try:
-        mod_source = hotspot_obj if hotspot_obj is not None else (adata.obs if adata is not None else None)
+        mod_source = (
+            hotspot_obj
+            if hotspot_obj is not None
+            else (adata.obs if adata is not None else None)
+        )
         tf_mod_matrix, tf_mod_summary = compute_tf_to_module_mapping(
             links_df=links_df,
             modules_dict_or_df=mod_source,
@@ -614,7 +866,9 @@ def run_comparative_analysis(
         results["tf_to_module_summary"] = tf_mod_summary
         if save_tables and not tf_mod_matrix.empty:
             tf_mod_matrix.to_csv(os.path.join(comp_dir, "tf_to_module_matrix.csv"))
-            tf_mod_summary.to_csv(os.path.join(comp_dir, "tf_to_module_mapping.csv"), index=False)
+            tf_mod_summary.to_csv(
+                os.path.join(comp_dir, "tf_to_module_mapping.csv"), index=False
+            )
             print("  ✓ Computed TF-to-Module regulatory mapping")
     except Exception as e:
         log_error("ComparativeAnalysis.TFToModule", e)
@@ -626,7 +880,9 @@ def run_comparative_analysis(
         diff_targets_df = compute_differential_tf_targets(links_df=links_df)
         results["differential_tf_targets"] = diff_targets_df
         if save_tables and not diff_targets_df.empty:
-            diff_targets_df.to_csv(os.path.join(comp_dir, "differential_tf_targets.csv"), index=False)
+            diff_targets_df.to_csv(
+                os.path.join(comp_dir, "differential_tf_targets.csv"), index=False
+            )
             print("  ✓ Computed differential TF target rewiring")
     except Exception as e:
         log_error("ComparativeAnalysis.DiffTargets", e)
@@ -634,4 +890,3 @@ def run_comparative_analysis(
 
     print("  Comparative analysis complete.")
     return results
-

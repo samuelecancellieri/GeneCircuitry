@@ -30,7 +30,7 @@ genecircuitry/
 ├── hotspot_processing.py        # Gene module detection (optional dep: hotspotsc)
 ├── grn_deep_analysis.py         # NetworkX GRN visualisation
 ├── atac_peaks_processing.py     # ATAC peak → TF motif matrix (optional dep: genomepy, gimmemotifs)
-├── enrichment_analysis.py       # ORA enrichment via gseapy (optional dep)
+├── enrichment_analysis.py       # Local ORA enrichment engine (bundled gene sets, disk caching)
 ├── logging_utils.py             # Internal logging helpers
 ├── pipeline/
 │   ├── __init__.py              # Exports PipelineController, log_step, log_error
@@ -63,7 +63,8 @@ genecircuitry/
 | `genecircuitry/plotting/`                | Canonical plot generation (`qc_plots.py`, `grn_plots.py`, `hotspot_plots.py`) |
 | `genecircuitry/reporting/`               | HTML / PDF report generation                                                  |
 | `genecircuitry/atac_peaks_processing.py` | ATAC-seq peak motif scanning (optional)                                       |
-| `genecircuitry/enrichment_analysis.py`   | Gene set enrichment via gseapy (optional)                                     |
+| `genecircuitry/enrichment_analysis.py`   | Fast local gene set over-representation analysis (ORA) with bundled gene sets |
+
 
 ---
 

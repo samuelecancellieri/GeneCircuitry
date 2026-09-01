@@ -15,7 +15,6 @@ from typing import Optional, List, Dict, Any
 from . import config
 from .logging_utils import log_error, log_warning
 
-
 # ---------------------------------------------------------------------------
 # Data helpers (non-plotting)
 # ---------------------------------------------------------------------------

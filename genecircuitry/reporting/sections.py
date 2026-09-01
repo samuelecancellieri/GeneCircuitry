@@ -128,12 +128,10 @@ def create_data_summary_section(
     content_parts = []
 
     # Dataset dimensions
-    content_parts.append(
-        """
+    content_parts.append("""
     <h3>Dataset Overview</h3>
     <p>Summary of the input single-cell RNA-seq dataset.</p>
-    """
-    )
+    """)
 
     # Observation annotations table
     if adata.obs.columns.any():
@@ -255,14 +253,12 @@ def create_settings_section() -> ReportSection:
             if value is not None:
                 settings_html += f"<dt>{key}</dt><dd>{value}</dd>"
 
-        content_parts.append(
-            f"""
+        content_parts.append(f"""
         <div class="settings-category">
             <h4>{category}</h4>
             <dl>{settings_html}</dl>
         </div>
-        """
-        )
+        """)
 
     content_parts.append("</div>")
 
@@ -387,6 +383,7 @@ def create_clustering_section(
     Create Clustering & Visualization section.
     """
     from ..preprocessing import resolve_cluster_key_name
+
     if cluster_key is not None:
         cluster_key = resolve_cluster_key_name(cluster_key)
 
@@ -847,15 +844,13 @@ def create_operations_log_section(
         else:
             status_class = ""
 
-        log_html.append(
-            f"""
+        log_html.append(f"""
         <div class="log-entry">
             <span class="timestamp">{entry.get('timestamp', '')}</span>
             <span class="step">{entry.get('message', '')}</span>
             <span class="status-badge {status_class}">{level}</span>
         </div>
-        """
-        )
+        """)
 
     log_html.append("</div>")
 
@@ -1102,6 +1097,7 @@ def create_stratified_clustering_section(
     subsections = []
 
     from ..preprocessing import resolve_cluster_key_name
+
     if cluster_key is not None:
         cluster_key = resolve_cluster_key_name(cluster_key)
 
@@ -1548,4 +1544,3 @@ def create_comparative_section(
         metrics=metrics,
         subsections=subsections,
     )
-

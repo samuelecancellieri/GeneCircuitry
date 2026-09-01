@@ -15,12 +15,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
+
 try:
     from adjustText import adjust_text
 except ImportError:
+
     def adjust_text(texts=None, *args, **kwargs):
         """Fallback when adjustText is not installed."""
         return None
+
 
 from itertools import combinations
 from typing import Optional, List, Dict, Tuple, Union, Any
@@ -381,9 +384,7 @@ def _plot_enriched_tf_network_single_worker(task: Dict[str, Any]) -> bool:
     if "degree_out" in cluster_scores.columns:
         cluster_scores = cluster_scores[cluster_scores["degree_out"] > 0]
     else:
-        out_counts = (
-            links_df_cluster.groupby("source").size().rename("_degree_out")
-        )
+        out_counts = links_df_cluster.groupby("source").size().rename("_degree_out")
         cluster_scores = cluster_scores.merge(
             out_counts, left_on="gene", right_index=True, how="left"
         )
@@ -483,9 +484,7 @@ def _plot_enriched_tf_network_single_worker(task: Dict[str, Any]) -> bool:
         ax=ax,
     )
 
-    sm = plt.cm.ScalarMappable(
-        cmap=plt.cm.YlOrRd, norm=plt.Normalize(vmin=0, vmax=1)
-    )
+    sm = plt.cm.ScalarMappable(cmap=plt.cm.YlOrRd, norm=plt.Normalize(vmin=0, vmax=1))
     sm.set_array([])
     cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
     cbar.set_label(f"{score} (scaled 0-1)", fontsize=10)
@@ -493,9 +492,7 @@ def _plot_enriched_tf_network_single_worker(task: Dict[str, Any]) -> bool:
     edge_weights = nx.get_edge_attributes(graph, "coef_abs")
     if edge_weights:
         max_w = max(edge_weights.values()) if edge_weights else 1.0
-        widths = [
-            0.5 + 2.5 * (edge_weights.get(e, 0) / max_w) for e in graph.edges()
-        ]
+        widths = [0.5 + 2.5 * (edge_weights.get(e, 0) / max_w) for e in graph.edges()]
     else:
         widths = [1.0] * graph.number_of_edges()
 
@@ -1144,9 +1141,7 @@ def _plot_difference_single_worker(task: Dict[str, Any]) -> bool:
                 gene,
                 (i, row["Difference"]),
                 fontsize=8,
-                bbox=dict(
-                    boxstyle="round,pad=0.2", facecolor="lightgreen", alpha=0.7
-                ),
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="lightgreen", alpha=0.7),
             )
         )
 
@@ -1157,15 +1152,11 @@ def _plot_difference_single_worker(task: Dict[str, Any]) -> bool:
                 gene,
                 (rank_pos, row["Difference"]),
                 fontsize=8,
-                bbox=dict(
-                    boxstyle="round,pad=0.2", facecolor="lightcoral", alpha=0.7
-                ),
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="lightcoral", alpha=0.7),
             )
         )
 
-    adjust_text(
-        texts, arrowprops=dict(arrowstyle="->", color="black", lw=0.5), ax=ax
-    )
+    adjust_text(texts, arrowprops=dict(arrowstyle="->", color="black", lw=0.5), ax=ax)
 
     ax.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
     ax.set_xlabel("Rank")
@@ -1225,7 +1216,11 @@ def plot_difference_cluster_scores(
         ]
 
     clusters = sorted(set(score_df["cluster"].tolist()))
-    stratifications = sorted(set(score_df["stratification"].tolist())) if "stratification" in score_df.columns else []
+    stratifications = (
+        sorted(set(score_df["stratification"].tolist()))
+        if "stratification" in score_df.columns
+        else []
+    )
     stratification_name = (
         stratifications[0] if len(stratifications) == 1 else "combined"
     )
@@ -1386,7 +1381,11 @@ def plot_compare_cluster_scores(
         ]
 
     clusters = sorted(set(score_df["cluster"].tolist()))
-    stratifications = sorted(set(score_df["stratification"].tolist())) if "stratification" in score_df.columns else []
+    stratifications = (
+        sorted(set(score_df["stratification"].tolist()))
+        if "stratification" in score_df.columns
+        else []
+    )
     stratification_name = (
         stratifications[0] if len(stratifications) == 1 else "combined"
     )
@@ -1446,9 +1445,7 @@ def _plot_tf_shared_target_network_single_worker(task: Dict[str, Any]) -> bool:
     if "degree_out" in df_cluster.columns:
         df_cluster = df_cluster[df_cluster["degree_out"] > 0]
     else:
-        out_counts = (
-            links_cluster.groupby("source").size().rename("_deg_out")
-        )
+        out_counts = links_cluster.groupby("source").size().rename("_deg_out")
         df_cluster = df_cluster.merge(
             out_counts,
             left_on="gene",
@@ -1488,8 +1485,7 @@ def _plot_tf_shared_target_network_single_worker(task: Dict[str, Any]) -> bool:
         )
 
     edges = links_cluster[
-        links_cluster["source"].isin(top_tfs)
-        & links_cluster["target"].isin(top_tfs)
+        links_cluster["source"].isin(top_tfs) & links_cluster["target"].isin(top_tfs)
     ]
     for _, row in edges.iterrows():
         G.add_edge(
@@ -1839,7 +1835,11 @@ def generate_all_grn_plots(
     # Network plots (if links provided)
     if links_df is not None:
         results["network"] = plot_network_graph(
-            score_df, links_df, scores=scores, skip_existing=skip_existing, n_jobs=n_jobs
+            score_df,
+            links_df,
+            scores=scores,
+            skip_existing=skip_existing,
+            n_jobs=n_jobs,
         )
 
         # Enriched TF network plots (all scores in parallel)

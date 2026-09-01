@@ -781,14 +781,12 @@ class ReportGenerator:
             else:
                 value_str = str(value)
 
-            cards.append(
-                f"""
+            cards.append(f"""
             <div class="metric-card">
                 <div class="value">{value_str}</div>
                 <div class="label">{label}</div>
             </div>
-            """
-            )
+            """)
 
         return f'<div class="metrics-grid">{"".join(cards)}</div>'
 
@@ -831,14 +829,12 @@ class ReportGenerator:
             # Reference the pre-stored array by index instead of embedding all images again
             gallery_js = f"openLightbox({array_name}, {idx})"
 
-            html_parts.append(
-                f"""
+            html_parts.append(f"""
             <div class="gallery-item" onclick='{gallery_js}'>
                 <img src="{image_sources[idx]}" alt="{caption}" loading="lazy">
                 <div class="caption" title="{Path(fig_path).stem}">{caption}</div>
             </div>
-            """
-            )
+            """)
 
         html_parts.append("</div>")
         return "".join(html_parts)
@@ -863,14 +859,12 @@ class ReportGenerator:
                 cells = "".join(f"<td>{cell}</td>" for cell in row)
                 rows_html += f"<tr>{cells}</tr>"
 
-            html_parts.append(
-                f"""
+            html_parts.append(f"""
             <table>
                 <thead><tr>{header_html}</tr></thead>
                 <tbody>{rows_html}</tbody>
             </table>
-            """
-            )
+            """)
 
         return "".join(html_parts)
 
@@ -898,16 +892,14 @@ class ReportGenerator:
             for sub_idx, subsection in enumerate(section.subsections):
                 is_active = "active" if sub_idx == 0 else ""
                 tab_id = f"{section_id}-tab-{sub_idx}"
-                tab_contents.append(
-                    f"""
+                tab_contents.append(f"""
                 <div class="tab-content {is_active}" id="{tab_id}">
                     {self._render_metrics(subsection.metrics)}
                     <div class="content">{subsection.content}</div>
                     {self._render_figures(subsection.figures, gallery_id=f"{section_id}-gallery-{sub_idx}")}
                     {self._render_tables(subsection.tables)}
                 </div>
-                """
-                )
+                """)
 
             subsections_html = f"""
             <div class="tabs-container" id="{tabs_container_id}">
@@ -1155,7 +1147,10 @@ def generate_report(
         "cluster_column_name", kwargs.get("cluster_column", cluster_key)
     )
     from ..preprocessing import resolve_cluster_key_name
-    cluster_key = resolve_cluster_key_name(cluster_key) if cluster_key is not None else "leiden"
+
+    cluster_key = (
+        resolve_cluster_key_name(cluster_key) if cluster_key is not None else "leiden"
+    )
     from .sections import (
         create_data_summary_section,
         create_settings_section,
@@ -1289,7 +1284,10 @@ def generate_stratified_report(
         "cluster_column_name", kwargs.get("cluster_column", cluster_key)
     )
     from ..preprocessing import resolve_cluster_key_name
-    cluster_key = resolve_cluster_key_name(cluster_key) if cluster_key is not None else "leiden"
+
+    cluster_key = (
+        resolve_cluster_key_name(cluster_key) if cluster_key is not None else "leiden"
+    )
     from .sections import (
         create_data_summary_section,
         create_settings_section,

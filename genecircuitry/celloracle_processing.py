@@ -557,7 +557,11 @@ def perform_grn_pre_processing(
     print(f"  Computed draw_graph for cluster key: {cluster_key}")
 
     if adata_cc.n_obs > cell_downsample:
-        if cell_downsample is not None and cell_downsample > 0 and adata_cc.n_obs > cell_downsample:
+        if (
+            cell_downsample is not None
+            and cell_downsample > 0
+            and adata_cc.n_obs > cell_downsample
+        ):
             print(f"  Downsampling to {cell_downsample} cells for GRN analysis")
             sc.pp.subsample(adata_cc, n_obs=cell_downsample)
 

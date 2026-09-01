@@ -168,3 +168,32 @@ def test_run_comparative_analysis(temp_dir, mock_adata, mock_score_df, mock_link
     assert os.path.exists(os.path.join(comp_dir, "tf_centrality_matrix.csv"))
     assert os.path.exists(os.path.join(comp_dir, "differential_tf_targets.csv"))
 
+
+def test_stratification_results_list_format(temp_dir, mock_adata):
+    """Test compute_module_activity_matrix and run_comparative_analysis with list-of-dicts stratification_results."""
+    adata1 = mock_adata[:25].copy()
+    adata2 = mock_adata[25:].copy()
+
+    # Pass as list of dicts (the format controller.stratification_results uses)
+    strat_list = [
+        {"name": "StratA", "adata": adata1, "output_dir": os.path.join(temp_dir, "StratA")},
+        {"name": "StratB", "adata": adata2, "output_dir": os.path.join(temp_dir, "StratB")},
+    ]
+
+    act_df = compute_module_activity_matrix(stratification_results=strat_list)
+    assert isinstance(act_df, pd.DataFrame)
+    assert not act_df.empty
+    assert "StratA" in act_df.columns
+    assert "StratB" in act_df.columns
+
+    # Also test run_comparative_analysis
+    res = run_comparative_analysis(
+        stratification_results=strat_list,
+        output_dir=temp_dir,
+        save_tables=True,
+    )
+    assert isinstance(res, dict)
+    assert "module_activity" in res
+    assert not res["module_activity"].empty
+
+

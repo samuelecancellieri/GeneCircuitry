@@ -214,7 +214,10 @@ def process_atac_peaks(
     # ------------------------------------------------------------------
     step_hash = None
     if log_dir:
-        from genecircuitry.pipeline.controller import check_checkpoint, compute_input_hash
+        from genecircuitry.pipeline.controller import (
+            check_checkpoint,
+            compute_input_hash,
+        )
 
         step_hash = compute_input_hash(
             bed_path,
@@ -321,7 +324,10 @@ def process_atac_peaks(
 
     # Save checkpoint if log_dir is provided
     if log_dir:
-        from genecircuitry.pipeline.controller import compute_input_hash, write_checkpoint
+        from genecircuitry.pipeline.controller import (
+            compute_input_hash,
+            write_checkpoint,
+        )
 
         if step_hash is None:
             step_hash = compute_input_hash(
