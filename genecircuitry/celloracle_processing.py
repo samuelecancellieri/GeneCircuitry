@@ -417,7 +417,6 @@ def load_hotspot_genes(hotspot_genes_path: str) -> list:
 def perform_grn_pre_processing(
     adata: AnnData,
     cluster_key: Union[str, Sequence[str]] = "leiden",
-    cell_downsample: int = 20000,
     cell_downsample: Optional[int] = None,
     top_genes: Optional[int] = None,
     gene_list: Optional[list] = None,
