@@ -167,6 +167,23 @@ def test_plot_differential_tf_targets(temp_plot_dir, sample_comparative_data):
     assert os.path.exists(pdf_file)
 
 
+from genecircuitry.plotting.comparative_plots import (
+    plot_comparative_module_activity,
+    plot_comparative_pathway_enrichment,
+    plot_tf_module_regulatory_matrix,
+    plot_comparative_tf_centrality,
+    plot_differential_tf_targets,
+    plot_comparative_summary_dashboard,
+    plot_module_overlap_heatmap,
+    plot_module_tf_regulatory_network,
+    plot_gene_selection_sankey,
+    plot_cross_cluster_regulatory_comparison,
+    plot_tf_module_concordance,
+    plot_integrated_regulatory_dashboard,
+    generate_all_comparative_plots,
+)
+
+
 def test_plot_comparative_summary_dashboard(temp_plot_dir, sample_comparative_data):
     """Test summary dashboard generates both PNG and PDF."""
     _, comp_fig_dir = temp_plot_dir
@@ -180,6 +197,56 @@ def test_plot_comparative_summary_dashboard(temp_plot_dir, sample_comparative_da
     pdf_file = os.path.join(comp_fig_dir, "comparative_summary_dashboard_test.pdf")
     assert os.path.exists(png_file)
     assert os.path.exists(pdf_file)
+
+
+def test_plot_all_new_comparative_visualizations(temp_plot_dir):
+    """Test all new comparative visualization functions."""
+    _, comp_fig_dir = temp_plot_dir
+
+    # 1. Overlap Heatmap
+    cov_df = pd.DataFrame([[0.8, 0.4], [0.3, 0.9]], index=["Module 1", "Module 2"], columns=["Cluster 0", "Cluster 1"])
+    jac_df = pd.DataFrame([[0.5], [0.2]], index=["Module 1", "Module 2"], columns=["0 vs 1"])
+    assert plot_module_overlap_heatmap(cov_df, jac_df, save_name="test", skip_existing=False) is True
+
+    # 2. TF Regulatory Network
+    integ_df = pd.DataFrame([
+        {"cluster": "0", "module": "Module 1", "tf": "STAT1", "n_targets_in_module": 5, "total_module_genes": 10, "coverage_pct": 0.5, "tf_centrality": 0.8},
+        {"cluster": "1", "module": "Module 2", "tf": "MYC", "n_targets_in_module": 8, "total_module_genes": 10, "coverage_pct": 0.8, "tf_centrality": 0.9},
+    ])
+    assert plot_module_tf_regulatory_network(integ_df, save_name="test", skip_existing=False) is True
+
+    # 3. Gene Sankey
+    prov_df = pd.DataFrame([
+        {"gene": f"G_{i}", "hotspot_fdr": 0.01, "hotspot_module": f"Module {i%2+1}", "stage": "TF & Target", "is_tf": True, "is_target": True, "n_clusters_active": 2, "regulated_by_tfs": "STAT1", "pathway": "Immune Response"}
+        for i in range(20)
+    ])
+    assert plot_gene_selection_sankey(prov_df, save_name="test", skip_existing=False) is True
+
+    # 4. Cross Cluster Comparison
+    reg_df = pd.DataFrame([
+        {"cluster": "0", "n_active_modules": 2, "top_modules": "Module 1", "n_active_tfs": 5, "top_tfs": "STAT1, IRF1", "n_regulatory_edges": 120, "n_unique_targets": 85, "top_edges": "STAT1→G1, STAT1→G2"},
+        {"cluster": "1", "n_active_modules": 2, "top_modules": "Module 2", "n_active_tfs": 4, "top_tfs": "MYC, MAX", "n_regulatory_edges": 140, "n_unique_targets": 95, "top_edges": "MYC→G3, MYC→G4"},
+    ])
+    assert plot_cross_cluster_regulatory_comparison(reg_df, save_name="test", skip_existing=False) is True
+
+    # 5. Concordance Bubble Plot
+    conc_df = pd.DataFrame([
+        {"cluster": "0", "module": "Module 1", "top_driver_tf": "STAT1", "n_targets_in_module": 8, "module_coverage_pct": 0.8, "module_activity": 1.5, "concordance_score": 1.2},
+        {"cluster": "1", "module": "Module 2", "top_driver_tf": "MYC", "n_targets_in_module": 7, "module_coverage_pct": 0.7, "module_activity": 1.8, "concordance_score": 1.26},
+    ])
+    assert plot_tf_module_concordance(conc_df, save_name="test", skip_existing=False) is True
+
+    # 6. Integrated Dashboard
+    comp_results = {
+        "module_activity": cov_df,
+        "module_coverage": cov_df,
+        "tf_centrality": pd.DataFrame([[0.8, 0.4], [0.2, 0.9]], index=["STAT1", "MYC"], columns=["Cluster 0", "Cluster 1"]),
+        "gene_provenance": prov_df,
+        "regulatory_summary": reg_df,
+        "tf_module_concordance": conc_df,
+        "module_tf_integration": integ_df,
+    }
+    assert plot_integrated_regulatory_dashboard(comp_results, save_name="test", skip_existing=False) is True
 
 
 def test_generate_all_comparative_plots(temp_plot_dir, sample_comparative_data):

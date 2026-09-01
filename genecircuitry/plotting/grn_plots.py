@@ -475,7 +475,7 @@ def _plot_enriched_tf_network_single_worker(task: Dict[str, Any]) -> bool:
         nodelist=tf_nodes,
         node_size=tf_sizes,
         node_color=[tf_score_scaled.get(n, 0.5) for n in tf_nodes],
-        cmap=plt.cm.YlOrRd,
+        cmap=plt.cm.inferno,
         vmin=0,
         vmax=1,
         alpha=0.9,
@@ -484,7 +484,7 @@ def _plot_enriched_tf_network_single_worker(task: Dict[str, Any]) -> bool:
         ax=ax,
     )
 
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.YlOrRd, norm=plt.Normalize(vmin=0, vmax=1))
+    sm = plt.cm.ScalarMappable(cmap=plt.cm.inferno, norm=plt.Normalize(vmin=0, vmax=1))
     sm.set_array([])
     cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
     cbar.set_label(f"{score} (scaled 0-1)", fontsize=10)
@@ -1515,7 +1515,7 @@ def _plot_tf_shared_target_network_single_worker(task: Dict[str, Any]) -> bool:
     pos = nx.kamada_kawai_layout(G, dist=dist, scale=1.0)
 
     # Colours
-    palette = sns.color_palette("Set2", 20)
+    palette = sns.color_palette(getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel"), 20)
     term_color_map: Dict[str, tuple] = {}
     palette_idx = 0
     unique_terms = sorted(set(tf_enrichment_map.values()))

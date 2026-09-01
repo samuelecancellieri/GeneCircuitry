@@ -127,17 +127,16 @@ def perform_qc(
     if plot:
         fig, axes = plt.subplots(1, 3, figsize=config.PLOT_FIGSIZE_LARGE)
 
-        sns.violinplot(
-            data=adata_cc.obs, y="n_genes_by_counts", ax=axes[0], inner="box"
-        )
+        pastel = sns.color_palette(getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel"))
+        sns.violinplot(data=adata_cc.obs, y="n_genes_by_counts", ax=axes[0], inner="box", color=pastel[0])
         axes[0].set_ylabel("Number of genes")
         axes[0].set_title("Genes per cell")
 
-        sns.violinplot(data=adata_cc.obs, y="total_counts", ax=axes[1], inner="box")
+        sns.violinplot(data=adata_cc.obs, y="total_counts", ax=axes[1], inner="box", color=pastel[1 % len(pastel)])
         axes[1].set_ylabel("Total counts")
         axes[1].set_title("Total counts per cell")
 
-        sns.violinplot(data=adata_cc.obs, y="pct_counts_mt", ax=axes[2], inner="box")
+        sns.violinplot(data=adata_cc.obs, y="pct_counts_mt", ax=axes[2], inner="box", color=pastel[2 % len(pastel)])
         axes[2].set_ylabel("% Mitochondrial counts")
         axes[2].set_title("Mitochondrial percentage")
 
@@ -208,18 +207,19 @@ def perform_qc(
     # Create seaborn violin plot for post-filtering metrics
     if plot:
         fig, axes = plt.subplots(1, 3, figsize=config.PLOT_FIGSIZE_LARGE)
+        pastel = sns.color_palette(getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel"))
 
         sns.violinplot(
-            data=adata_cc.obs, y="n_genes_by_counts", ax=axes[0], inner="box"
+            data=adata_cc.obs, y="n_genes_by_counts", ax=axes[0], inner="box", color=pastel[0]
         )
         axes[0].set_ylabel("Number of genes")
         axes[0].set_title("Genes per cell")
 
-        sns.violinplot(data=adata_cc.obs, y="total_counts", ax=axes[1], inner="box")
+        sns.violinplot(data=adata_cc.obs, y="total_counts", ax=axes[1], inner="box", color=pastel[1 % len(pastel)])
         axes[1].set_ylabel("Total counts")
         axes[1].set_title("Total counts per cell")
 
-        sns.violinplot(data=adata_cc.obs, y="pct_counts_mt", ax=axes[2], inner="box")
+        sns.violinplot(data=adata_cc.obs, y="pct_counts_mt", ax=axes[2], inner="box", color=pastel[2 % len(pastel)])
         axes[2].set_ylabel("% Mitochondrial counts")
         axes[2].set_title("Mitochondrial percentage")
 

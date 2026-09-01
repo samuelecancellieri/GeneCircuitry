@@ -65,30 +65,309 @@ def _normalize_stratification_results(
     return items
 
 
+def _normalize_links_df(
+    links_df: Optional[Union[pd.DataFrame, Dict[str, Any], str]] = None,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
+) -> pd.DataFrame:
+    """Normalize links_df from DataFrame, dict of cluster DataFrames, pickle file, or search paths."""
+    if links_df is not None:
+        if isinstance(links_df, dict):
+            dfs = []
+            for c_name, c_df in links_df.items():
+                if isinstance(c_df, pd.DataFrame):
+                    df_copy = c_df.copy()
+                    df_copy["cluster"] = str(c_name)
+                    dfs.append(df_copy)
+                elif isinstance(c_df, dict):
+                    df_copy = pd.DataFrame(c_df)
+                    df_copy["cluster"] = str(c_name)
+                    dfs.append(df_copy)
+            if dfs:
+                links_df = pd.concat(dfs, ignore_index=True)
+            else:
+                links_df = pd.DataFrame()
+        elif isinstance(links_df, str) and os.path.exists(links_df):
+            try:
+                import pickle
+                with open(links_df, "rb") as f:
+                    data = pickle.load(f)
+                return _normalize_links_df(data, output_dir=output_dir, stratification_results=stratification_results)
+            except Exception:
+                links_df = pd.DataFrame()
+
+    if links_df is None or (isinstance(links_df, pd.DataFrame) and links_df.empty):
+        strat_items = _normalize_stratification_results(stratification_results)
+        collected = []
+        if strat_items:
+            for s_name, s_data in strat_items:
+                s_out = s_data.get("output_dir") if isinstance(s_data, dict) else getattr(s_data, "output_dir", None)
+                if s_out:
+                    p = os.path.join(s_out, "celloracle", "grn_filtered_links.pkl")
+                    if os.path.exists(p):
+                        try:
+                            import pickle
+                            with open(p, "rb") as f:
+                                l_data = pickle.load(f)
+                            if isinstance(l_data, dict):
+                                for c_name, c_df in l_data.items():
+                                    if isinstance(c_df, pd.DataFrame):
+                                        df_c = c_df.copy()
+                                        df_c["cluster"] = str(c_name)
+                                        df_c["stratification"] = str(s_name)
+                                        collected.append(df_c)
+                            elif isinstance(l_data, pd.DataFrame):
+                                df_c = l_data.copy()
+                                df_c["stratification"] = str(s_name)
+                                collected.append(df_c)
+                        except Exception:
+                            pass
+        if collected:
+            links_df = pd.concat(collected, ignore_index=True)
+
+    if (links_df is None or (isinstance(links_df, pd.DataFrame) and links_df.empty)) and output_dir:
+        p = os.path.join(output_dir, "celloracle", "grn_filtered_links.pkl")
+        if os.path.exists(p):
+            try:
+                import pickle
+                with open(p, "rb") as f:
+                    l_data = pickle.load(f)
+                return _normalize_links_df(l_data)
+            except Exception:
+                pass
+
+    if not isinstance(links_df, pd.DataFrame) or links_df.empty:
+        return pd.DataFrame()
+
+    df = links_df.copy()
+    if "source" not in df.columns or "target" not in df.columns:
+        return pd.DataFrame()
+
+    if "cluster" not in df.columns:
+        if "stratification" in df.columns:
+            df["cluster"] = df["stratification"].astype(str)
+        else:
+            df["cluster"] = "0"
+    else:
+        df["cluster"] = df["cluster"].astype(str)
+
+    if "coef_abs" not in df.columns:
+        if "coef_mean" in df.columns:
+            df["coef_abs"] = df["coef_mean"].abs()
+        else:
+            df["coef_abs"] = 1.0
+
+    return df
+
+
+def _normalize_score_df(
+    score_df: Optional[Union[pd.DataFrame, str]] = None,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
+) -> pd.DataFrame:
+    """Normalize score_df from DataFrame, CSV path, or search paths, ensuring 'gene' and 'cluster' columns exist."""
+    if score_df is not None and isinstance(score_df, str) and os.path.exists(score_df):
+        try:
+            score_df = pd.read_csv(score_df)
+        except Exception:
+            score_df = None
+
+    if score_df is None or (isinstance(score_df, pd.DataFrame) and score_df.empty):
+        strat_items = _normalize_stratification_results(stratification_results)
+        collected = []
+        if strat_items:
+            for s_name, s_data in strat_items:
+                s_out = s_data.get("output_dir") if isinstance(s_data, dict) else getattr(s_data, "output_dir", None)
+                if s_out:
+                    p = os.path.join(s_out, "celloracle", "grn_merged_scores.csv")
+                    if os.path.exists(p):
+                        try:
+                            df_s = pd.read_csv(p)
+                            df_s["stratification"] = str(s_name)
+                            collected.append(df_s)
+                        except Exception:
+                            pass
+        if collected:
+            score_df = pd.concat(collected, ignore_index=True)
+
+    if (score_df is None or (isinstance(score_df, pd.DataFrame) and score_df.empty)) and output_dir:
+        for fname in ["total_merged_scores.csv", "grn_merged_scores.csv"]:
+            p = os.path.join(output_dir, "celloracle", fname)
+            if os.path.exists(p):
+                try:
+                    score_df = pd.read_csv(p)
+                    break
+                except Exception:
+                    pass
+
+    if not isinstance(score_df, pd.DataFrame) or score_df.empty:
+        return pd.DataFrame()
+
+    df = score_df.copy()
+    if "Unnamed: 0" in df.columns:
+        df = df.rename(columns={"Unnamed: 0": "gene"})
+    if "gene" not in df.columns:
+        if df.index.name == "gene":
+            df = df.reset_index()
+        elif len(df) > 0 and isinstance(df.index[0], str):
+            df = df.reset_index().rename(columns={"index": "gene"})
+
+    if "cluster" not in df.columns:
+        if "stratification" in df.columns:
+            df["cluster"] = df["stratification"].astype(str)
+        else:
+            df["cluster"] = "0"
+    else:
+        df["cluster"] = df["cluster"].astype(str)
+
+    if "degree_centrality_all" not in df.columns:
+        for alt_col in ["degree_centrality", "degree", "betweenness_centrality", "eigenvector_centrality"]:
+            if alt_col in df.columns:
+                df["degree_centrality_all"] = df[alt_col]
+                break
+        if "degree_centrality_all" not in df.columns:
+            df["degree_centrality_all"] = 0.0
+
+    return df
+
+
 def _extract_module_genes(
     hotspot_obj: Any = None,
     adata: Optional[AnnData] = None,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
 ) -> Dict[str, set]:
-    """
-    Extract module_name -> set_of_genes mapping from Hotspot object or AnnData.
-    
-    Returns dict like {'Module 1': {'GeneA', 'GeneB'}, 'Module 2': {'GeneC', ...}}
-    """
+    """Extract module_name -> set_of_genes mapping from Hotspot object, AnnData, disk CSVs, or stratification results."""
     module_genes: Dict[str, set] = {}
-    
-    if hotspot_obj is not None and hasattr(hotspot_obj, 'modules') and hotspot_obj.modules is not None:
-        mod_series = hotspot_obj.modules
-        for m in mod_series.unique():
-            if m != -1 and m != '-1':
-                mod_name = f'Module {m}'
-                module_genes[mod_name] = set(mod_series[mod_series == m].index.tolist())
-    elif adata is not None:
-        # Fallback: try to reconstruct from adata.obs Module_ columns
-        mod_cols = [c for c in adata.obs.columns if str(c).startswith('Module_')]
-        # Module columns contain scores, not assignments - can't extract gene lists from them
-        pass
-    
+
+    if hotspot_obj is not None:
+        if hasattr(hotspot_obj, "modules") and hotspot_obj.modules is not None:
+            mod_series = hotspot_obj.modules
+            for m in mod_series.unique():
+                if m != -1 and m != "-1" and str(m) != "-1":
+                    mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                    module_genes[mod_name] = set(mod_series[mod_series == m].index.tolist())
+        elif isinstance(hotspot_obj, dict):
+            for m, g_list in hotspot_obj.items():
+                if m != -1 and m != "-1" and str(m) != "-1":
+                    mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                    module_genes[mod_name] = set(g_list) if isinstance(g_list, (list, set, pd.Series)) else set()
+
+    if not module_genes and stratification_results:
+        strat_items = _normalize_stratification_results(stratification_results)
+        for _, s_data in strat_items:
+            s_hs = s_data.get("hotspot_result") or s_data.get("hotspot") if isinstance(s_data, dict) else getattr(s_data, "hotspot_result", getattr(s_data, "hotspot", None))
+            if s_hs is not None and hasattr(s_hs, "modules") and s_hs.modules is not None:
+                mod_series = s_hs.modules
+                for m in mod_series.unique():
+                    if m != -1 and m != "-1" and str(m) != "-1":
+                        mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                        module_genes.setdefault(mod_name, set()).update(mod_series[mod_series == m].index.tolist())
+            s_out = s_data.get("output_dir") if isinstance(s_data, dict) else getattr(s_data, "output_dir", None)
+            if s_out:
+                csv_path = os.path.join(s_out, "hotspot", "gene_modules.csv")
+                if os.path.exists(csv_path):
+                    try:
+                        m_df = pd.read_csv(csv_path, index_col=0)
+                        col = m_df.columns[0] if len(m_df.columns) > 0 else None
+                        if col:
+                            for g, m in m_df[col].items():
+                                if m != -1 and m != "-1" and str(m) != "-1":
+                                    mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                                    module_genes.setdefault(mod_name, set()).add(str(g))
+                    except Exception:
+                        pass
+
+    if not module_genes and output_dir:
+        csv_path = os.path.join(output_dir, "hotspot", "gene_modules.csv")
+        if os.path.exists(csv_path):
+            try:
+                m_df = pd.read_csv(csv_path, index_col=0)
+                col = m_df.columns[0] if len(m_df.columns) > 0 else None
+                if col:
+                    for g, m in m_df[col].items():
+                        if m != -1 and m != "-1" and str(m) != "-1":
+                            mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                            module_genes.setdefault(mod_name, set()).add(str(g))
+            except Exception:
+                pass
+
+    if not module_genes and adata is not None:
+        if "hotspot_modules" in adata.uns:
+            hm = adata.uns["hotspot_modules"]
+            if isinstance(hm, dict):
+                for m, g_list in hm.items():
+                    mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                    module_genes[mod_name] = set(g_list)
+        elif "hotspot_module" in adata.var:
+            for g, m in adata.var["hotspot_module"].items():
+                if m != -1 and m != "-1" and str(m) != "-1":
+                    mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                    module_genes.setdefault(mod_name, set()).add(str(g))
+
     return module_genes
+
+
+def _extract_autocorr_results(
+    hotspot_obj: Any = None,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
+) -> Tuple[Optional[pd.DataFrame], Optional[pd.Series]]:
+    """Extract results DataFrame (with FDR) and modules Series from Hotspot object or disk CSVs."""
+    results_df = None
+    modules_series = None
+
+    if hotspot_obj is not None:
+        if hasattr(hotspot_obj, "results") and hotspot_obj.results is not None:
+            results_df = hotspot_obj.results
+        if hasattr(hotspot_obj, "modules") and hotspot_obj.modules is not None:
+            modules_series = hotspot_obj.modules
+
+    if results_df is None and stratification_results:
+        strat_items = _normalize_stratification_results(stratification_results)
+        for _, s_data in strat_items:
+            s_out = s_data.get("output_dir") if isinstance(s_data, dict) else getattr(s_data, "output_dir", None)
+            if s_out:
+                p = os.path.join(s_out, "hotspot", "autocorrelation_results.csv")
+                if not os.path.exists(p):
+                    p = os.path.join(s_out, "hotspot", "significant_genes.csv")
+                if os.path.exists(p):
+                    try:
+                        results_df = pd.read_csv(p, index_col=0)
+                        if "FDR" not in results_df.columns and "fdr" in results_df.columns:
+                            results_df["FDR"] = results_df["fdr"]
+                    except Exception:
+                        pass
+                m_path = os.path.join(s_out, "hotspot", "gene_modules.csv")
+                if os.path.exists(m_path):
+                    try:
+                        m_df = pd.read_csv(m_path, index_col=0)
+                        modules_series = m_df.iloc[:, 0]
+                    except Exception:
+                        pass
+                if results_df is not None and modules_series is not None:
+                    break
+
+    if results_df is None and output_dir:
+        p = os.path.join(output_dir, "hotspot", "autocorrelation_results.csv")
+        if not os.path.exists(p):
+            p = os.path.join(output_dir, "hotspot", "significant_genes.csv")
+        if os.path.exists(p):
+            try:
+                results_df = pd.read_csv(p, index_col=0)
+                if "FDR" not in results_df.columns and "fdr" in results_df.columns:
+                    results_df["FDR"] = results_df["fdr"]
+            except Exception:
+                pass
+        m_path = os.path.join(output_dir, "hotspot", "gene_modules.csv")
+        if os.path.exists(m_path):
+            try:
+                m_df = pd.read_csv(m_path, index_col=0)
+                modules_series = m_df.iloc[:, 0]
+            except Exception:
+                pass
+
+    return results_df, modules_series
 
 
 def compute_module_activity_matrix(
@@ -96,133 +375,102 @@ def compute_module_activity_matrix(
     cluster_key: str = "leiden",
     hotspot_obj: Any = None,
     stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
+    output_dir: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Compute mean co-expression module activity scores per cluster or stratification.
-
-    Parameters
-    ----------
-    adata : AnnData, optional
-        Annotated data matrix containing module scores in `.obs`.
-    cluster_key : str, default="leiden"
-        Observation column specifying cell clusters.
-    hotspot_obj : Hotspot, optional
-        Hotspot object with computed module scores.
-    stratification_results : dict or list, optional
-        Stratified analysis results (dictionary or list of per-stratification dicts).
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame where rows are Module IDs and columns are groups (clusters/stratifications).
     """
     activity_dict: Dict[str, pd.Series] = {}
 
-    # Case 1: Stratified results provided
     strat_items = _normalize_stratification_results(stratification_results)
     if strat_items:
         for strat_name, s_data in strat_items:
-            s_adata = (
-                s_data.get("adata")
-                if isinstance(s_data, dict)
-                else getattr(s_data, "adata", None)
-            )
-            s_hs = (
-                s_data.get("hotspot_result") or s_data.get("hotspot")
-                if isinstance(s_data, dict)
-                else getattr(s_data, "hotspot_result", getattr(s_data, "hotspot", None))
-            )
+            s_adata = s_data.get("adata") if isinstance(s_data, dict) else getattr(s_data, "adata", None)
+            s_hs = s_data.get("hotspot_result") or s_data.get("hotspot") if isinstance(s_data, dict) else getattr(s_data, "hotspot_result", getattr(s_data, "hotspot", None))
+            s_out = s_data.get("output_dir") if isinstance(s_data, dict) else getattr(s_data, "output_dir", None)
+
+            # Load module scores if needed
+            scores_df = None
+            if s_hs is not None and hasattr(s_hs, "module_scores") and s_hs.module_scores is not None:
+                scores_df = s_hs.module_scores
+            elif s_out:
+                csv_p = os.path.join(s_out, "hotspot", "hotspot_module_scores.csv")
+                if os.path.exists(csv_p):
+                    try:
+                        scores_df = pd.read_csv(csv_p, index_col=0)
+                    except Exception:
+                        pass
 
             if s_adata is not None:
-                # Find module score columns in s_adata.obs
-                mod_cols = [
-                    c
-                    for c in s_adata.obs.columns
-                    if str(c).startswith("Module_")
-                    or (
-                        isinstance(c, (int, np.integer))
-                        and f"Module_{c}" in s_adata.obs.columns
-                    )
-                ]
-                if (
-                    not mod_cols
-                    and s_hs is not None
-                    and hasattr(s_hs, "module_scores")
-                    and s_hs.module_scores is not None
-                ):
-                    # Use hotspot module_scores directly
-                    hs_scores = s_hs.module_scores
-                    for m_col in hs_scores.columns:
-                        col_name = (
-                            f"Module_{m_col}"
-                            if not str(m_col).startswith("Module_")
-                            else str(m_col)
-                        )
-                        activity_dict[f"{strat_name}"] = hs_scores.mean(axis=0)
-                    continue
+                # Find or attach module columns
+                mod_cols = [c for c in s_adata.obs.columns if str(c).startswith("Module_")]
+                if not mod_cols and scores_df is not None:
+                    for col in scores_df.columns:
+                        cname = f"Module_{col}" if not str(col).startswith("Module_") else str(col)
+                        try:
+                            s_adata.obs[cname] = scores_df[col].reindex(s_adata.obs.index).values
+                            mod_cols.append(cname)
+                        except Exception:
+                            pass
 
-                if mod_cols:
-                    mean_scores = s_adata.obs[mod_cols].mean(axis=0)
-                    mean_scores.index = [
-                        (
-                            str(c).replace("Module_", "Module ")
-                            if not str(c).startswith("Module ")
-                            else str(c)
-                        )
-                        for c in mean_scores.index
-                    ]
-                    activity_dict[str(strat_name)] = mean_scores
+                # If cluster_key exists, compute per-cluster activity
+                if mod_cols and cluster_key in s_adata.obs.columns:
+                    for c_val in s_adata.obs[cluster_key].unique():
+                        c_cells = s_adata.obs[s_adata.obs[cluster_key] == c_val]
+                        if len(c_cells) > 0:
+                            mean_s = c_cells[mod_cols].mean(axis=0)
+                            mean_s.index = [str(c).replace("Module_", "Module ") for c in mean_s.index]
+                            prefix = f"{strat_name} - Cl {c_val}" if len(strat_items) > 1 else f"Cluster {c_val}"
+                            activity_dict[prefix] = mean_s
+                elif mod_cols:
+                    mean_s = s_adata.obs[mod_cols].mean(axis=0)
+                    mean_s.index = [str(c).replace("Module_", "Module ") for c in mean_s.index]
+                    activity_dict[str(strat_name)] = mean_s
+            elif scores_df is not None:
+                mean_s = scores_df.mean(axis=0)
+                mean_s.index = [f"Module {c}" if not str(c).startswith("Module") else str(c) for c in mean_s.index]
+                activity_dict[str(strat_name)] = mean_s
 
         if activity_dict:
             df_activity = pd.DataFrame(activity_dict).fillna(0.0)
             df_activity.index.name = "Module"
             return df_activity
 
-    # Case 2: Single dataset with clusters
+    # Case 2: Single dataset
     if adata is not None:
-        # Check if module columns exist in adata.obs
         mod_cols = [c for c in adata.obs.columns if str(c).startswith("Module_")]
-
-        # If not in obs, check if hotspot_obj has them
-        if (
-            not mod_cols
-            and hotspot_obj is not None
-            and hasattr(hotspot_obj, "module_scores")
-            and hotspot_obj.module_scores is not None
-        ):
-            hs_scores = hotspot_obj.module_scores.copy()
-            hs_cols = []
-            for col in hs_scores.columns:
-                cname = (
-                    f"Module_{col}" if not str(col).startswith("Module_") else str(col)
-                )
-                adata.obs[cname] = (
-                    hs_scores[col].values if len(hs_scores) == len(adata) else np.nan
-                )
-                hs_cols.append(cname)
-            mod_cols = hs_cols
+        if not mod_cols:
+            scores_df = None
+            if hotspot_obj is not None and hasattr(hotspot_obj, "module_scores") and hotspot_obj.module_scores is not None:
+                scores_df = hotspot_obj.module_scores
+            elif output_dir:
+                csv_p = os.path.join(output_dir, "hotspot", "hotspot_module_scores.csv")
+                if os.path.exists(csv_p):
+                    try:
+                        scores_df = pd.read_csv(csv_p, index_col=0)
+                    except Exception:
+                        pass
+            if scores_df is not None:
+                for col in scores_df.columns:
+                    cname = f"Module_{col}" if not str(col).startswith("Module_") else str(col)
+                    try:
+                        adata.obs[cname] = scores_df[col].reindex(adata.obs.index).values
+                        mod_cols.append(cname)
+                    except Exception:
+                        pass
 
         if mod_cols and cluster_key in adata.obs.columns:
-            # Group by cluster and compute mean module scores
             grouped = adata.obs.groupby(cluster_key, observed=False)[mod_cols].mean().T
-            grouped.index = [
-                str(c).replace("Module_", "Module ") for c in grouped.index
-            ]
-            grouped.columns = [
-                f"Cluster {c}" if not str(c).startswith("Cluster") else str(c)
-                for c in grouped.columns
-            ]
+            grouped.index = [str(c).replace("Module_", "Module ") for c in grouped.index]
+            grouped.columns = [f"Cluster {c}" if not str(c).startswith("Cluster") else str(c) for c in grouped.columns]
             grouped.index.name = "Module"
             return grouped
         elif mod_cols:
             mean_all = adata.obs[mod_cols].mean(axis=0).to_frame(name="All Cells")
-            mean_all.index = [
-                str(c).replace("Module_", "Module ") for c in mean_all.index
-            ]
+            mean_all.index = [str(c).replace("Module_", "Module ") for c in mean_all.index]
             mean_all.index.name = "Module"
             return mean_all
 
-    # Fallback empty DataFrame
     return pd.DataFrame(columns=["Module"]).set_index("Module")
 
 
@@ -482,66 +730,46 @@ def compute_tf_centrality_matrix(
 
 
 def compute_tf_to_module_mapping(
-    links_df: pd.DataFrame,
-    modules_dict_or_df: Union[Dict[Any, List[str]], pd.DataFrame, pd.Series, Any],
+    links_df: Optional[pd.DataFrame] = None,
+    modules_dict_or_df: Union[Dict[Any, List[str]], pd.DataFrame, pd.Series, Any] = None,
     top_tfs: Optional[List[str]] = None,
     top_n_tfs: int = 15,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Map transcription factors to the co-expression modules they regulate based on
     TF-Target Gene overlaps.
-
-    Parameters
-    ----------
-    links_df : pd.DataFrame
-        Regulatory links DataFrame (columns: source, target, coef_abs, etc.).
-    modules_dict_or_df : dict or pd.Series or pd.DataFrame or Hotspot
-        Mapping of genes to module IDs.
-    top_tfs : list of str, optional
-        List of specific TFs to map. If None, top TFs by link count are used.
-    top_n_tfs : int, default=15
-        Number of top TFs to evaluate if top_tfs is None.
-
-    Returns
-    -------
-    Tuple[pd.DataFrame, pd.DataFrame]
-        - matrix_df: Matrix of TF (rows) by Module (columns) target counts.
-        - mapping_df: Long-form summary of TF-module regulatory connections.
     """
-    if links_df is None or links_df.empty:
+    links_df = _normalize_links_df(links_df, output_dir=output_dir, stratification_results=stratification_results)
+    if links_df.empty:
         empty = pd.DataFrame(columns=["TF"]).set_index("TF")
         return empty, pd.DataFrame()
 
     # Extract module -> gene list mapping
-    gene_to_module: Dict[str, str] = {}
-    if (
-        hasattr(modules_dict_or_df, "modules")
-        and modules_dict_or_df.modules is not None
-    ):
-        for g, m in modules_dict_or_df.modules.items():
-            if m != -1 and m != "-1":
-                gene_to_module[str(g)] = f"Module {m}"
-    elif isinstance(modules_dict_or_df, pd.Series):
-        for g, m in modules_dict_or_df.items():
-            if m != -1 and m != "-1":
-                gene_to_module[str(g)] = f"Module {m}"
-    elif (
-        isinstance(modules_dict_or_df, pd.DataFrame)
-        and "module" in modules_dict_or_df.columns
-    ):
-        for g, row in modules_dict_or_df.iterrows():
-            m = row["module"]
-            if m != -1 and m != "-1":
-                gene_to_module[str(g)] = f"Module {m}"
-    elif isinstance(modules_dict_or_df, dict):
+    module_genes = _extract_module_genes(
+        hotspot_obj=modules_dict_or_df if not isinstance(modules_dict_or_df, (dict, pd.DataFrame, pd.Series)) else None,
+        output_dir=output_dir,
+        stratification_results=stratification_results,
+    )
+    if not module_genes and isinstance(modules_dict_or_df, dict):
         for m, genes in modules_dict_or_df.items():
             mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
-            for g in genes:
-                gene_to_module[str(g)] = mod_name
+            module_genes[mod_name] = set(genes)
+    elif not module_genes and isinstance(modules_dict_or_df, pd.Series):
+        for g, m in modules_dict_or_df.items():
+            if m != -1 and m != "-1" and str(m) != "-1":
+                mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                module_genes.setdefault(mod_name, set()).add(str(g))
 
-    if not gene_to_module:
+    if not module_genes:
         empty = pd.DataFrame(columns=["TF"]).set_index("TF")
         return empty, pd.DataFrame()
+
+    gene_to_module = {}
+    for mod_name, genes in module_genes.items():
+        for g in genes:
+            gene_to_module[str(g)] = mod_name
 
     # Identify TFs to map
     if top_tfs is None:
@@ -557,7 +785,7 @@ def compute_tf_to_module_mapping(
 
     if mapped_links.empty:
         empty = pd.DataFrame(
-            index=top_tfs, columns=sorted(list(set(gene_to_module.values())))
+            index=top_tfs, columns=sorted(list(module_genes.keys()))
         ).fillna(0)
         empty.index.name = "TF"
         return empty, pd.DataFrame()
@@ -581,6 +809,7 @@ def compute_tf_to_module_mapping(
         for mod in matrix_df.columns:
             n_in_mod = int(matrix_df.loc[tf, mod]) if tf in matrix_df.index else 0
             if n_in_mod > 0:
+                mod_total_genes = len(module_genes.get(mod, set()))
                 summary_rows.append(
                     {
                         "tf": tf,
@@ -588,6 +817,7 @@ def compute_tf_to_module_mapping(
                         "target_count": n_in_mod,
                         "total_tf_targets": total_targets,
                         "module_target_ratio": n_in_mod / total_targets,
+                        "module_coverage_pct": (n_in_mod / mod_total_genes) if mod_total_genes > 0 else 0.0,
                     }
                 )
 
@@ -596,29 +826,18 @@ def compute_tf_to_module_mapping(
 
 
 def compute_differential_tf_targets(
-    links_df: pd.DataFrame,
+    links_df: Optional[pd.DataFrame] = None,
     top_tfs: Optional[List[str]] = None,
     top_n_tfs: int = 10,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
 ) -> pd.DataFrame:
     """
     Compare downstream target genes of top TFs across clusters or stratifications to
     identify conserved vs. condition-specific regulatory connections.
-
-    Parameters
-    ----------
-    links_df : pd.DataFrame
-        Regulatory links DataFrame with 'source', 'target', and 'cluster' / 'stratification'.
-    top_tfs : list of str, optional
-        Specific TFs to compare. If None, top TFs across groups are selected.
-    top_n_tfs : int, default=10
-        Number of top TFs to evaluate.
-
-    Returns
-    -------
-    pd.DataFrame
-        Summary table comparing target conservation across groups for each TF.
     """
-    if links_df is None or links_df.empty:
+    links_df = _normalize_links_df(links_df, output_dir=output_dir, stratification_results=stratification_results)
+    if links_df.empty:
         return pd.DataFrame(
             columns=[
                 "tf",
@@ -631,52 +850,33 @@ def compute_differential_tf_targets(
 
     # Determine group column
     if "stratification" in links_df.columns and "cluster" in links_df.columns:
+        links_df = links_df.copy()
         if links_df["stratification"].nunique() > 1:
-            links_df = links_df.copy()
             links_df["_group"] = (
                 links_df["stratification"].astype(str)
                 + " - "
                 + links_df["cluster"].astype(str)
             )
         else:
-            links_df = links_df.copy()
             links_df["_group"] = links_df["cluster"].astype(str)
     elif "cluster" in links_df.columns:
         links_df = links_df.copy()
         links_df["_group"] = links_df["cluster"].astype(str)
-    elif "stratification" in links_df.columns:
-        links_df = links_df.copy()
-        links_df["_group"] = links_df["stratification"].astype(str)
     else:
-        return pd.DataFrame(
-            columns=[
-                "tf",
-                "group_count",
-                "shared_targets_count",
-                "specific_targets_count",
-                "conservation_ratio",
-            ]
-        )
+        return pd.DataFrame()
 
     groups = links_df["_group"].unique()
     if len(groups) < 2:
-        return pd.DataFrame(
-            columns=[
-                "tf",
-                "group_count",
-                "shared_targets_count",
-                "specific_targets_count",
-                "conservation_ratio",
-            ]
-        )
+        return pd.DataFrame()
 
     if top_tfs is None:
-        top_tfs = links_df["source"].value_counts().head(top_n_tfs).index.tolist()
+        tf_counts = links_df.groupby("source", observed=False)["_group"].nunique()
+        top_tfs = tf_counts.nlargest(top_n_tfs * 2).index.tolist()
 
     rows = []
     for tf in top_tfs:
         tf_links = links_df[links_df["source"] == tf]
-        group_targets: Dict[str, set] = {}
+        group_targets = {}
         all_targets: set = set()
 
         for grp in groups:
@@ -686,9 +886,7 @@ def compute_differential_tf_targets(
                 all_targets.update(targets)
 
         if len(group_targets) >= 2:
-            # Intersection across groups
             shared = set.intersection(*group_targets.values())
-            # Targets present in only one group
             specific = set()
             for grp, targets in group_targets.items():
                 other_targets = set.union(
@@ -708,6 +906,8 @@ def compute_differential_tf_targets(
                 }
             )
 
+    if not rows:
+        return pd.DataFrame(columns=["tf", "group_count", "total_targets", "shared_targets_count", "specific_targets_count", "conservation_ratio", "sample_shared_targets"])
     return pd.DataFrame(rows).sort_values("conservation_ratio", ascending=False)
 
 
@@ -715,18 +915,23 @@ def compute_module_gene_overlap_matrix(
     hotspot_obj: Any = None,
     links_df: Optional[pd.DataFrame] = None,
     adata: Optional[AnnData] = None,
-    cluster_key: str = 'leiden',
+    cluster_key: str = "leiden",
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    module_genes = _extract_module_genes(hotspot_obj, adata)
-    if not module_genes or links_df is None or 'cluster' not in links_df.columns:
-        empty1 = pd.DataFrame(columns=['Module']).set_index('Module')
-        empty2 = pd.DataFrame(columns=['Module']).set_index('Module')
+    """Compute module gene GRN coverage and cross-cluster Jaccard similarity."""
+    module_genes = _extract_module_genes(hotspot_obj, adata, output_dir=output_dir, stratification_results=stratification_results)
+    links_df = _normalize_links_df(links_df, output_dir=output_dir, stratification_results=stratification_results)
+
+    if not module_genes or links_df.empty or "cluster" not in links_df.columns:
+        empty1 = pd.DataFrame(columns=["Module"]).set_index("Module")
+        empty2 = pd.DataFrame(columns=["Module"]).set_index("Module")
         return empty1, empty2
 
-    clusters = links_df['cluster'].unique()
+    clusters = sorted(list(links_df["cluster"].unique()))
     cluster_targets = {}
     for c in clusters:
-        cluster_targets[c] = set(links_df[links_df['cluster'] == c]['target'].unique())
+        cluster_targets[c] = set(links_df[links_df["cluster"] == c]["target"].unique())
 
     # Build coverage_df
     coverage_rows = {}
@@ -734,10 +939,11 @@ def compute_module_gene_overlap_matrix(
         row = {}
         for c in clusters:
             intersection = genes.intersection(cluster_targets[c])
-            row[f"Cluster {c}"] = len(intersection) / len(genes) if len(genes) > 0 else 0.0
+            col_label = f"Cluster {c}" if not str(c).startswith("Cluster") else str(c)
+            row[col_label] = len(intersection) / len(genes) if len(genes) > 0 else 0.0
         coverage_rows[mod_name] = row
-    coverage_df = pd.DataFrame.from_dict(coverage_rows, orient='index').fillna(0.0)
-    coverage_df.index.name = 'Module'
+    coverage_df = pd.DataFrame.from_dict(coverage_rows, orient="index").fillna(0.0)
+    coverage_df.index.name = "Module"
 
     # Build jaccard_df
     jaccard_rows = {}
@@ -750,8 +956,8 @@ def compute_module_gene_overlap_matrix(
             union = len(g1.union(g2))
             row[f"{c1} vs {c2}"] = intersection / union if union > 0 else 0.0
         jaccard_rows[mod_name] = row
-    jaccard_df = pd.DataFrame.from_dict(jaccard_rows, orient='index').fillna(0.0)
-    jaccard_df.index.name = 'Module'
+    jaccard_df = pd.DataFrame.from_dict(jaccard_rows, orient="index").fillna(0.0)
+    jaccard_df.index.name = "Module"
 
     return coverage_df, jaccard_df
 
@@ -762,39 +968,45 @@ def compute_module_tf_integration(
     score_df: Optional[pd.DataFrame] = None,
     adata: Optional[AnnData] = None,
     top_n_tfs: int = 15,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
 ) -> pd.DataFrame:
-    module_genes = _extract_module_genes(hotspot_obj, adata)
-    cols = ['cluster', 'module', 'tf', 'n_targets_in_module', 'total_module_genes', 'coverage_pct', 'tf_centrality']
-    if not module_genes or links_df is None or 'cluster' not in links_df.columns:
+    """Cross-reference module genes with TF-TG links and centrality scores per cluster."""
+    module_genes = _extract_module_genes(hotspot_obj, adata, output_dir=output_dir, stratification_results=stratification_results)
+    links_df = _normalize_links_df(links_df, output_dir=output_dir, stratification_results=stratification_results)
+    score_df = _normalize_score_df(score_df, output_dir=output_dir, stratification_results=stratification_results)
+
+    cols = ["cluster", "module", "tf", "n_targets_in_module", "total_module_genes", "coverage_pct", "tf_centrality"]
+    if not module_genes or links_df.empty or "cluster" not in links_df.columns:
         return pd.DataFrame(columns=cols)
 
     rows = []
-    for cluster in links_df['cluster'].unique():
-        c_links = links_df[links_df['cluster'] == cluster]
-        top_tfs = c_links['source'].value_counts().head(top_n_tfs).index.tolist()
+    for cluster in links_df["cluster"].unique():
+        c_links = links_df[links_df["cluster"] == cluster]
+        top_tfs = c_links["source"].value_counts().head(top_n_tfs).index.tolist()
         for mod_name, genes in module_genes.items():
             for tf in top_tfs:
-                tf_targets = set(c_links[c_links['source'] == tf]['target'].unique())
+                tf_targets = set(c_links[c_links["source"] == tf]["target"].unique())
                 overlap = genes.intersection(tf_targets)
                 if len(overlap) > 0:
                     cent = np.nan
-                    if score_df is not None and 'gene' in score_df.columns and 'cluster' in score_df.columns:
-                        s_df = score_df[(score_df['gene'] == tf) & (score_df['cluster'] == cluster)]
-                        if not s_df.empty and 'degree_centrality_all' in s_df.columns:
-                            cent = s_df['degree_centrality_all'].values[0]
+                    if not score_df.empty and "gene" in score_df.columns and "cluster" in score_df.columns:
+                        s_df = score_df[(score_df["gene"] == tf) & (score_df["cluster"] == cluster)]
+                        if not s_df.empty and "degree_centrality_all" in s_df.columns:
+                            cent = s_df["degree_centrality_all"].values[0]
                     rows.append({
-                        'cluster': cluster,
-                        'module': mod_name,
-                        'tf': tf,
-                        'n_targets_in_module': len(overlap),
-                        'total_module_genes': len(genes),
-                        'coverage_pct': len(overlap) / len(genes),
-                        'tf_centrality': cent
+                        "cluster": cluster,
+                        "module": mod_name,
+                        "tf": tf,
+                        "n_targets_in_module": len(overlap),
+                        "total_module_genes": len(genes),
+                        "coverage_pct": len(overlap) / len(genes),
+                        "tf_centrality": cent if not np.isnan(cent) else 0.0,
                     })
-    
+
     if not rows:
         return pd.DataFrame(columns=cols)
-    return pd.DataFrame(rows).sort_values('n_targets_in_module', ascending=False)
+    return pd.DataFrame(rows).sort_values("n_targets_in_module", ascending=False)
 
 
 def compute_gene_selection_provenance(
@@ -802,83 +1014,99 @@ def compute_gene_selection_provenance(
     links_df: Optional[pd.DataFrame] = None,
     enrichment_df: Optional[pd.DataFrame] = None,
     adata: Optional[AnnData] = None,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
 ) -> pd.DataFrame:
-    cols = ['gene', 'hotspot_fdr', 'hotspot_module', 'stage', 'is_tf', 'is_target', 'n_clusters_active', 'regulated_by_tfs', 'pathway']
-    if hotspot_obj is None or not hasattr(hotspot_obj, 'results') or not hasattr(hotspot_obj, 'modules'):
+    """Trace each gene through the pipeline: Hotspot significance -> Module assignment -> GRN role -> Pathway."""
+    cols = ["gene", "hotspot_fdr", "hotspot_module", "stage", "is_tf", "is_target", "n_clusters_active", "regulated_by_tfs", "pathway"]
+
+    results_df, modules_series = _extract_autocorr_results(hotspot_obj, output_dir=output_dir, stratification_results=stratification_results)
+    if results_df is None:
         return pd.DataFrame(columns=cols)
 
-    results = hotspot_obj.results
-    modules = hotspot_obj.modules
-    sig_genes = results[results['FDR'] < 0.05].index.tolist()
+    links_df = _normalize_links_df(links_df, output_dir=output_dir, stratification_results=stratification_results)
+
+    fdr_col = "FDR" if "FDR" in results_df.columns else ("fdr" if "fdr" in results_df.columns else None)
+    if fdr_col:
+        sig_genes = results_df[results_df[fdr_col] < 0.05].index.tolist()
+    else:
+        sig_genes = results_df.index.tolist()
 
     all_tfs = set()
     all_targets = set()
     gene_clusters: Dict[str, set] = {}
     target_tfs: Dict[str, Dict[str, int]] = {}
-    if links_df is not None and not links_df.empty:
-        all_tfs = set(links_df['source'].unique())
-        all_targets = set(links_df['target'].unique())
-        if 'cluster' in links_df.columns:
-            # Vectorized: gene -> set of clusters (for both sources and targets)
-            src_clusters = links_df.groupby('source')['cluster'].apply(lambda x: set(x.unique())).to_dict()
-            tgt_clusters = links_df.groupby('target')['cluster'].apply(lambda x: set(x.unique())).to_dict()
+    if not links_df.empty:
+        all_tfs = set(links_df["source"].unique())
+        all_targets = set(links_df["target"].unique())
+        if "cluster" in links_df.columns:
+            src_clusters = links_df.groupby("source")["cluster"].apply(lambda x: set(x.unique())).to_dict()
+            tgt_clusters = links_df.groupby("target")["cluster"].apply(lambda x: set(x.unique())).to_dict()
             for g, cl_set in src_clusters.items():
                 gene_clusters.setdefault(g, set()).update(cl_set)
             for g, cl_set in tgt_clusters.items():
                 gene_clusters.setdefault(g, set()).update(cl_set)
-            # Vectorized: target -> {tf: count}
-            tf_target_counts = links_df.groupby(['target', 'source']).size().reset_index(name='count')
+            tf_target_counts = links_df.groupby(["target", "source"]).size().reset_index(name="count")
             for _, r in tf_target_counts.iterrows():
-                target_tfs.setdefault(r['target'], {})[r['source']] = int(r['count'])
+                target_tfs.setdefault(r["target"], {})[r["source"]] = int(r["count"])
 
     pathway_map = {}
-    if enrichment_df is not None and not enrichment_df.empty and 'module' in enrichment_df.columns and 'term' in enrichment_df.columns:
-        for m in enrichment_df['module'].unique():
-            m_df = enrichment_df[enrichment_df['module'] == m]
+    if enrichment_df is not None and not enrichment_df.empty and "module" in enrichment_df.columns and "term" in enrichment_df.columns:
+        for m in enrichment_df["module"].unique():
+            m_df = enrichment_df[enrichment_df["module"] == m]
             if not m_df.empty:
-                pathway_map[m] = m_df.iloc[0]['term']
+                pathway_map[m] = m_df.iloc[0]["term"]
 
     rows = []
     for gene in sig_genes:
-        fdr = results.loc[gene, 'FDR']
-        mod = modules.get(gene, 'Unassigned')
-        if mod != -1 and mod != '-1' and mod != 'Unassigned':
-            mod_str = f"Module {mod}"
-        else:
-            mod_str = 'Unassigned'
-            
+        fdr = results_df.loc[gene, fdr_col] if fdr_col and gene in results_df.index else 0.01
+        if isinstance(fdr, pd.Series):
+            fdr = fdr.iloc[0]
+        mod = "Unassigned"
+        if modules_series is not None and gene in modules_series.index:
+            m_val = modules_series.loc[gene]
+            if isinstance(m_val, pd.Series):
+                m_val = m_val.iloc[0]
+            if m_val != -1 and m_val != "-1" and str(m_val) != "-1":
+                mod = f"Module {m_val}" if not str(m_val).startswith("Module") else str(m_val)
+
         is_tf = gene in all_tfs
         is_target = gene in all_targets
         n_clust = len(gene_clusters.get(gene, set()))
-        
+
         reg_tfs = ""
         if gene in target_tfs:
             sorted_tfs = sorted(target_tfs[gene].items(), key=lambda x: x[1], reverse=True)[:5]
             reg_tfs = ", ".join([t[0] for t in sorted_tfs])
 
-        if is_tf and is_target: stage = 'TF & Target'
-        elif is_tf: stage = 'TF'
-        elif is_target: stage = 'Target'
-        elif mod_str != 'Unassigned': stage = 'Module Member'
-        else: stage = 'Significant Only'
-        
-        pathway = pathway_map.get(mod_str, "")
+        if is_tf and is_target:
+            stage = "TF & Target"
+        elif is_tf:
+            stage = "TF"
+        elif is_target:
+            stage = "Target"
+        elif mod != "Unassigned":
+            stage = "Module Member"
+        else:
+            stage = "Significant Only"
+
+        pathway = pathway_map.get(mod, "")
 
         rows.append({
-            'gene': gene,
-            'hotspot_fdr': fdr,
-            'hotspot_module': mod_str,
-            'stage': stage,
-            'is_tf': is_tf,
-            'is_target': is_target,
-            'n_clusters_active': n_clust,
-            'regulated_by_tfs': reg_tfs,
-            'pathway': pathway
+            "gene": gene,
+            "hotspot_fdr": fdr,
+            "hotspot_module": mod,
+            "stage": stage,
+            "is_tf": is_tf,
+            "is_target": is_target,
+            "n_clusters_active": n_clust,
+            "regulated_by_tfs": reg_tfs,
+            "pathway": pathway,
         })
 
     if not rows:
         return pd.DataFrame(columns=cols)
-    return pd.DataFrame(rows).sort_values('hotspot_fdr', ascending=True)
+    return pd.DataFrame(rows).sort_values("hotspot_fdr", ascending=True)
 
 
 def compute_cross_cluster_regulatory_summary(
@@ -888,58 +1116,143 @@ def compute_cross_cluster_regulatory_summary(
     activity_df: Optional[pd.DataFrame] = None,
     adata: Optional[AnnData] = None,
     top_n: int = 5,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
 ) -> pd.DataFrame:
-    cols = ['cluster', 'n_active_modules', 'top_modules', 'n_active_tfs', 'top_tfs', 'n_regulatory_edges', 'n_unique_targets', 'top_edges']
-    if links_df is None or 'cluster' not in links_df.columns:
+    """Per-cluster summary of regulatory activity for side-by-side comparison."""
+    cols = ["cluster", "n_active_modules", "top_modules", "n_active_tfs", "top_tfs", "n_regulatory_edges", "n_unique_targets", "top_edges"]
+    links_df = _normalize_links_df(links_df, output_dir=output_dir, stratification_results=stratification_results)
+    score_df = _normalize_score_df(score_df, output_dir=output_dir, stratification_results=stratification_results)
+    module_genes = _extract_module_genes(hotspot_obj, adata, output_dir=output_dir, stratification_results=stratification_results)
+
+    if links_df.empty or "cluster" not in links_df.columns:
         return pd.DataFrame(columns=cols)
 
-    clusters = links_df['cluster'].unique()
-    module_genes = _extract_module_genes(hotspot_obj, adata)
-    
+    clusters = links_df["cluster"].unique()
     rows = []
     for c in clusters:
-        c_links = links_df[links_df['cluster'] == c]
+        c_links = links_df[links_df["cluster"] == c]
         n_edges = len(c_links)
-        unique_targets = c_links['target'].nunique()
-        unique_tfs = c_links['source'].nunique()
-        
-        if score_df is not None and 'gene' in score_df.columns and 'cluster' in score_df.columns and 'degree_centrality_all' in score_df.columns:
-            s_df = score_df[score_df['cluster'] == c].sort_values('degree_centrality_all', ascending=False)
-            top_tfs_list = s_df['gene'].head(top_n).tolist()
+        unique_targets = c_links["target"].nunique()
+        unique_tfs = c_links["source"].nunique()
+
+        if not score_df.empty and "gene" in score_df.columns and "cluster" in score_df.columns and "degree_centrality_all" in score_df.columns:
+            s_df = score_df[score_df["cluster"] == c].sort_values("degree_centrality_all", ascending=False)
+            top_tfs_list = s_df["gene"].head(top_n).tolist()
             if not top_tfs_list:
-                top_tfs_list = c_links['source'].value_counts().head(top_n).index.tolist()
+                top_tfs_list = c_links["source"].value_counts().head(top_n).index.tolist()
         else:
-            top_tfs_list = c_links['source'].value_counts().head(top_n).index.tolist()
-        
+            top_tfs_list = c_links["source"].value_counts().head(top_n).index.tolist()
+
         active_mods = []
         if module_genes:
-            c_targets = set(c_links['target'].unique())
+            c_targets = set(c_links["target"].unique())
             for mod_name, genes in module_genes.items():
                 if len(genes) > 0:
                     overlap = len(genes.intersection(c_targets))
-                    if overlap / len(genes) > 0.3:
+                    if overlap / len(genes) > 0.2:
                         active_mods.append(mod_name)
-        
-        if 'coef_abs' in c_links.columns:
-            top_e_df = c_links.sort_values('coef_abs', ascending=False).head(top_n)
+
+        if "coef_abs" in c_links.columns:
+            top_e_df = c_links.sort_values("coef_abs", ascending=False).head(top_n)
             top_edges_list = [f"{r['source']}->{r['target']}" for _, r in top_e_df.iterrows()]
         else:
             top_edges_list = []
 
         rows.append({
-            'cluster': c,
-            'n_active_modules': len(active_mods),
-            'top_modules': ", ".join(active_mods),
-            'n_active_tfs': unique_tfs,
-            'top_tfs': ", ".join(top_tfs_list),
-            'n_regulatory_edges': n_edges,
-            'n_unique_targets': unique_targets,
-            'top_edges': ", ".join(top_edges_list)
+            "cluster": c,
+            "n_active_modules": len(active_mods),
+            "top_modules": ", ".join(active_mods) if active_mods else "None",
+            "n_active_tfs": unique_tfs,
+            "top_tfs": ", ".join(top_tfs_list),
+            "n_regulatory_edges": n_edges,
+            "n_unique_targets": unique_targets,
+            "top_edges": ", ".join(top_edges_list),
         })
 
     if not rows:
         return pd.DataFrame(columns=cols)
     return pd.DataFrame(rows)
+
+
+def compute_tf_module_concordance(
+    links_df: Optional[pd.DataFrame] = None,
+    score_df: Optional[pd.DataFrame] = None,
+    activity_df: Optional[pd.DataFrame] = None,
+    hotspot_obj: Any = None,
+    adata: Optional[AnnData] = None,
+    top_n_tfs_per_module: int = 3,
+    output_dir: Optional[str] = None,
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
+) -> pd.DataFrame:
+    """
+    Directly correlate and integrate CellOracle TF-TG regulation with Hotspot Module activity
+    per cluster to identify the driving regulatory circuits.
+    """
+    cols = [
+        "cluster", "module", "module_activity", "top_driver_tf",
+        "n_targets_in_module", "module_coverage_pct", "tf_centrality", "concordance_score"
+    ]
+    links_df = _normalize_links_df(links_df, output_dir=output_dir, stratification_results=stratification_results)
+    score_df = _normalize_score_df(score_df, output_dir=output_dir, stratification_results=stratification_results)
+    module_genes = _extract_module_genes(hotspot_obj, adata, output_dir=output_dir, stratification_results=stratification_results)
+
+    if links_df.empty or not module_genes:
+        return pd.DataFrame(columns=cols)
+
+    clusters = links_df["cluster"].unique()
+    rows = []
+
+    for c in clusters:
+        c_links = links_df[links_df["cluster"] == c]
+        for mod_name, genes in module_genes.items():
+            if not genes:
+                continue
+
+            # Check module activity in this cluster
+            mod_act = 0.0
+            if activity_df is not None and not activity_df.empty:
+                # Find matching column
+                col_match = [col for col in activity_df.columns if str(c) in str(col)]
+                row_match = [idx for idx in activity_df.index if str(mod_name) in str(idx)]
+                if col_match and row_match:
+                    try:
+                        mod_act = float(activity_df.loc[row_match[0], col_match[0]])
+                    except Exception:
+                        mod_act = 0.0
+
+            # Find TFs targeting this module
+            mod_links = c_links[c_links["target"].isin(genes)]
+            if mod_links.empty:
+                continue
+
+            tf_target_counts = mod_links.groupby("source")["target"].nunique().sort_values(ascending=False)
+            top_tf = tf_target_counts.index[0]
+            n_targets = int(tf_target_counts.iloc[0])
+            coverage_pct = n_targets / len(genes)
+
+            tf_cent = 0.0
+            if not score_df.empty and "gene" in score_df.columns and "cluster" in score_df.columns:
+                s_match = score_df[(score_df["gene"] == top_tf) & (score_df["cluster"] == c)]
+                if not s_match.empty and "degree_centrality_all" in s_match.columns:
+                    tf_cent = float(s_match["degree_centrality_all"].values[0])
+
+            concordance = (abs(mod_act) + 0.1) * coverage_pct * (1.0 + tf_cent)
+
+            rows.append({
+                "cluster": c,
+                "module": mod_name,
+                "module_activity": mod_act,
+                "top_driver_tf": top_tf,
+                "n_targets_in_module": n_targets,
+                "module_coverage_pct": coverage_pct,
+                "tf_centrality": tf_cent,
+                "concordance_score": concordance,
+            })
+
+    if not rows:
+        return pd.DataFrame(columns=cols)
+    return pd.DataFrame(rows).sort_values("concordance_score", ascending=False)
 
 
 def run_comparative_analysis(
@@ -955,35 +1268,6 @@ def run_comparative_analysis(
 ) -> Dict[str, Any]:
     """
     Master orchestrator for comparative analysis.
-
-    Executes all cross-group comparative modules, generates processed tables,
-    and optionally saves them to `<output_dir>/comparative/`.
-
-    Parameters
-    ----------
-    adata : AnnData, optional
-        Annotated data matrix.
-    score_df : pd.DataFrame, optional
-        Centrality scores DataFrame.
-    links_df : pd.DataFrame, optional
-        GRN regulatory links DataFrame.
-    hotspot_obj : Hotspot, optional
-        Hotspot object.
-    stratification_results : dict or list, optional
-        Stratified analysis results.
-    cluster_key : str, default="leiden"
-        Cluster key in `adata.obs`.
-    output_dir : str, optional
-        Base output directory. Defaults to config.OUTPUT_DIR.
-    gene_sets : list of str, optional
-        Gene set libraries for enrichment.
-    save_tables : bool, default=True
-        Whether to save CSV tables to disk.
-
-    Returns
-    -------
-    dict
-        Dictionary of computed comparative data structures.
     """
     if output_dir is None:
         output_dir = config.OUTPUT_DIR
@@ -998,61 +1282,9 @@ def run_comparative_analysis(
     )
     print("\nRunning Comparative Analysis...")
 
-    strat_items = _normalize_stratification_results(stratification_results)
-
-    # In stratified mode, auto-gather missing inputs from stratification_results
-    if strat_items:
-        if hotspot_obj is None:
-            for _, s_data in strat_items:
-                s_hs = s_data.get("hotspot_result") or s_data.get("hotspot")
-                if (
-                    s_hs is not None
-                    and hasattr(s_hs, "modules")
-                    and s_hs.modules is not None
-                ):
-                    hotspot_obj = s_hs
-                    break
-
-        if links_df is None:
-            collected_links = []
-            for s_name, s_data in strat_items:
-                s_out = s_data.get("output_dir")
-                if s_out:
-                    links_path = os.path.join(
-                        s_out, "celloracle", "grn_filtered_links.pkl"
-                    )
-                    if os.path.exists(links_path):
-                        try:
-                            import pickle
-
-                            with open(links_path, "rb") as f:
-                                df_l = pickle.load(f)
-                                if isinstance(df_l, pd.DataFrame):
-                                    df_l = df_l.copy()
-                                    df_l["stratification"] = str(s_name)
-                                    collected_links.append(df_l)
-                        except Exception:
-                            pass
-            if collected_links:
-                links_df = pd.concat(collected_links, ignore_index=True)
-
-        if score_df is None:
-            collected_scores = []
-            for s_name, s_data in strat_items:
-                s_out = s_data.get("output_dir")
-                if s_out:
-                    score_path = os.path.join(
-                        s_out, "celloracle", "grn_merged_scores.csv"
-                    )
-                    if os.path.exists(score_path):
-                        try:
-                            df_s = pd.read_csv(score_path)
-                            df_s["stratification"] = str(s_name)
-                            collected_scores.append(df_s)
-                        except Exception:
-                            pass
-            if collected_scores:
-                score_df = pd.concat(collected_scores, ignore_index=True)
+    # Normalize inputs
+    links_df = _normalize_links_df(links_df, output_dir=output_dir, stratification_results=stratification_results)
+    score_df = _normalize_score_df(score_df, output_dir=output_dir, stratification_results=stratification_results)
 
     results: Dict[str, Any] = {}
 
@@ -1063,6 +1295,7 @@ def run_comparative_analysis(
             cluster_key=cluster_key,
             hotspot_obj=hotspot_obj,
             stratification_results=stratification_results,
+            output_dir=output_dir,
         )
         results["module_activity"] = activity_df
         if save_tables and not activity_df.empty:
@@ -1111,14 +1344,11 @@ def run_comparative_analysis(
 
     # 4. TF-to-Module Mapping
     try:
-        mod_source = (
-            hotspot_obj
-            if hotspot_obj is not None
-            else (adata.obs if adata is not None else None)
-        )
         tf_mod_matrix, tf_mod_summary = compute_tf_to_module_mapping(
             links_df=links_df,
-            modules_dict_or_df=mod_source,
+            modules_dict_or_df=hotspot_obj,
+            output_dir=output_dir,
+            stratification_results=stratification_results,
         )
         results["tf_to_module_matrix"] = tf_mod_matrix
         results["tf_to_module_summary"] = tf_mod_summary
@@ -1135,7 +1365,11 @@ def run_comparative_analysis(
 
     # 5. Differential TF Targets
     try:
-        diff_targets_df = compute_differential_tf_targets(links_df=links_df)
+        diff_targets_df = compute_differential_tf_targets(
+            links_df=links_df,
+            output_dir=output_dir,
+            stratification_results=stratification_results,
+        )
         results["differential_tf_targets"] = diff_targets_df
         if save_tables and not diff_targets_df.empty:
             diff_targets_df.to_csv(
@@ -1153,17 +1387,19 @@ def run_comparative_analysis(
             links_df=links_df,
             adata=adata,
             cluster_key=cluster_key,
+            output_dir=output_dir,
+            stratification_results=stratification_results,
         )
-        results['module_coverage'] = coverage_df
-        results['module_jaccard'] = jaccard_df
+        results["module_coverage"] = coverage_df
+        results["module_jaccard"] = jaccard_df
         if save_tables and not coverage_df.empty:
-            coverage_df.to_csv(os.path.join(comp_dir, 'module_gene_coverage.csv'))
-            jaccard_df.to_csv(os.path.join(comp_dir, 'module_gene_jaccard.csv'))
-            print('  \u2713 Computed module gene overlap matrix')
+            coverage_df.to_csv(os.path.join(comp_dir, "module_gene_coverage.csv"))
+            jaccard_df.to_csv(os.path.join(comp_dir, "module_gene_jaccard.csv"))
+            print("  ✓ Computed module gene overlap matrix")
     except Exception as e:
-        log_error('ComparativeAnalysis.ModuleOverlap', e)
-        results['module_coverage'] = pd.DataFrame()
-        results['module_jaccard'] = pd.DataFrame()
+        log_error("ComparativeAnalysis.ModuleOverlap", e)
+        results["module_coverage"] = pd.DataFrame()
+        results["module_jaccard"] = pd.DataFrame()
 
     # 7. Module-TF Integration
     try:
@@ -1172,30 +1408,34 @@ def run_comparative_analysis(
             hotspot_obj=hotspot_obj,
             score_df=score_df,
             adata=adata,
+            output_dir=output_dir,
+            stratification_results=stratification_results,
         )
-        results['module_tf_integration'] = integration_df
+        results["module_tf_integration"] = integration_df
         if save_tables and not integration_df.empty:
-            integration_df.to_csv(os.path.join(comp_dir, 'module_tf_integration.csv'), index=False)
-            print('  \u2713 Computed module-TF regulatory integration')
+            integration_df.to_csv(os.path.join(comp_dir, "module_tf_integration.csv"), index=False)
+            print("  ✓ Computed module-TF regulatory integration")
     except Exception as e:
-        log_error('ComparativeAnalysis.ModuleTFIntegration', e)
-        results['module_tf_integration'] = pd.DataFrame()
+        log_error("ComparativeAnalysis.ModuleTFIntegration", e)
+        results["module_tf_integration"] = pd.DataFrame()
 
     # 8. Gene Selection Provenance
     try:
         provenance_df = compute_gene_selection_provenance(
             hotspot_obj=hotspot_obj,
             links_df=links_df,
-            enrichment_df=results.get('module_enrichment'),
+            enrichment_df=results.get("module_enrichment"),
             adata=adata,
+            output_dir=output_dir,
+            stratification_results=stratification_results,
         )
-        results['gene_provenance'] = provenance_df
+        results["gene_provenance"] = provenance_df
         if save_tables and not provenance_df.empty:
-            provenance_df.to_csv(os.path.join(comp_dir, 'gene_selection_provenance.csv'), index=False)
-            print('  \u2713 Computed gene selection provenance')
+            provenance_df.to_csv(os.path.join(comp_dir, "gene_selection_provenance.csv"), index=False)
+            print("  ✓ Computed gene selection provenance")
     except Exception as e:
-        log_error('ComparativeAnalysis.GeneProvenance', e)
-        results['gene_provenance'] = pd.DataFrame()
+        log_error("ComparativeAnalysis.GeneProvenance", e)
+        results["gene_provenance"] = pd.DataFrame()
 
     # 9. Cross-Cluster Regulatory Summary
     try:
@@ -1203,16 +1443,37 @@ def run_comparative_analysis(
             links_df=links_df,
             score_df=score_df,
             hotspot_obj=hotspot_obj,
-            activity_df=results.get('module_activity'),
+            activity_df=results.get("module_activity"),
             adata=adata,
+            output_dir=output_dir,
+            stratification_results=stratification_results,
         )
-        results['regulatory_summary'] = reg_summary_df
+        results["regulatory_summary"] = reg_summary_df
         if save_tables and not reg_summary_df.empty:
-            reg_summary_df.to_csv(os.path.join(comp_dir, 'cross_cluster_regulatory_summary.csv'), index=False)
-            print('  \u2713 Computed cross-cluster regulatory summary')
+            reg_summary_df.to_csv(os.path.join(comp_dir, "cross_cluster_regulatory_summary.csv"), index=False)
+            print("  ✓ Computed cross-cluster regulatory summary")
     except Exception as e:
-        log_error('ComparativeAnalysis.RegulatorySummary', e)
-        results['regulatory_summary'] = pd.DataFrame()
+        log_error("ComparativeAnalysis.RegulatorySummary", e)
+        results["regulatory_summary"] = pd.DataFrame()
+
+    # 10. TF-Module Concordance Integration
+    try:
+        concordance_df = compute_tf_module_concordance(
+            links_df=links_df,
+            score_df=score_df,
+            activity_df=results.get("module_activity"),
+            hotspot_obj=hotspot_obj,
+            adata=adata,
+            output_dir=output_dir,
+            stratification_results=stratification_results,
+        )
+        results["tf_module_concordance"] = concordance_df
+        if save_tables and not concordance_df.empty:
+            concordance_df.to_csv(os.path.join(comp_dir, "tf_module_concordance.csv"), index=False)
+            print("  ✓ Computed TF-Module regulatory concordance")
+    except Exception as e:
+        log_error("ComparativeAnalysis.Concordance", e)
+        results["tf_module_concordance"] = pd.DataFrame()
 
     print("  Comparative analysis complete.")
     return results

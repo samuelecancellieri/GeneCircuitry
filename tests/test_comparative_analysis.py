@@ -213,8 +213,8 @@ def test_stratification_results_list_format(temp_dir, mock_adata):
     act_df = compute_module_activity_matrix(stratification_results=strat_list)
     assert isinstance(act_df, pd.DataFrame)
     assert not act_df.empty
-    assert "StratA" in act_df.columns
-    assert "StratB" in act_df.columns
+    assert any("StratA" in str(c) for c in act_df.columns)
+    assert any("StratB" in str(c) for c in act_df.columns)
 
     # Also test run_comparative_analysis
     res = run_comparative_analysis(
@@ -313,6 +313,28 @@ def test_compute_cross_cluster_regulatory_summary(mock_hotspot_obj, mock_links_d
     assert len(summary_df) == 2  # clusters "0" and "1"
 
 
+def test_compute_tf_module_concordance(
+    mock_links_df, mock_score_df, mock_hotspot_obj, mock_adata
+):
+    """Test computing direct TF-TG to Hotspot Module concordance metrics."""
+    from genecircuitry.comparative_analysis import compute_tf_module_concordance, compute_module_activity_matrix
+
+    act_df = compute_module_activity_matrix(adata=mock_adata, hotspot_obj=mock_hotspot_obj)
+    conc_df = compute_tf_module_concordance(
+        links_df=mock_links_df,
+        score_df=mock_score_df,
+        activity_df=act_df,
+        hotspot_obj=mock_hotspot_obj,
+        adata=mock_adata,
+    )
+    assert isinstance(conc_df, pd.DataFrame)
+    assert not conc_df.empty
+    assert "cluster" in conc_df.columns
+    assert "module" in conc_df.columns
+    assert "top_driver_tf" in conc_df.columns
+    assert "concordance_score" in conc_df.columns
+
+
 def test_run_comparative_analysis_with_new_functions(
     temp_dir, mock_adata, mock_score_df, mock_links_df, mock_hotspot_obj
 ):
@@ -333,9 +355,11 @@ def test_run_comparative_analysis_with_new_functions(
     assert "module_tf_integration" in results
     assert "gene_provenance" in results
     assert "regulatory_summary" in results
+    assert "tf_module_concordance" in results
     # Check new CSV files were written
     comp_dir = os.path.join(temp_dir, "comparative")
     assert os.path.exists(os.path.join(comp_dir, "module_gene_coverage.csv"))
     assert os.path.exists(os.path.join(comp_dir, "module_tf_integration.csv"))
     assert os.path.exists(os.path.join(comp_dir, "gene_selection_provenance.csv"))
     assert os.path.exists(os.path.join(comp_dir, "cross_cluster_regulatory_summary.csv"))
+    assert os.path.exists(os.path.join(comp_dir, "tf_module_concordance.csv"))

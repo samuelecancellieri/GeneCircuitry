@@ -283,15 +283,9 @@ def plot_hotspot_annotation(
             index=False,
         )
 
-    # Create module colors using a large, distinct color palette
+    # Create module colors using a delicate pastel color palette
     n_modules_total = len(unique_modules)
-    if n_modules_total <= 10:
-        colors = sns.color_palette("tab10", n_colors=10)
-    elif n_modules_total <= 20:
-        colors = sns.color_palette("tab20", n_colors=20)
-    else:
-        # For many modules, use husl which generates evenly spaced hues
-        colors = sns.color_palette("husl", n_colors=max(n_modules_total, 30))
+    colors = sns.color_palette(getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel"), n_colors=max(n_modules_total, 10))
 
     module_colors = {
         i: colors[(i - 1) % len(colors)] for i in hotspot_obj.modules.unique()
@@ -341,7 +335,7 @@ def plot_hotspot_annotation(
         row_linkage=hotspot_obj.linkage,
         col_linkage=hotspot_obj.linkage,
         row_colors=row_colors1,
-        cmap="RdBu_r",
+        cmap="viridis",
         vmin=-8,
         vmax=8,
         xticklabels=False,
@@ -425,7 +419,7 @@ def _plot_hotspot_violin_single_worker(task: Dict[str, Any]) -> Tuple[str, bool]
         )
         axes = axes.flatten()
 
-        module_palette = sns.color_palette("husl", n_colors=n_modules)
+        module_palette = sns.color_palette(getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel"), n_colors=max(n_modules, 3))
         y_min = scores_melted["Score"].min()
         y_max = scores_melted["Score"].max()
         y_margin = (y_max - y_min) * 0.1
@@ -504,7 +498,7 @@ def _plot_hotspot_violin_single_worker(task: Dict[str, Any]) -> Tuple[str, bool]
         fig_height = 10
 
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-        cluster_palette = sns.color_palette("Set2", n_colors=n_clusters)
+        cluster_palette = sns.color_palette(getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel"), n_colors=max(n_clusters, 3))
 
         sns.violinplot(
             data=scores_melted,
@@ -577,7 +571,7 @@ def _plot_hotspot_violin_single_worker(task: Dict[str, Any]) -> Tuple[str, bool]
         fig_width = max(14, n_clusters * 2.5)
 
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-        cluster_palette = sns.color_palette("Set2", n_colors=n_clusters)
+        cluster_palette = sns.color_palette(getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel"), n_colors=max(n_clusters, 3))
 
         sns.violinplot(
             data=scores_melted,

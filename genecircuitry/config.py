@@ -89,7 +89,10 @@ PLOT_FIGSIZE_WIDE = (20, 8)
 """Wide figure size (landscape layout)"""
 
 PLOT_COLOR_PALETTE = "viridis"
-"""Default color palette for plots"""
+"""Default continuous color palette for plots (e.g., viridis or inferno)"""
+
+PLOT_CATEGORICAL_PALETTE = "pastel"
+"""Default categorical color palette for plots using soft and delicate pastel colors"""
 
 
 # ============================================================================
