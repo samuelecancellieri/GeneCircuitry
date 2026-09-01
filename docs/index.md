@@ -21,6 +21,7 @@ GeneCircuitry is a Python package that integrates [Scanpy](https://scanpy.readth
 | GRN inference                         | CellOracle                 | Per-cluster transcription factor networks    |
 | Gene module identification            | Hotspot                    | Spatially autocorrelated gene modules        |
 | Network visualization                 | NetworkX                   | Centrality plots, network graphs, rank plots |
+| Comparative & aggregation analysis    | GeneCircuitry Engine       | Cross-cluster concordance, Jaccard alignment |
 | Reporting                             | Built-in HTML/PDF engine   | Interactive analysis report                  |
 | Stratified analysis                   | `PipelineController`       | Per-cell-type parallel runs                  |
 

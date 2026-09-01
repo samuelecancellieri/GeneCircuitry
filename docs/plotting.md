@@ -181,6 +181,39 @@ plot_module_scores_violin(
 
 ---
 
+## Comparative & aggregation plots (`plotting/comparative_plots.py`)
+
+Visualizations for cross-cluster and cross-stratification integration:
+
+### `plot_comparative_module_activity(activity_df, save_name, skip_existing)`
+Row-standardized Z-score heatmap (`cmap="viridis"`) comparing Hotspot co-expression module activation across clusters or stratifications.
+
+### `plot_cross_stratification_module_overlap(jaccard_df, alignment_summary_df, save_name, skip_existing)`
+Heatmap (`cmap="viridis"`) of gene-set Jaccard similarity across modules from different stratifications to align homologous programs and prevent numeric module name collisions.
+
+### `plot_tf_module_regulatory_matrix(tf_mod_matrix, save_name, skip_existing)`
+Heatmap (`cmap="inferno"`) showing target gene overlap counts between top transcription factors and co-expression modules.
+
+### `plot_tf_module_concordance(concordance_df, save_name, skip_existing)`
+Bubble matrix (`cmap="inferno"`) cross-referencing module expression scores (color) and top driver TF target coverage percentages (bubble size).
+
+### `plot_gene_selection_sankey(provenance_df, save_name, skip_existing)`
+4-stage alluvial flow diagram (`pastel`) tracing genes from Hotspot significance to module assignment, GRN master driver role, cluster specificity, and pathway enrichment.
+
+### `plot_comparative_tf_centrality(tf_pivot_df, tf_summary_df, save_name, skip_existing)`
+Heatmap (`cmap="inferno"`) of TF degree centralities across groups with automatic $\bigstar$ Global Master Regulator and $\blacklozenge$ Group-Specific Regulator classifications.
+
+### `plot_differential_tf_targets(diff_targets_df, save_name, skip_existing)`
+Stacked horizontal bar chart partitioning TF targets into Conserved (pastel blue) and Condition-Specific / Rewired (pastel coral) sets.
+
+### `plot_cross_cluster_regulatory_comparison(reg_summary_df, save_name, skip_existing)`
+2x2 multi-panel comparison of network scale, active TFs/modules, top central TFs, and dominant regulatory circuits per cluster.
+
+### `plot_integrated_regulatory_dashboard(comparative_results, save_name, skip_existing)`
+6-panel publication-ready composite dashboard summarizing all comparative metrics.
+
+---
+
 ## Figure sizing and DPI
 
 All plot functions accept a `figsize` parameter; when `None`, they fall back to a config preset:

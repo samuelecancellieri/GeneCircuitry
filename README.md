@@ -144,6 +144,20 @@ controller.run_complete_pipeline()
 
 ---
 
+## Comparative & Aggregation Analysis
+
+GeneCircuitry features an integrated comparative analysis engine that bridges **Hotspot co-expression modules** and **CellOracle regulatory networks** across cell types (clusters) and experimental conditions (stratifications):
+
+- 🧬 **Gene-Overlap Module Alignment**: Resolves arbitrary sequential module IDs (`Module 1`, `Module 2` across runs) by computing pairwise Jaccard similarity matrices ($J = \frac{|A \cap B|}{|A \cup B|}$) to align truly homologous biological programs.
+- 🎯 **TF-to-Module Regulatory Concordance**: Cross-references module expression activity with TF target coverage to identify which **Master Driver TF** actively regulates each module in each cell state.
+- 🌊 **4-Stage Biological Sankey Flow**: Visualizes end-to-end gene provenance: *Hotspot Significance $\rightarrow$ Co-expression Module $\rightarrow$ GRN Master Regulator $\rightarrow$ Cell-State Activation $\rightarrow$ Enriched Pathway*.
+- 🔄 **Differential TF Rewiring**: Identifies whether transcription factors regulate a static set of core targets or dynamically rewire their downstream networks across conditions.
+- 📊 **Integrated 6-Panel Dashboard**: Synthesizes module activities, TF centralities, provenance breakdowns, and top regulatory circuits into a single publication-ready figure.
+
+For full mathematical formulations and interpretation guides, see the [Comparative Analysis Guide](docs/comparative-analysis.md).
+
+---
+
 ## Output Structure
 
 Each run produces an organized directory structure:
@@ -160,7 +174,17 @@ output/
 ├── figures/
 │   ├── qc/                             # QC violin and scatter plots
 │   ├── grn/                            # Regulatory network graphs & centrality plots
-│   └── hotspot/                        # Module heatmaps and expression violins
+│   ├── hotspot/                        # Module heatmaps and expression violins
+│   └── comparative/                    # Concordance bubbles, alignment heatmaps, Sankey flow
+├── comparative/
+│   ├── module_activity_matrix.csv      # Mean module expression scores
+│   ├── cross_stratification_module_jaccard.csv # Pairwise module Jaccard similarity
+│   ├── cross_stratification_module_alignment.csv # Homologous module matching table
+│   ├── tf_to_module_matrix.csv         # TF-to-module target count matrix
+│   ├── tf_specificity_summary.csv      # Master vs. group-specific TF classification
+│   ├── differential_tf_targets.csv     # Conserved vs. rewired TF targets
+│   ├── gene_selection_provenance.csv   # 4-stage gene lineage tracing table
+│   └── tf_module_concordance.csv       # TF driver and module concordance metrics
 ├── celloracle/
 │   ├── oracle_object.celloracle.oracle # CellOracle object
 │   ├── grn_links.celloracle.links      # Inferred regulatory links
@@ -184,6 +208,8 @@ Full documentation is hosted at **[samuelecancellieri.github.io/GeneCircuitry](h
 - ⚙️ **[Configuration](https://samuelecancellieri.github.io/GeneCircuitry/configuration/)** — Full parameters reference
 - 🔬 **[GRN Inference](https://samuelecancellieri.github.io/GeneCircuitry/celloracle/)** — CellOracle workflows
 - 🧩 **[Gene Modules](https://samuelecancellieri.github.io/GeneCircuitry/hotspot/)** — Hotspot workflows
+- 📊 **[Comparative Analysis](https://samuelecancellieri.github.io/GeneCircuitry/comparative-analysis/)** — Cross-cluster and cross-stratification integration
+- 🎨 **[Plotting System](https://samuelecancellieri.github.io/GeneCircuitry/plotting/)** — Complete visualization catalog
 - 🏗️ **[Implementation & Architecture](https://samuelecancellieri.github.io/GeneCircuitry/implementation/)** — Internal design, multiprocessing, logging, and APIs
 
 ---
