@@ -111,7 +111,7 @@ HVGS_MIN_DISP = 0.5
 PCA_N_COMPS = 50
 """Number of principal components to compute"""
 
-PCA_SVDSOLVE = "arpack"
+PCA_SVD_SOLVER = "arpack"
 """SVD solver for PCA"""
 
 
@@ -382,7 +382,7 @@ def get_config():
         "HVGS_MAX_MEAN": HVGS_MAX_MEAN,
         "HVGS_MIN_DISP": HVGS_MIN_DISP,
         "PCA_N_COMPS": PCA_N_COMPS,
-        "PCA_SVDSOLVE": PCA_SVDSOLVE,
+        "PCA_SVD_SOLVER": PCA_SVD_SOLVER,
         # Neighbors
         "NEIGHBORS_N_NEIGHBORS": NEIGHBORS_N_NEIGHBORS,
         "NEIGHBORS_N_PCS": NEIGHBORS_N_PCS,

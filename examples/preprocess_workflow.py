@@ -100,7 +100,7 @@ print("\nPerforming GRN preprocessing with config defaults...")
 print(f"  top_genes: {config.HVGS_N_TOP_GENES}")
 print(f"  n_neighbors: {config.NEIGHBORS_N_NEIGHBORS}")
 print(f"  n_pcs: {config.NEIGHBORS_N_PCS}")
-print(f"  svd_solver: {config.PCA_SVDSOLVE}")
+print(f"  svd_solver: {config.PCA_SVD_SOLVER}")
 
 adata_grn = perform_grn_pre_processing(
     adata_qc4, cluster_key="paul15_clusters"  # Will use all cells

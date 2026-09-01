@@ -42,7 +42,7 @@ All pipeline parameters live in `genecircuitry/config.py`. Import with `from gen
 | `HVGS_MAX_MEAN`        | `3`        | Max mean expression for HVG selection        |
 | `HVGS_MIN_DISP`        | `0.5`      | Min dispersion for HVG selection             |
 | `PCA_N_COMPS`          | `50`       | Number of PCA components                     |
-| `PCA_SVDSOLVE`         | `'arpack'` | SVD solver for PCA                           |
+| `PCA_SVD_SOLVER`         | `'arpack'` | SVD solver for PCA                           |
 
 ---
 

@@ -462,7 +462,7 @@ def perform_grn_pre_processing(
         If None, uses config.NEIGHBORS_N_PCS (default: 40).
     svd_solver : str, optional
         SVD solver for PCA.
-        If None, uses config.PCA_SVDSOLVE (default: 'arpack').
+        If None, uses config.PCA_SVD_SOLVER (default: 'arpack').
 
     Returns
     -------
@@ -505,7 +505,7 @@ def perform_grn_pre_processing(
     if n_pcs is None:
         n_pcs = config.NEIGHBORS_N_PCS
     if svd_solver is None:
-        svd_solver = config.PCA_SVDSOLVE
+        svd_solver = config.PCA_SVD_SOLVER
 
     # Make a copy to avoid modifying the original
     adata_cc = adata.copy()
@@ -558,8 +558,8 @@ def perform_grn_pre_processing(
     print(f"  Computed draw_graph for cluster key: {cluster_key}")
 
     if adata_cc.n_obs > cell_downsample:
-    if cell_downsample is not None and cell_downsample > 0 and adata_cc.n_obs > cell_downsample:
-        print(f"  Downsampling to {cell_downsample} cells for GRN analysis")
-        sc.pp.subsample(adata_cc, n_obs=cell_downsample)
+        if cell_downsample is not None and cell_downsample > 0 and adata_cc.n_obs > cell_downsample:
+            print(f"  Downsampling to {cell_downsample} cells for GRN analysis")
+            sc.pp.subsample(adata_cc, n_obs=cell_downsample)
 
     return adata_cc

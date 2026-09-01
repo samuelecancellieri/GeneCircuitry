@@ -392,9 +392,9 @@ def perform_dimensionality_reduction_clustering(
         )
     else:
         n_comps = config.PCA_N_COMPS
-        if n_comps is not None and config.PCA_SVDSOLVE == "arpack":
+        if n_comps is not None and config.PCA_SVD_SOLVER == "arpack":
             n_comps = min(n_comps, min(adata_cc.shape) - 1)
-        sc.pp.pca(adata_cc, n_comps=n_comps, svd_solver=config.PCA_SVDSOLVE)
+        sc.pp.pca(adata_cc, n_comps=n_comps, svd_solver=config.PCA_SVD_SOLVER)
         print(f"Computed PCA with {n_comps} components")
 
     # Step 3: Neighborhood graph
