@@ -308,6 +308,74 @@ def _extract_module_genes(
     return module_genes
 
 
+def _extract_per_stratification_modules(
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
+    hotspot_obj: Any = None,
+    adata: Optional[AnnData] = None,
+    output_dir: Optional[str] = None,
+) -> Dict[str, Dict[str, set]]:
+    """
+    Extract module_name -> set_of_genes mapping distinctly per stratification or dataset.
+    
+    Returns
+    -------
+    dict: {strat_name: {module_name: set(genes)}}
+    """
+    strat_modules: Dict[str, Dict[str, set]] = {}
+
+    strat_items = _normalize_stratification_results(stratification_results)
+    if strat_items:
+        for s_name, s_data in strat_items:
+            m_dict: Dict[str, set] = {}
+            s_hs = s_data.get("hotspot_result") or s_data.get("hotspot") if isinstance(s_data, dict) else getattr(s_data, "hotspot_result", getattr(s_data, "hotspot", None))
+            if s_hs is not None and hasattr(s_hs, "modules") and s_hs.modules is not None:
+                mod_series = s_hs.modules
+                for m in mod_series.unique():
+                    if m != -1 and m != "-1" and str(m) != "-1":
+                        mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                        m_dict[mod_name] = set(mod_series[mod_series == m].index.tolist())
+            
+            s_out = s_data.get("output_dir") if isinstance(s_data, dict) else getattr(s_data, "output_dir", None)
+            if not m_dict and s_out:
+                csv_path = os.path.join(s_out, "hotspot", "gene_modules.csv")
+                if os.path.exists(csv_path):
+                    try:
+                        m_df = pd.read_csv(csv_path, index_col=0)
+                        col = m_df.columns[0] if len(m_df.columns) > 0 else None
+                        if col:
+                            for g, m in m_df[col].items():
+                                if m != -1 and m != "-1" and str(m) != "-1":
+                                    mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                                    m_dict.setdefault(mod_name, set()).add(str(g))
+                    except Exception:
+                        pass
+            
+            s_adata = s_data.get("adata") if isinstance(s_data, dict) else getattr(s_data, "adata", None)
+            if not m_dict and s_adata is not None:
+                if "hotspot_modules" in s_adata.uns:
+                    hm = s_adata.uns["hotspot_modules"]
+                    if isinstance(hm, dict):
+                        for m, g_list in hm.items():
+                            mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                            m_dict[mod_name] = set(g_list)
+                elif "hotspot_module" in s_adata.var:
+                    for g, m in s_adata.var["hotspot_module"].items():
+                        if m != -1 and m != "-1" and str(m) != "-1":
+                            mod_name = f"Module {m}" if not str(m).startswith("Module") else str(m)
+                            m_dict.setdefault(mod_name, set()).add(str(g))
+                            
+            if m_dict:
+                strat_modules[str(s_name)] = m_dict
+
+    # Single-dataset fallback
+    if not strat_modules:
+        single_m = _extract_module_genes(hotspot_obj, adata, output_dir=output_dir)
+        if single_m:
+            strat_modules["Dataset"] = single_m
+
+    return strat_modules
+
+
 def _extract_autocorr_results(
     hotspot_obj: Any = None,
     output_dir: Optional[str] = None,
@@ -962,6 +1030,109 @@ def compute_module_gene_overlap_matrix(
     return coverage_df, jaccard_df
 
 
+def compute_cross_stratification_module_overlap(
+    stratification_results: Optional[Union[Dict[str, Any], List[Any]]] = None,
+    hotspot_obj: Any = None,
+    adata: Optional[AnnData] = None,
+    output_dir: Optional[str] = None,
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Compute pairwise gene overlap (Jaccard similarity and Overlap coefficient) between
+    Hotspot modules across different stratifications or runs to align truly similar modules
+    by gene content rather than arbitrary numeric names.
+
+    Returns
+    -------
+    jaccard_df : pd.DataFrame
+        Matrix of Jaccard similarity indices between (strat1, mod1) and (strat2, mod2).
+    overlap_coef_df : pd.DataFrame
+        Matrix of Overlap/Simpson coefficients |A ∩ B| / min(|A|, |B|).
+    alignment_summary_df : pd.DataFrame
+        Summary table detailing pairwise overlap metrics, shared gene count, sample genes,
+        and alignment status (Conserved, Related, Distinct).
+    """
+    strat_modules = _extract_per_stratification_modules(
+        stratification_results=stratification_results,
+        hotspot_obj=hotspot_obj,
+        adata=adata,
+        output_dir=output_dir,
+    )
+
+    if not strat_modules or sum(len(m) for m in strat_modules.values()) == 0:
+        empty_df = pd.DataFrame()
+        return empty_df, empty_df, empty_df
+
+    all_mod_keys: List[Tuple[str, str, set]] = []
+    for s_name, m_dict in strat_modules.items():
+        for m_name, genes in m_dict.items():
+            if genes:
+                all_mod_keys.append((s_name, m_name, genes))
+
+    labels = [f"{s}: {m}" if len(strat_modules) > 1 else m for s, m, _ in all_mod_keys]
+    n = len(all_mod_keys)
+
+    jaccard_mat = np.zeros((n, n), dtype=float)
+    overlap_mat = np.zeros((n, n), dtype=float)
+    summary_rows = []
+
+    for i in range(n):
+        s1, m1, g1 = all_mod_keys[i]
+        for j in range(n):
+            s2, m2, g2 = all_mod_keys[j]
+            inter = len(g1.intersection(g2))
+            union = len(g1.union(g2))
+            min_len = min(len(g1), len(g2))
+
+            jacc = inter / union if union > 0 else 0.0
+            ov_coef = inter / min_len if min_len > 0 else 0.0
+
+            jaccard_mat[i, j] = jacc
+            overlap_mat[i, j] = ov_coef
+
+            if (s1 != s2 and i < j) or (s1 == s2 and i < j and len(strat_modules) == 1):
+                shared_genes = sorted(list(g1.intersection(g2)))
+                sample_str = ", ".join(shared_genes[:5])
+                if len(shared_genes) > 5:
+                    sample_str += f" (+{len(shared_genes)-5} more)"
+
+                if jacc >= 0.3 or ov_coef >= 0.5:
+                    status = "Conserved Program (High Overlap)"
+                elif jacc >= 0.15 or ov_coef >= 0.25:
+                    status = "Related Program (Partial Overlap)"
+                else:
+                    status = "Condition-Specific / Distinct"
+
+                summary_rows.append({
+                    "stratification_1": s1,
+                    "module_1": m1,
+                    "stratification_2": s2,
+                    "module_2": m2,
+                    "jaccard_similarity": round(jacc, 4),
+                    "overlap_coefficient": round(ov_coef, 4),
+                    "n_shared_genes": inter,
+                    "n_module_1_genes": len(g1),
+                    "n_module_2_genes": len(g2),
+                    "shared_genes_sample": sample_str,
+                    "alignment_status": status,
+                })
+
+    jaccard_df = pd.DataFrame(jaccard_mat, index=labels, columns=labels)
+    overlap_coef_df = pd.DataFrame(overlap_mat, index=labels, columns=labels)
+
+    if summary_rows:
+        summary_df = pd.DataFrame(summary_rows).sort_values(
+            ["jaccard_similarity", "overlap_coefficient"], ascending=[False, False]
+        )
+    else:
+        summary_df = pd.DataFrame(columns=[
+            "stratification_1", "module_1", "stratification_2", "module_2",
+            "jaccard_similarity", "overlap_coefficient", "n_shared_genes",
+            "n_module_1_genes", "n_module_2_genes", "shared_genes_sample", "alignment_status"
+        ])
+
+    return jaccard_df, overlap_coef_df, summary_df
+
+
 def compute_module_tf_integration(
     links_df: Optional[pd.DataFrame] = None,
     hotspot_obj: Any = None,
@@ -1474,6 +1645,28 @@ def run_comparative_analysis(
     except Exception as e:
         log_error("ComparativeAnalysis.Concordance", e)
         results["tf_module_concordance"] = pd.DataFrame()
+
+    # 11. Cross-Stratification Module Gene Alignment
+    try:
+        mod_jaccard_df, mod_ov_coef_df, mod_align_summary = compute_cross_stratification_module_overlap(
+            stratification_results=stratification_results,
+            hotspot_obj=hotspot_obj,
+            adata=adata,
+            output_dir=output_dir,
+        )
+        results["cross_strat_module_jaccard"] = mod_jaccard_df
+        results["cross_strat_module_overlap"] = mod_ov_coef_df
+        results["cross_strat_module_alignment"] = mod_align_summary
+        if save_tables and not mod_jaccard_df.empty:
+            mod_jaccard_df.to_csv(os.path.join(comp_dir, "cross_stratification_module_jaccard.csv"))
+            mod_ov_coef_df.to_csv(os.path.join(comp_dir, "cross_stratification_module_overlap_coefficient.csv"))
+            mod_align_summary.to_csv(os.path.join(comp_dir, "cross_stratification_module_alignment.csv"), index=False)
+            print("  ✓ Computed cross-stratification module gene alignment")
+    except Exception as e:
+        log_error("ComparativeAnalysis.CrossStratModuleOverlap", e)
+        results["cross_strat_module_jaccard"] = pd.DataFrame()
+        results["cross_strat_module_overlap"] = pd.DataFrame()
+        results["cross_strat_module_alignment"] = pd.DataFrame()
 
     print("  Comparative analysis complete.")
     return results

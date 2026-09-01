@@ -356,6 +356,8 @@ def test_run_comparative_analysis_with_new_functions(
     assert "gene_provenance" in results
     assert "regulatory_summary" in results
     assert "tf_module_concordance" in results
+    assert "cross_strat_module_jaccard" in results
+    assert "cross_strat_module_alignment" in results
     # Check new CSV files were written
     comp_dir = os.path.join(temp_dir, "comparative")
     assert os.path.exists(os.path.join(comp_dir, "module_gene_coverage.csv"))
@@ -363,3 +365,46 @@ def test_run_comparative_analysis_with_new_functions(
     assert os.path.exists(os.path.join(comp_dir, "gene_selection_provenance.csv"))
     assert os.path.exists(os.path.join(comp_dir, "cross_cluster_regulatory_summary.csv"))
     assert os.path.exists(os.path.join(comp_dir, "tf_module_concordance.csv"))
+    assert os.path.exists(os.path.join(comp_dir, "cross_stratification_module_jaccard.csv"))
+
+
+def test_compute_cross_stratification_module_overlap():
+    """Test pairwise Jaccard and overlap coefficient calculations across stratifications."""
+    from genecircuitry.comparative_analysis import compute_cross_stratification_module_overlap
+
+    # StratA has Module 1 (ISG15, IFIT1, OAS1) and Module 2 (CDK1, TOP2A)
+    # StratB has Module 1 (CDK1, TOP2A, PCNA - same as M2!) and Module 2 (ISG15, IFIT1 - same as M1!)
+    class MockHS1:
+        modules = pd.Series([1, 1, 1, 2, 2], index=["ISG15", "IFIT1", "OAS1", "CDK1", "TOP2A"])
+    class MockHS2:
+        modules = pd.Series([1, 1, 1, 2, 2], index=["CDK1", "TOP2A", "PCNA", "ISG15", "IFIT1"])
+
+    strat_list = [
+        {"name": "StratA", "hotspot_result": MockHS1()},
+        {"name": "StratB", "hotspot_result": MockHS2()},
+    ]
+
+    jaccard_df, ov_df, align_df = compute_cross_stratification_module_overlap(
+        stratification_results=strat_list
+    )
+
+    assert isinstance(jaccard_df, pd.DataFrame)
+    assert not jaccard_df.empty
+    assert "StratA: Module 1" in jaccard_df.index
+    assert "StratB: Module 2" in jaccard_df.columns
+
+    # StratA: Module 1 (ISG15, IFIT1, OAS1) vs StratB: Module 2 (ISG15, IFIT1) -> intersection 2, union 3 -> Jaccard = 2/3 ≈ 0.67
+    jacc_val = jaccard_df.loc["StratA: Module 1", "StratB: Module 2"]
+    assert round(jacc_val, 2) == 0.67
+
+    # StratA: Module 1 vs StratB: Module 1 (CDK1, TOP2A, PCNA) -> intersection 0 -> Jaccard = 0.0
+    jacc_zero = jaccard_df.loc["StratA: Module 1", "StratB: Module 1"]
+    assert jacc_zero == 0.0
+
+    # Alignment summary
+    assert isinstance(align_df, pd.DataFrame)
+    assert not align_df.empty
+    assert "alignment_status" in align_df.columns
+    # Top aligned pair should be high overlap
+    top_row = align_df.iloc[0]
+    assert "Conserved" in top_row["alignment_status"] or "Related" in top_row["alignment_status"]

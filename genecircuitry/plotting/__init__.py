@@ -57,6 +57,8 @@ from .comparative_plots import (
     plot_module_tf_regulatory_network,
     plot_gene_selection_sankey,
     plot_cross_cluster_regulatory_comparison,
+    plot_tf_module_concordance,
+    plot_cross_stratification_module_overlap,
     plot_integrated_regulatory_dashboard,
     generate_all_comparative_plots,
 )
@@ -100,6 +102,8 @@ __all__ = [
     "plot_module_tf_regulatory_network",
     "plot_gene_selection_sankey",
     "plot_cross_cluster_regulatory_comparison",
+    "plot_tf_module_concordance",
+    "plot_cross_stratification_module_overlap",
     "plot_integrated_regulatory_dashboard",
     "generate_all_comparative_plots",
 ]

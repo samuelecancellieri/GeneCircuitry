@@ -1199,6 +1199,73 @@ def plot_tf_module_concordance(
     )
 
 
+def plot_cross_stratification_module_overlap(
+    jaccard_df: pd.DataFrame,
+    alignment_summary_df: Optional[pd.DataFrame] = None,
+    save_name: str = "default",
+    figsize: Optional[Tuple[int, int]] = None,
+    skip_existing: bool = True,
+) -> bool:
+    """
+    Plot heatmap of gene-level Jaccard similarity across modules from different stratifications / runs.
+    Ensures that modules with identical numeric names (e.g. Module 1) but different gene content
+    are differentiated, and homologous biological programs across conditions are aligned.
+    """
+    suffix = _clean_save_suffix(save_name)
+    filepath = (
+        f"{config.FIGURES_DIR_COMPARATIVE}/cross_stratification_module_overlap{suffix}.png"
+    )
+
+    if plot_exists(filepath, skip_existing):
+        return False
+
+    if jaccard_df is None or jaccard_df.empty or jaccard_df.shape[0] < 2:
+        return False
+
+    if figsize is None:
+        n_items = jaccard_df.shape[0]
+        w = max(8, min(24, 4 + n_items * 1.0))
+        h = max(7, min(22, 3 + n_items * 0.85))
+        figsize = (w, h)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    do_annot = (jaccard_df.shape[0] <= 18 and jaccard_df.shape[1] <= 18)
+    sns.heatmap(
+        jaccard_df,
+        cmap="viridis",
+        vmin=0.0,
+        vmax=1.0,
+        annot=do_annot,
+        fmt=".2f",
+        linewidths=0.8,
+        linecolor="white",
+        cbar_kws={"label": "Gene Jaccard Similarity (A ∩ B / A ∪ B)", "shrink": 0.8},
+        ax=ax,
+    )
+
+    ax.set_title(
+        "Cross-Stratification Module Gene Alignment (Jaccard Overlap)\n"
+        "Aligns true biological programs across conditions rather than numeric names",
+        fontsize=13,
+        pad=15,
+        fontweight="bold",
+    )
+    ax.set_xlabel("Co-expression Modules (Condition : Module)", fontsize=11, fontweight="semibold")
+    ax.set_ylabel("Co-expression Modules (Condition : Module)", fontsize=11, fontweight="semibold")
+    plt.xticks(rotation=45, ha="right", fontsize=9)
+    plt.yticks(rotation=0, fontsize=9)
+    plt.tight_layout()
+
+    return save_plot(
+        fig=fig,
+        filepath=filepath,
+        plot_type="comparative",
+        metadata={"plot_name": "cross_strat_module_overlap", "n_modules": len(jaccard_df)},
+        skip_existing=False,
+    )
+
+
 def generate_all_comparative_plots(
     comparative_results: Dict[str, Any],
     save_name: str = "default",
@@ -1255,7 +1322,7 @@ def generate_all_comparative_plots(
         comparative_results, save_name=save_name, skip_existing=skip_existing
     )
     
-    # 7. Module Overlap Heatmap
+    # 7. Module Overlap Heatmap (GRN Target Coverage & Cluster Jaccard)
     coverage_df = comparative_results.get('module_coverage')
     jaccard_df = comparative_results.get('module_jaccard')
     if (coverage_df is not None and not coverage_df.empty) or (jaccard_df is not None and not jaccard_df.empty):
@@ -1293,7 +1360,18 @@ def generate_all_comparative_plots(
             concordance_df, save_name=save_name, skip_existing=skip_existing,
         )
 
-    # 12. Integrated Regulatory Dashboard
+    # 12. Cross-Stratification Module Gene Alignment Heatmap
+    cross_strat_jaccard = comparative_results.get('cross_strat_module_jaccard')
+    cross_strat_align = comparative_results.get('cross_strat_module_alignment')
+    if cross_strat_jaccard is not None and not cross_strat_jaccard.empty:
+        results['cross_strat_module_overlap'] = plot_cross_stratification_module_overlap(
+            cross_strat_jaccard,
+            alignment_summary_df=cross_strat_align,
+            save_name=save_name,
+            skip_existing=skip_existing,
+        )
+
+    # 13. Integrated Regulatory Dashboard
     results['integrated_dashboard'] = plot_integrated_regulatory_dashboard(
         comparative_results, save_name=save_name, skip_existing=skip_existing,
     )

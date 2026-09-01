@@ -179,6 +179,7 @@ from genecircuitry.plotting.comparative_plots import (
     plot_gene_selection_sankey,
     plot_cross_cluster_regulatory_comparison,
     plot_tf_module_concordance,
+    plot_cross_stratification_module_overlap,
     plot_integrated_regulatory_dashboard,
     generate_all_comparative_plots,
 )
@@ -236,7 +237,15 @@ def test_plot_all_new_comparative_visualizations(temp_plot_dir):
     ])
     assert plot_tf_module_concordance(conc_df, save_name="test", skip_existing=False) is True
 
-    # 6. Integrated Dashboard
+    # 6. Cross Stratification Module Alignment
+    strat_jac = pd.DataFrame(
+        [[1.0, 0.0, 0.67], [0.0, 1.0, 0.1], [0.67, 0.1, 1.0]],
+        index=["StratA: Module 1", "StratA: Module 2", "StratB: Module 1"],
+        columns=["StratA: Module 1", "StratA: Module 2", "StratB: Module 1"],
+    )
+    assert plot_cross_stratification_module_overlap(strat_jac, save_name="test", skip_existing=False) is True
+
+    # 7. Integrated Dashboard
     comp_results = {
         "module_activity": cov_df,
         "module_coverage": cov_df,
@@ -244,6 +253,7 @@ def test_plot_all_new_comparative_visualizations(temp_plot_dir):
         "gene_provenance": prov_df,
         "regulatory_summary": reg_df,
         "tf_module_concordance": conc_df,
+        "cross_strat_module_jaccard": strat_jac,
         "module_tf_integration": integ_df,
     }
     assert plot_integrated_regulatory_dashboard(comp_results, save_name="test", skip_existing=False) is True
