@@ -1393,3 +1393,159 @@ def create_stratification_summary_section(
         content=content,
         metrics={"Stratifications": n_strats},
     )
+
+
+def create_comparative_section(
+    output_dir: str,
+    comparative_results: Optional[Dict[str, Any]] = None,
+) -> ReportSection:
+    """
+    Create Comparative Analysis section with cross-group module, TF, and pathway comparisons.
+
+    Parameters
+    ----------
+    output_dir : str
+        Output directory containing comparative figures and tables.
+    comparative_results : dict, optional
+        Results dictionary from run_comparative_analysis().
+
+    Returns
+    -------
+    ReportSection
+        Comparative analysis report section.
+    """
+    import pandas as pd
+
+    metrics = {}
+    comp_fig_dir = os.path.join(output_dir, "figures", "comparative")
+    comp_csv_dir = os.path.join(output_dir, "comparative")
+
+    subsections = []
+
+    # 1. Summary Dashboard
+    dashboard_img = os.path.join(comp_fig_dir, "comparative_summary_dashboard.png")
+    dashboard_figs = [dashboard_img] if os.path.exists(dashboard_img) else []
+
+    dashboard_content = """
+    <p>Comprehensive comparative overview connecting co-expression modules, active transcription factors,
+    functional pathway enrichments, and differential regulatory targets across groups.</p>
+    """
+    if dashboard_figs:
+        subsections.append(
+            ReportSection(
+                title="Summary Dashboard",
+                section_id="comparative_dashboard",
+                content=dashboard_content,
+                figures=dashboard_figs,
+            )
+        )
+
+    # 2. Module Activity & Pathways
+    mod_act_img = os.path.join(comp_fig_dir, "comparative_module_activity.png")
+    mod_enr_img = os.path.join(comp_fig_dir, "comparative_pathway_enrichment.png")
+    mod_figs = [f for f in [mod_act_img, mod_enr_img] if os.path.exists(f)]
+
+    mod_enr_csv = os.path.join(comp_csv_dir, "module_pathway_enrichment.csv")
+    mod_content = "<p>Co-expression module activity scores and their top functionally enriched biological pathways across groups.</p>"
+
+    if os.path.exists(mod_enr_csv):
+        try:
+            df_enr = pd.read_csv(mod_enr_csv)
+            if not df_enr.empty:
+                metrics["Enriched Pathways"] = len(df_enr)
+                table_rows = []
+                for _, r in df_enr.head(10).iterrows():
+                    table_rows.append(
+                        f"<tr><td>{r.get('module', '')}</td>"
+                        f"<td>{r.get('term', '')}</td>"
+                        f"<td>{float(r.get('adjusted_p_value', 1.0)):.2e}</td>"
+                        f"<td>{r.get('overlap_genes', '')}</td></tr>"
+                    )
+                mod_content += f"""
+                <table class="dataframe">
+                    <thead><tr><th>Module</th><th>Top Enriched Term</th><th>Adj. P-value</th><th>Overlap Genes</th></tr></thead>
+                    <tbody>{''.join(table_rows)}</tbody>
+                </table>
+                """
+        except Exception:
+            pass
+
+    if mod_figs or os.path.exists(mod_enr_csv):
+        subsections.append(
+            ReportSection(
+                title="Module Activity & Pathways",
+                section_id="comparative_modules",
+                content=mod_content,
+                figures=mod_figs,
+            )
+        )
+
+    # 3. TF Centrality & Specificity
+    tf_cent_img = os.path.join(comp_fig_dir, "comparative_tf_centrality.png")
+    tf_figs = [tf_cent_img] if os.path.exists(tf_cent_img) else []
+
+    tf_sum_csv = os.path.join(comp_csv_dir, "tf_specificity_summary.csv")
+    tf_content = "<p>Comparative ranking of transcription factor network centralities, distinguishing Global Master Regulators from Group-Specific Drivers.</p>"
+
+    if os.path.exists(tf_sum_csv):
+        try:
+            df_tf = pd.read_csv(tf_sum_csv)
+            if not df_tf.empty:
+                metrics["Evaluated TFs"] = len(df_tf)
+                table_rows = []
+                for _, r in df_tf.head(10).iterrows():
+                    table_rows.append(
+                        f"<tr><td><strong>{r.get('gene', '')}</strong></td>"
+                        f"<td>{float(r.get('mean_centrality', 0.0)):.3f}</td>"
+                        f"<td>{r.get('top_group', '')}</td>"
+                        f"<td><span class='badge'>{r.get('classification', '')}</span></td></tr>"
+                    )
+                tf_content += f"""
+                <table class="dataframe">
+                    <thead><tr><th>Transcription Factor</th><th>Mean Centrality</th><th>Top Group</th><th>Classification</th></tr></thead>
+                    <tbody>{''.join(table_rows)}</tbody>
+                </table>
+                """
+        except Exception:
+            pass
+
+    if tf_figs or os.path.exists(tf_sum_csv):
+        subsections.append(
+            ReportSection(
+                title="TF Centrality & Specificity",
+                section_id="comparative_tfs",
+                content=tf_content,
+                figures=tf_figs,
+            )
+        )
+
+    # 4. TF-to-Module & Target Rewiring
+    tf_mod_img = os.path.join(comp_fig_dir, "tf_module_regulatory_matrix.png")
+    diff_tg_img = os.path.join(comp_fig_dir, "differential_tf_targets.png")
+    rewire_figs = [f for f in [tf_mod_img, diff_tg_img] if os.path.exists(f)]
+
+    rewire_content = "<p>Mapping between upstream transcription factors and downstream co-expression modules, along with conserved vs. condition-specific target gene connections.</p>"
+
+    if rewire_figs:
+        subsections.append(
+            ReportSection(
+                title="TF-to-Module & Target Rewiring",
+                section_id="comparative_rewiring",
+                content=rewire_content,
+                figures=rewire_figs,
+            )
+        )
+
+    main_content = """
+    <p>The comparative analysis module provides an integrated overview of transcriptional regulation
+    and co-expression across multiple clusters and stratifications.</p>
+    """
+
+    return ReportSection(
+        title="Comparative Analysis",
+        section_id="comparative_analysis",
+        content=main_content,
+        metrics=metrics,
+        subsections=subsections,
+    )
+

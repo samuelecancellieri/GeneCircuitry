@@ -113,22 +113,14 @@ All pipeline parameters live in `genecircuitry/config.py`. Import with `from gen
 
 ## File I/O
 
-| Parameter             | Default                    | Description              |
-| --------------------- | -------------------------- | ------------------------ |
-| `OUTPUT_DIR`          | `'output'`                 | Default output directory |
-| `FIGURES_DIR`         | `'output/figures'`         | Figures root             |
-| `FIGURES_DIR_QC`      | `'output/figures/qc'`      | QC figures               |
-| `FIGURES_DIR_GRN`     | `'output/figures/grn'`     | GRN figures              |
-| `FIGURES_DIR_HOTSPOT` | `'output/figures/hotspot'` | Hotspot figures          |
-| `LOG_PATH`            | `'output/logs'`            | Log directory            |
-
----
-
-## Runtime update
-
-```python
-from genecircuitry import config
-
+| Parameter                 | Default                        | Description              |
+| ------------------------- | ------------------------------ | ------------------------ |
+| `OUTPUT_DIR`              | `'output'`                     | Default output directory |
+| `FIGURES_DIR`             | `'output/figures'`             | Figures root             |
+| `FIGURES_DIR_QC`          | `'output/figures/qc'`          | QC figures               |
+| `FIGURES_DIR_GRN`         | `'output/figures/grn'`         | GRN figures              |
+| `FIGURES_DIR_HOTSPOT`     | `'output/figures/hotspot'`     | Hotspot figures          |
+| `FIGURES_DIR_COMPARATIVE` | `'output/figures/comparative'` | Comparative figures      |
 # Update one or more parameters globally
 config.update_config(QC_MIN_GENES=300, LEIDEN_RESOLUTION=0.8)
 

@@ -135,6 +135,7 @@ def test_config_types():
         "OUTPUT_DIR",
         "CACHE_DIR",
         "FIGURES_DIR",
+        "FIGURES_DIR_COMPARATIVE",
         "LOG_LEVEL",
     ]
     for param in string_params:
@@ -142,6 +143,7 @@ def test_config_types():
 
     # Boolean values
     bool_params = ["VERBOSE", "LOW_MEMORY", "FORCE_DIM_REDUCTION", "SAVE_PDF"]
+    for param in bool_params:
         assert isinstance(cfg[param], bool), f"{param} should be boolean"
 
     # List values

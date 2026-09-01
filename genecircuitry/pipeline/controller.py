@@ -826,9 +826,8 @@ class PipelineController:
                     self.args.output, "celloracle", "grn_filtered_links.pkl"
                 )
                 if os.path.exists(grn_score_file) and os.path.exists(grn_links_file):
-                    self.run_step_grn_analysis(grn_score_file, grn_links_file)
-
-            # Generate report
+                    self.run_step_grn_analysis(grn_score_path=grn_score_file, grn_links_path=grn_links_file)
+            # Step: Comparative analysis across clusters
             if "report" in steps:
                 self.run_step_report(
                     output_dir=self.args.output,
@@ -869,7 +868,7 @@ class PipelineController:
             FIGURES_DIR_QC=os.path.join(self.args.output, "figures", "qc"),
             FIGURES_DIR_GRN=os.path.join(self.args.output, "figures", "grn"),
             FIGURES_DIR_HOTSPOT=os.path.join(self.args.output, "figures", "hotspot"),
-        )
+            FIGURES_DIR_COMPARATIVE=os.path.join(self.args.output, "figures", "comparative"),
 
         if self.adata_stratification_list and not self.args.skip_celloracle:
             from genecircuitry.grn_deep_analysis import (
@@ -900,7 +899,7 @@ class PipelineController:
         else:
             total_merged_scores = None
 
-        # Generate unified report with stratification tabs
+        # Cross-stratification comparative analysis
         if self.adata_stratification_list and self.stratification_results:
             try:
                 log_file = os.path.join(self.args.output, "logs", "pipeline.log")
@@ -948,10 +947,10 @@ def setup_directories(output_dir, figures_dir, debug=False):
         f"{output_dir}/logs",
         f"{output_dir}/celloracle",
         f"{output_dir}/hotspot",
-        f"{figures_dir}/qc",
+        f"{output_dir}/comparative",
         f"{figures_dir}/grn",
         f"{figures_dir}/hotspot",
-    ]
+        f"{figures_dir}/comparative",
 
     if debug:
         for directory in directories:
