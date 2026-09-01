@@ -19,6 +19,10 @@ from genecircuitry.comparative_analysis import (
     compute_tf_centrality_matrix,
     compute_tf_to_module_mapping,
     compute_differential_tf_targets,
+    compute_module_gene_overlap_matrix,
+    compute_module_tf_integration,
+    compute_gene_selection_provenance,
+    compute_cross_cluster_regulatory_summary,
     run_comparative_analysis,
 )
 
@@ -84,6 +88,32 @@ def mock_modules_dict():
         "1": ["Gene_0", "Gene_1", "Gene_2", "Gene_3", "Gene_4"],
         "2": ["Gene_5", "Gene_6", "Gene_7", "Gene_8", "Gene_9"],
     }
+
+
+class MockHotspotObj:
+    """Mock Hotspot object with modules and results attributes."""
+    def __init__(self):
+        # modules: gene -> module_id mapping
+        self.modules = pd.Series({
+            "Gene_0": 1, "Gene_1": 1, "Gene_2": 1, "Gene_3": 1, "Gene_4": 1,
+            "Gene_5": 2, "Gene_6": 2, "Gene_7": 2, "Gene_8": 2, "Gene_9": 2,
+            "Gene_10": -1, "Gene_11": -1,
+        })
+        # results: autocorrelation results with FDR
+        self.results = pd.DataFrame({
+            "Z": np.random.randn(12),
+            "Pval": np.random.uniform(0, 0.1, 12),
+            "FDR": [0.001, 0.002, 0.003, 0.01, 0.02,
+                    0.005, 0.006, 0.008, 0.015, 0.025,
+                    0.04, 0.06],
+        }, index=[f"Gene_{i}" for i in range(12)])
+        self.module_scores = None
+
+
+@pytest.fixture
+def mock_hotspot_obj():
+    """Create a mock Hotspot object with modules and results."""
+    return MockHotspotObj()
 
 
 def test_compute_module_activity_matrix(mock_adata):
@@ -197,3 +227,115 @@ def test_stratification_results_list_format(temp_dir, mock_adata):
     assert not res["module_activity"].empty
 
 
+def test_compute_module_gene_overlap_matrix(mock_hotspot_obj, mock_links_df):
+    """Test module gene overlap and Jaccard similarity computation."""
+    coverage_df, jaccard_df = compute_module_gene_overlap_matrix(
+        hotspot_obj=mock_hotspot_obj,
+        links_df=mock_links_df,
+    )
+    assert isinstance(coverage_df, pd.DataFrame)
+    assert isinstance(jaccard_df, pd.DataFrame)
+    assert not coverage_df.empty
+    assert "Module 1" in coverage_df.index or "Module 2" in coverage_df.index
+    # Coverage values should be between 0 and 1
+    assert coverage_df.min().min() >= 0.0
+    assert coverage_df.max().max() <= 1.0
+
+
+def test_compute_module_gene_overlap_matrix_empty():
+    """Test module gene overlap with no data returns empty DataFrames."""
+    coverage_df, jaccard_df = compute_module_gene_overlap_matrix()
+    assert coverage_df.empty
+    assert jaccard_df.empty
+
+
+def test_compute_module_tf_integration(mock_hotspot_obj, mock_links_df, mock_score_df):
+    """Test module-TF integration cross-reference."""
+    integration_df = compute_module_tf_integration(
+        links_df=mock_links_df,
+        hotspot_obj=mock_hotspot_obj,
+        score_df=mock_score_df,
+    )
+    assert isinstance(integration_df, pd.DataFrame)
+    assert not integration_df.empty
+    assert "cluster" in integration_df.columns
+    assert "module" in integration_df.columns
+    assert "tf" in integration_df.columns
+    assert "n_targets_in_module" in integration_df.columns
+    assert "coverage_pct" in integration_df.columns
+    # All coverage percentages should be between 0 and 1
+    assert integration_df["coverage_pct"].min() >= 0.0
+    assert integration_df["coverage_pct"].max() <= 1.0
+
+
+def test_compute_gene_selection_provenance(mock_hotspot_obj, mock_links_df):
+    """Test gene selection provenance tracing."""
+    provenance_df = compute_gene_selection_provenance(
+        hotspot_obj=mock_hotspot_obj,
+        links_df=mock_links_df,
+    )
+    assert isinstance(provenance_df, pd.DataFrame)
+    assert not provenance_df.empty
+    assert "gene" in provenance_df.columns
+    assert "hotspot_fdr" in provenance_df.columns
+    assert "hotspot_module" in provenance_df.columns
+    assert "stage" in provenance_df.columns
+    assert "is_tf" in provenance_df.columns
+    assert "is_target" in provenance_df.columns
+    # All significant genes should appear (FDR < 0.05)
+    assert len(provenance_df) >= 10  # 11 genes have FDR < 0.05 in our mock
+    # Stages should be valid
+    valid_stages = {"TF & Target", "TF", "Target", "Module Member", "Significant Only"}
+    assert set(provenance_df["stage"].unique()).issubset(valid_stages)
+
+
+def test_compute_gene_selection_provenance_empty():
+    """Test gene provenance with no hotspot returns empty DataFrame."""
+    provenance_df = compute_gene_selection_provenance()
+    assert provenance_df.empty
+
+
+def test_compute_cross_cluster_regulatory_summary(mock_hotspot_obj, mock_links_df, mock_score_df):
+    """Test cross-cluster regulatory summary computation."""
+    summary_df = compute_cross_cluster_regulatory_summary(
+        links_df=mock_links_df,
+        score_df=mock_score_df,
+        hotspot_obj=mock_hotspot_obj,
+    )
+    assert isinstance(summary_df, pd.DataFrame)
+    assert not summary_df.empty
+    assert "cluster" in summary_df.columns
+    assert "n_regulatory_edges" in summary_df.columns
+    assert "n_unique_targets" in summary_df.columns
+    assert "top_tfs" in summary_df.columns
+    assert "n_active_tfs" in summary_df.columns
+    # Should have one row per cluster
+    assert len(summary_df) == 2  # clusters "0" and "1"
+
+
+def test_run_comparative_analysis_with_new_functions(
+    temp_dir, mock_adata, mock_score_df, mock_links_df, mock_hotspot_obj
+):
+    """Test end-to-end comparative analysis includes new result keys."""
+    results = run_comparative_analysis(
+        adata=mock_adata,
+        score_df=mock_score_df,
+        links_df=mock_links_df,
+        hotspot_obj=mock_hotspot_obj,
+        output_dir=temp_dir,
+        cluster_key="leiden",
+        save_tables=True,
+    )
+    assert isinstance(results, dict)
+    # Check new result keys exist
+    assert "module_coverage" in results
+    assert "module_jaccard" in results
+    assert "module_tf_integration" in results
+    assert "gene_provenance" in results
+    assert "regulatory_summary" in results
+    # Check new CSV files were written
+    comp_dir = os.path.join(temp_dir, "comparative")
+    assert os.path.exists(os.path.join(comp_dir, "module_gene_coverage.csv"))
+    assert os.path.exists(os.path.join(comp_dir, "module_tf_integration.csv"))
+    assert os.path.exists(os.path.join(comp_dir, "gene_selection_provenance.csv"))
+    assert os.path.exists(os.path.join(comp_dir, "cross_cluster_regulatory_summary.csv"))

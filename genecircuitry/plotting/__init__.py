@@ -46,6 +46,21 @@ from .hotspot_plots import (
     generate_all_hotspot_plots,
 )
 
+from .comparative_plots import (
+    plot_comparative_module_activity,
+    plot_comparative_pathway_enrichment,
+    plot_tf_module_regulatory_matrix,
+    plot_comparative_tf_centrality,
+    plot_differential_tf_targets,
+    plot_comparative_summary_dashboard,
+    plot_module_overlap_heatmap,
+    plot_module_tf_regulatory_network,
+    plot_gene_selection_sankey,
+    plot_cross_cluster_regulatory_comparison,
+    plot_integrated_regulatory_dashboard,
+    generate_all_comparative_plots,
+)
+
 __all__ = [
     # Utilities
     "PlotLogger",
@@ -74,4 +89,18 @@ __all__ = [
     "plot_hotspot_annotation",
     "plot_module_scores_violin",
     "generate_all_hotspot_plots",
+    # Comparative plots
+    "plot_comparative_module_activity",
+    "plot_comparative_pathway_enrichment",
+    "plot_tf_module_regulatory_matrix",
+    "plot_comparative_tf_centrality",
+    "plot_differential_tf_targets",
+    "plot_comparative_summary_dashboard",
+    "plot_module_overlap_heatmap",
+    "plot_module_tf_regulatory_network",
+    "plot_gene_selection_sankey",
+    "plot_cross_cluster_regulatory_comparison",
+    "plot_integrated_regulatory_dashboard",
+    "generate_all_comparative_plots",
 ]
+

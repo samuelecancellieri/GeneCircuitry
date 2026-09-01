@@ -14,6 +14,7 @@ from typing import Optional, Dict, Any, List, Tuple, Union
 import numpy as np
 import pandas as pd
 from anndata import AnnData
+from itertools import combinations
 
 from . import config
 from .logging_utils import log_error, log_warning, log_info
@@ -62,6 +63,32 @@ def _normalize_stratification_results(
                 items.append((str(item.name), {"adata": getattr(item, "adata", None)}))
 
     return items
+
+
+def _extract_module_genes(
+    hotspot_obj: Any = None,
+    adata: Optional[AnnData] = None,
+) -> Dict[str, set]:
+    """
+    Extract module_name -> set_of_genes mapping from Hotspot object or AnnData.
+    
+    Returns dict like {'Module 1': {'GeneA', 'GeneB'}, 'Module 2': {'GeneC', ...}}
+    """
+    module_genes: Dict[str, set] = {}
+    
+    if hotspot_obj is not None and hasattr(hotspot_obj, 'modules') and hotspot_obj.modules is not None:
+        mod_series = hotspot_obj.modules
+        for m in mod_series.unique():
+            if m != -1 and m != '-1':
+                mod_name = f'Module {m}'
+                module_genes[mod_name] = set(mod_series[mod_series == m].index.tolist())
+    elif adata is not None:
+        # Fallback: try to reconstruct from adata.obs Module_ columns
+        mod_cols = [c for c in adata.obs.columns if str(c).startswith('Module_')]
+        # Module columns contain scores, not assignments - can't extract gene lists from them
+        pass
+    
+    return module_genes
 
 
 def compute_module_activity_matrix(
@@ -684,6 +711,237 @@ def compute_differential_tf_targets(
     return pd.DataFrame(rows).sort_values("conservation_ratio", ascending=False)
 
 
+def compute_module_gene_overlap_matrix(
+    hotspot_obj: Any = None,
+    links_df: Optional[pd.DataFrame] = None,
+    adata: Optional[AnnData] = None,
+    cluster_key: str = 'leiden',
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    module_genes = _extract_module_genes(hotspot_obj, adata)
+    if not module_genes or links_df is None or 'cluster' not in links_df.columns:
+        empty1 = pd.DataFrame(columns=['Module']).set_index('Module')
+        empty2 = pd.DataFrame(columns=['Module']).set_index('Module')
+        return empty1, empty2
+
+    clusters = links_df['cluster'].unique()
+    cluster_targets = {}
+    for c in clusters:
+        cluster_targets[c] = set(links_df[links_df['cluster'] == c]['target'].unique())
+
+    # Build coverage_df
+    coverage_rows = {}
+    for mod_name, genes in module_genes.items():
+        row = {}
+        for c in clusters:
+            intersection = genes.intersection(cluster_targets[c])
+            row[f"Cluster {c}"] = len(intersection) / len(genes) if len(genes) > 0 else 0.0
+        coverage_rows[mod_name] = row
+    coverage_df = pd.DataFrame.from_dict(coverage_rows, orient='index').fillna(0.0)
+    coverage_df.index.name = 'Module'
+
+    # Build jaccard_df
+    jaccard_rows = {}
+    for mod_name, genes in module_genes.items():
+        row = {}
+        for c1, c2 in combinations(clusters, 2):
+            g1 = genes.intersection(cluster_targets[c1])
+            g2 = genes.intersection(cluster_targets[c2])
+            intersection = len(g1.intersection(g2))
+            union = len(g1.union(g2))
+            row[f"{c1} vs {c2}"] = intersection / union if union > 0 else 0.0
+        jaccard_rows[mod_name] = row
+    jaccard_df = pd.DataFrame.from_dict(jaccard_rows, orient='index').fillna(0.0)
+    jaccard_df.index.name = 'Module'
+
+    return coverage_df, jaccard_df
+
+
+def compute_module_tf_integration(
+    links_df: Optional[pd.DataFrame] = None,
+    hotspot_obj: Any = None,
+    score_df: Optional[pd.DataFrame] = None,
+    adata: Optional[AnnData] = None,
+    top_n_tfs: int = 15,
+) -> pd.DataFrame:
+    module_genes = _extract_module_genes(hotspot_obj, adata)
+    cols = ['cluster', 'module', 'tf', 'n_targets_in_module', 'total_module_genes', 'coverage_pct', 'tf_centrality']
+    if not module_genes or links_df is None or 'cluster' not in links_df.columns:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for cluster in links_df['cluster'].unique():
+        c_links = links_df[links_df['cluster'] == cluster]
+        top_tfs = c_links['source'].value_counts().head(top_n_tfs).index.tolist()
+        for mod_name, genes in module_genes.items():
+            for tf in top_tfs:
+                tf_targets = set(c_links[c_links['source'] == tf]['target'].unique())
+                overlap = genes.intersection(tf_targets)
+                if len(overlap) > 0:
+                    cent = np.nan
+                    if score_df is not None and 'gene' in score_df.columns and 'cluster' in score_df.columns:
+                        s_df = score_df[(score_df['gene'] == tf) & (score_df['cluster'] == cluster)]
+                        if not s_df.empty and 'degree_centrality_all' in s_df.columns:
+                            cent = s_df['degree_centrality_all'].values[0]
+                    rows.append({
+                        'cluster': cluster,
+                        'module': mod_name,
+                        'tf': tf,
+                        'n_targets_in_module': len(overlap),
+                        'total_module_genes': len(genes),
+                        'coverage_pct': len(overlap) / len(genes),
+                        'tf_centrality': cent
+                    })
+    
+    if not rows:
+        return pd.DataFrame(columns=cols)
+    return pd.DataFrame(rows).sort_values('n_targets_in_module', ascending=False)
+
+
+def compute_gene_selection_provenance(
+    hotspot_obj: Any = None,
+    links_df: Optional[pd.DataFrame] = None,
+    enrichment_df: Optional[pd.DataFrame] = None,
+    adata: Optional[AnnData] = None,
+) -> pd.DataFrame:
+    cols = ['gene', 'hotspot_fdr', 'hotspot_module', 'stage', 'is_tf', 'is_target', 'n_clusters_active', 'regulated_by_tfs', 'pathway']
+    if hotspot_obj is None or not hasattr(hotspot_obj, 'results') or not hasattr(hotspot_obj, 'modules'):
+        return pd.DataFrame(columns=cols)
+
+    results = hotspot_obj.results
+    modules = hotspot_obj.modules
+    sig_genes = results[results['FDR'] < 0.05].index.tolist()
+
+    all_tfs = set()
+    all_targets = set()
+    gene_clusters: Dict[str, set] = {}
+    target_tfs: Dict[str, Dict[str, int]] = {}
+    if links_df is not None and not links_df.empty:
+        all_tfs = set(links_df['source'].unique())
+        all_targets = set(links_df['target'].unique())
+        if 'cluster' in links_df.columns:
+            # Vectorized: gene -> set of clusters (for both sources and targets)
+            src_clusters = links_df.groupby('source')['cluster'].apply(lambda x: set(x.unique())).to_dict()
+            tgt_clusters = links_df.groupby('target')['cluster'].apply(lambda x: set(x.unique())).to_dict()
+            for g, cl_set in src_clusters.items():
+                gene_clusters.setdefault(g, set()).update(cl_set)
+            for g, cl_set in tgt_clusters.items():
+                gene_clusters.setdefault(g, set()).update(cl_set)
+            # Vectorized: target -> {tf: count}
+            tf_target_counts = links_df.groupby(['target', 'source']).size().reset_index(name='count')
+            for _, r in tf_target_counts.iterrows():
+                target_tfs.setdefault(r['target'], {})[r['source']] = int(r['count'])
+
+    pathway_map = {}
+    if enrichment_df is not None and not enrichment_df.empty and 'module' in enrichment_df.columns and 'term' in enrichment_df.columns:
+        for m in enrichment_df['module'].unique():
+            m_df = enrichment_df[enrichment_df['module'] == m]
+            if not m_df.empty:
+                pathway_map[m] = m_df.iloc[0]['term']
+
+    rows = []
+    for gene in sig_genes:
+        fdr = results.loc[gene, 'FDR']
+        mod = modules.get(gene, 'Unassigned')
+        if mod != -1 and mod != '-1' and mod != 'Unassigned':
+            mod_str = f"Module {mod}"
+        else:
+            mod_str = 'Unassigned'
+            
+        is_tf = gene in all_tfs
+        is_target = gene in all_targets
+        n_clust = len(gene_clusters.get(gene, set()))
+        
+        reg_tfs = ""
+        if gene in target_tfs:
+            sorted_tfs = sorted(target_tfs[gene].items(), key=lambda x: x[1], reverse=True)[:5]
+            reg_tfs = ", ".join([t[0] for t in sorted_tfs])
+
+        if is_tf and is_target: stage = 'TF & Target'
+        elif is_tf: stage = 'TF'
+        elif is_target: stage = 'Target'
+        elif mod_str != 'Unassigned': stage = 'Module Member'
+        else: stage = 'Significant Only'
+        
+        pathway = pathway_map.get(mod_str, "")
+
+        rows.append({
+            'gene': gene,
+            'hotspot_fdr': fdr,
+            'hotspot_module': mod_str,
+            'stage': stage,
+            'is_tf': is_tf,
+            'is_target': is_target,
+            'n_clusters_active': n_clust,
+            'regulated_by_tfs': reg_tfs,
+            'pathway': pathway
+        })
+
+    if not rows:
+        return pd.DataFrame(columns=cols)
+    return pd.DataFrame(rows).sort_values('hotspot_fdr', ascending=True)
+
+
+def compute_cross_cluster_regulatory_summary(
+    links_df: Optional[pd.DataFrame] = None,
+    score_df: Optional[pd.DataFrame] = None,
+    hotspot_obj: Any = None,
+    activity_df: Optional[pd.DataFrame] = None,
+    adata: Optional[AnnData] = None,
+    top_n: int = 5,
+) -> pd.DataFrame:
+    cols = ['cluster', 'n_active_modules', 'top_modules', 'n_active_tfs', 'top_tfs', 'n_regulatory_edges', 'n_unique_targets', 'top_edges']
+    if links_df is None or 'cluster' not in links_df.columns:
+        return pd.DataFrame(columns=cols)
+
+    clusters = links_df['cluster'].unique()
+    module_genes = _extract_module_genes(hotspot_obj, adata)
+    
+    rows = []
+    for c in clusters:
+        c_links = links_df[links_df['cluster'] == c]
+        n_edges = len(c_links)
+        unique_targets = c_links['target'].nunique()
+        unique_tfs = c_links['source'].nunique()
+        
+        if score_df is not None and 'gene' in score_df.columns and 'cluster' in score_df.columns and 'degree_centrality_all' in score_df.columns:
+            s_df = score_df[score_df['cluster'] == c].sort_values('degree_centrality_all', ascending=False)
+            top_tfs_list = s_df['gene'].head(top_n).tolist()
+            if not top_tfs_list:
+                top_tfs_list = c_links['source'].value_counts().head(top_n).index.tolist()
+        else:
+            top_tfs_list = c_links['source'].value_counts().head(top_n).index.tolist()
+        
+        active_mods = []
+        if module_genes:
+            c_targets = set(c_links['target'].unique())
+            for mod_name, genes in module_genes.items():
+                if len(genes) > 0:
+                    overlap = len(genes.intersection(c_targets))
+                    if overlap / len(genes) > 0.3:
+                        active_mods.append(mod_name)
+        
+        if 'coef_abs' in c_links.columns:
+            top_e_df = c_links.sort_values('coef_abs', ascending=False).head(top_n)
+            top_edges_list = [f"{r['source']}->{r['target']}" for _, r in top_e_df.iterrows()]
+        else:
+            top_edges_list = []
+
+        rows.append({
+            'cluster': c,
+            'n_active_modules': len(active_mods),
+            'top_modules': ", ".join(active_mods),
+            'n_active_tfs': unique_tfs,
+            'top_tfs': ", ".join(top_tfs_list),
+            'n_regulatory_edges': n_edges,
+            'n_unique_targets': unique_targets,
+            'top_edges': ", ".join(top_edges_list)
+        })
+
+    if not rows:
+        return pd.DataFrame(columns=cols)
+    return pd.DataFrame(rows)
+
+
 def run_comparative_analysis(
     adata: Optional[AnnData] = None,
     score_df: Optional[pd.DataFrame] = None,
@@ -887,6 +1145,74 @@ def run_comparative_analysis(
     except Exception as e:
         log_error("ComparativeAnalysis.DiffTargets", e)
         results["differential_tf_targets"] = pd.DataFrame()
+
+    # 6. Module Gene Overlap
+    try:
+        coverage_df, jaccard_df = compute_module_gene_overlap_matrix(
+            hotspot_obj=hotspot_obj,
+            links_df=links_df,
+            adata=adata,
+            cluster_key=cluster_key,
+        )
+        results['module_coverage'] = coverage_df
+        results['module_jaccard'] = jaccard_df
+        if save_tables and not coverage_df.empty:
+            coverage_df.to_csv(os.path.join(comp_dir, 'module_gene_coverage.csv'))
+            jaccard_df.to_csv(os.path.join(comp_dir, 'module_gene_jaccard.csv'))
+            print('  \u2713 Computed module gene overlap matrix')
+    except Exception as e:
+        log_error('ComparativeAnalysis.ModuleOverlap', e)
+        results['module_coverage'] = pd.DataFrame()
+        results['module_jaccard'] = pd.DataFrame()
+
+    # 7. Module-TF Integration
+    try:
+        integration_df = compute_module_tf_integration(
+            links_df=links_df,
+            hotspot_obj=hotspot_obj,
+            score_df=score_df,
+            adata=adata,
+        )
+        results['module_tf_integration'] = integration_df
+        if save_tables and not integration_df.empty:
+            integration_df.to_csv(os.path.join(comp_dir, 'module_tf_integration.csv'), index=False)
+            print('  \u2713 Computed module-TF regulatory integration')
+    except Exception as e:
+        log_error('ComparativeAnalysis.ModuleTFIntegration', e)
+        results['module_tf_integration'] = pd.DataFrame()
+
+    # 8. Gene Selection Provenance
+    try:
+        provenance_df = compute_gene_selection_provenance(
+            hotspot_obj=hotspot_obj,
+            links_df=links_df,
+            enrichment_df=results.get('module_enrichment'),
+            adata=adata,
+        )
+        results['gene_provenance'] = provenance_df
+        if save_tables and not provenance_df.empty:
+            provenance_df.to_csv(os.path.join(comp_dir, 'gene_selection_provenance.csv'), index=False)
+            print('  \u2713 Computed gene selection provenance')
+    except Exception as e:
+        log_error('ComparativeAnalysis.GeneProvenance', e)
+        results['gene_provenance'] = pd.DataFrame()
+
+    # 9. Cross-Cluster Regulatory Summary
+    try:
+        reg_summary_df = compute_cross_cluster_regulatory_summary(
+            links_df=links_df,
+            score_df=score_df,
+            hotspot_obj=hotspot_obj,
+            activity_df=results.get('module_activity'),
+            adata=adata,
+        )
+        results['regulatory_summary'] = reg_summary_df
+        if save_tables and not reg_summary_df.empty:
+            reg_summary_df.to_csv(os.path.join(comp_dir, 'cross_cluster_regulatory_summary.csv'), index=False)
+            print('  \u2713 Computed cross-cluster regulatory summary')
+    except Exception as e:
+        log_error('ComparativeAnalysis.RegulatorySummary', e)
+        results['regulatory_summary'] = pd.DataFrame()
 
     print("  Comparative analysis complete.")
     return results
