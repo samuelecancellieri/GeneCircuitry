@@ -189,8 +189,7 @@ def test_enrichment_gene_sets_update():
 
 def test_grn_cell_downsample_default():
     """Test that GRN_CELL_DOWNSAMPLE has expected default"""
-    assert config.GRN_CELL_DOWNSAMPLE == 20000
-
+    assert config.GRN_CELL_DOWNSAMPLE == 30000
 
 def test_grn_cell_downsample_in_get_config():
     """Test that GRN_CELL_DOWNSAMPLE is present in get_config()"""

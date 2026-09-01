@@ -190,7 +190,7 @@ See [docs/checkpoints.md](../docs/checkpoints.md) for full details.
 | Log from any submodule              | `from genecircuitry.logging_utils import log_error, log_warning`          |
 | Log step progress (controller only) | `from genecircuitry.pipeline import log_step`                             |
 
-## Known Remaining Issues (see `RESTRUCTURING_PLAN.md`)
+## Notes & Known Dependencies (see [docs/implementation.md](../docs/implementation.md))
 
-- `pyproject.toml` optional-dep groups (`enrichment`, `atac`) are not pinned — `gseapy>=1.0.0`, `genomepy`, `gimmemotifs` are in optional extras only, not core deps
-- PDF generation requires `weasyprint` which depends on system-level `pango` — use `pixi` env or install separately
+- `pyproject.toml` optional-dep groups (`enrichment`, `atac`) are in optional extras (`gseapy>=1.0.0`, `genomepy`, `gimmemotifs`).
+- PDF generation requires `weasyprint` which depends on system-level `pango` — use `pixi` env or install separately.

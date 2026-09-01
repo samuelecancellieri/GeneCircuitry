@@ -114,8 +114,7 @@ See [Getting Started → Quick Start](quickstart/) for the full walkthrough.
 
 ### Other
 
-- [Architecture](architecture/) — codebase design, data flow, design patterns
-- [Contributing](contributing/) — code conventions, PR checklist
+- [Architecture & Implementation](implementation/) — full subsystem architecture and developer guide
 
 ---
 

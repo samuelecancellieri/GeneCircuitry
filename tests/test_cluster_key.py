@@ -278,8 +278,7 @@ class TestControllerClusterKey:
         )
 
         args_default = parser.parse_args([])
-        assert args_default.cell_downsample == 20000
-
+        assert args_default.cell_downsample == 30000
         args1 = parser.parse_args(["--cell-downsample", "50000"])
         assert args1.cell_downsample == 50000
 
