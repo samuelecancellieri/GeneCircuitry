@@ -208,9 +208,11 @@ def plot_exists(
     filepath: str,
     skip_existing: bool = True,
     verbose: bool = True,
+    check_pdf: Optional[bool] = None,
 ) -> bool:
     """
     Check if a plot file already exists (including PDF counterpart if enabled).
+
     Parameters
     ----------
     filepath : str
@@ -221,10 +223,13 @@ def plot_exists(
     verbose : bool
         If True, print a message when skipping existing plots.
     check_pdf : bool, optional
+        If True, also require the .pdf counterpart to exist. Defaults to config.SAVE_PDF.
+
     Returns
     -------
     bool
         True if file exists (and PDF counterpart if required) and skip_existing is True, False otherwise.
+
     Examples
     --------
     >>> if plot_exists("figures/qc/plot.png"):
@@ -238,8 +243,18 @@ def plot_exists(
 
     if check_pdf is None:
         check_pdf = getattr(config, "SAVE_PDF", False)
+
     exists = os.path.exists(filepath)
+
+    if exists and check_pdf:
         base, ext = os.path.splitext(filepath)
+        if ext.lower() != ".pdf":
+            pdf_path = f"{base}.pdf"
+            if not os.path.exists(pdf_path):
+                exists = False
+
+    if exists and verbose:
+        print(f"  Skipping existing: {os.path.basename(filepath)}")
 
     return exists
 
@@ -256,9 +271,11 @@ def save_plot(
     verbose: bool = True,
     save_pdf: Optional[bool] = None,
 ) -> bool:
+    """
     Save a matplotlib figure with logging, existence checking, and dual PNG/PDF output.
 
     Parameters
+    ----------
     fig : matplotlib.figure.Figure
         The figure to save.
     filepath : str
@@ -266,6 +283,7 @@ def save_plot(
     plot_type : str
         Type of plot for logging (e.g., "qc", "grn", "hotspot", "comparative").
     dpi : int, optional
+        Resolution for saving. If None, uses config.SAVE_DPI.
     bbox_inches : str
         Bounding box setting for savefig. Default is "tight".
     metadata : dict, optional
@@ -280,6 +298,8 @@ def save_plot(
         Whether to also save a PDF version. If None, uses config.SAVE_PDF.
 
     Returns
+    -------
+    bool
         True if plot was saved, False if skipped.
 
     Examples
@@ -292,12 +312,21 @@ def save_plot(
         save_pdf = getattr(config, "SAVE_PDF", True)
 
     if plot_exists(
+        filepath,
+        skip_existing=skip_existing,
         verbose=verbose,
         check_pdf=save_pdf,
+    ):
+        if close_fig:
+            plt.close(fig)
+        return False
+
+    # Use config DPI if not specified
     if dpi is None:
         dpi = getattr(config, "SAVE_DPI", 600)
 
     # Ensure directory exists
+    os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
 
     base, ext = os.path.splitext(filepath)
     if not ext:
@@ -305,8 +334,14 @@ def save_plot(
         filepath = f"{base}{ext}"
 
     # Save primary figure
+    fig.savefig(filepath, dpi=dpi, bbox_inches=bbox_inches)
     if verbose:
         print(f"  Saved plot: {filepath}")
+
+    # Register in the logger
+    logger = get_plot_logger()
+    logger.register_plot(filepath, plot_type, metadata)
+
     # Save PDF version if enabled
     if save_pdf and ext.lower() != ".pdf":
         pdf_path = f"{base}.pdf"
@@ -314,6 +349,11 @@ def save_plot(
         logger.register_plot(pdf_path, plot_type, metadata)
         if verbose:
             print(f"  Saved plot (PDF): {pdf_path}")
+
+    if close_fig:
+        plt.close(fig)
+
+    return True
 
 def get_plot_registry(output_dir: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
     """
@@ -354,6 +394,8 @@ def ensure_plot_dirs(output_dir: Optional[str] = None) -> None:
         os.path.join(output_dir, "comparative"),
         os.path.join(output_dir, "logs"),
     ]
+
+    for d in dirs:
         os.makedirs(d, exist_ok=True)
 
 

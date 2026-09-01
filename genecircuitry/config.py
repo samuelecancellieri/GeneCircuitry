@@ -67,6 +67,9 @@ SAVE_DPI = 600
 PLOT_FORMAT = "png"
 """Default format for saved figures"""
 
+SAVE_PDF = True
+"""Whether to automatically save figures in PDF format alongside PNG"""
+
 PLOT_FIGSIZE_SQUARED = (6, 6)
 """Square figure size"""
 
@@ -245,6 +248,9 @@ FIGURES_DIR_GRN = os.path.join(FIGURES_DIR, "grn")
 FIGURES_DIR_HOTSPOT = os.path.join(FIGURES_DIR, "hotspot")
 """Directory for saving Hotspot figures"""
 
+FIGURES_DIR_COMPARATIVE = os.path.join(FIGURES_DIR, "comparative")
+"""Directory for saving Comparative figures"""
+
 
 # ============================================================================
 # Logging Configuration
@@ -368,6 +374,7 @@ def get_config():
         "PLOT_DPI": PLOT_DPI,
         "SAVE_DPI": SAVE_DPI,
         "PLOT_FORMAT": PLOT_FORMAT,
+        "SAVE_PDF": SAVE_PDF,
         "PLOT_FIGSIZE_SQUARED": PLOT_FIGSIZE_SQUARED,
         "PLOT_FIGSIZE_SQUARED_LARGE": PLOT_FIGSIZE_SQUARED_LARGE,
         "PLOT_FIGSIZE_SMALL": PLOT_FIGSIZE_SMALL,
@@ -420,6 +427,7 @@ def get_config():
         "FIGURES_DIR_QC": FIGURES_DIR_QC,
         "FIGURES_DIR_GRN": FIGURES_DIR_GRN,
         "FIGURES_DIR_HOTSPOT": FIGURES_DIR_HOTSPOT,
+        "FIGURES_DIR_COMPARATIVE": FIGURES_DIR_COMPARATIVE,
         # Logging
         "LOG_LEVEL": LOG_LEVEL,
         "VERBOSE": VERBOSE,

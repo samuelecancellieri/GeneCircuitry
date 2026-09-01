@@ -1,8 +1,8 @@
 """
 Centralized logging utilities for GeneCircuitry modules.
 
-All GeneCircuitry submodules should import `log_error` and `log_warning` from
-here to ensure errors/warnings are recorded in the pipeline's error.log
+All GeneCircuitry submodules should import `log_error`, `log_warning`, and `log_info`
+from here to ensure errors/warnings are recorded in the pipeline's error.log
 and pipeline.log files regardless of which module raises them.
 
 The loggers are the same instances created by
@@ -65,3 +65,19 @@ def log_warning(context: str, message: str) -> None:
     pipeline_logger = get_pipeline_logger()
     if pipeline_logger.handlers:
         pipeline_logger.warning(f"[{context}] {message}")
+
+
+def log_info(context: str, message: str) -> None:
+    """
+    Log an informational message to the pipeline log.
+
+    Parameters
+    ----------
+    context : str
+        Module/step context string.
+    message : str
+        Informational message.
+    """
+    pipeline_logger = get_pipeline_logger()
+    if pipeline_logger.handlers:
+        pipeline_logger.info(f"[{context}] {message}")

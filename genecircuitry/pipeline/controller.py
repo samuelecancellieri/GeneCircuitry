@@ -827,7 +827,19 @@ class PipelineController:
                 )
                 if os.path.exists(grn_score_file) and os.path.exists(grn_links_file):
                     self.run_step_grn_analysis(grn_score_path=grn_score_file, grn_links_path=grn_links_file)
+
             # Step: Comparative analysis across clusters
+            if "comparative" in steps:
+                try:
+                    self.run_step_comparative_analysis(
+                        adata=adata_clustered,
+                        hotspot_obj=hotspot_result,
+                        output_dir=self.args.output,
+                    )
+                except Exception as e:
+                    log_error("Controller.ComparativeAnalysis", e)
+                    print(f"  ⚠ Comparative analysis failed ({type(e).__name__}): {e}")
+
             if "report" in steps:
                 self.run_step_report(
                     output_dir=self.args.output,
@@ -841,6 +853,79 @@ class PipelineController:
         # Final summary
         if "summary" in steps:
             self.print_final_summary()
+
+    def run_step_comparative_analysis(
+        self,
+        adata=None,
+        score_df=None,
+        links_df=None,
+        hotspot_obj=None,
+        stratification_results=None,
+        output_dir=None,
+    ):
+        """
+        Execute comparative analysis and generate aggregation plots.
+
+        Parameters
+        ----------
+        adata : AnnData, optional
+            Input AnnData object.
+        score_df : pd.DataFrame, optional
+            TF centrality score DataFrame.
+        links_df : pd.DataFrame, optional
+            CellOracle links DataFrame.
+        hotspot_obj : Hotspot, optional
+            Hotspot analysis result object.
+        stratification_results : list, optional
+            List of per-stratification result dicts.
+        output_dir : str, optional
+            Base output directory.
+
+        Returns
+        -------
+        dict
+            Dictionary of computed comparative analysis results.
+        """
+        from genecircuitry.comparative_analysis import run_comparative_analysis
+        from genecircuitry.plotting.comparative_plots import generate_all_comparative_plots
+
+        if output_dir is None:
+            output_dir = getattr(self.args, "output", config.OUTPUT_DIR)
+
+        cluster_key = getattr(self.args, "cluster_key", "leiden")
+
+        # Automatically resolve scores and links if not provided
+        if score_df is None:
+            co_score_path = os.path.join(output_dir, "celloracle", "grn_merged_scores.csv")
+            if os.path.exists(co_score_path):
+                import pandas as pd
+                score_df = pd.read_csv(co_score_path)
+
+        if links_df is None:
+            co_links_path = os.path.join(output_dir, "celloracle", "grn_filtered_links.pkl")
+            if os.path.exists(co_links_path):
+                import pickle
+                with open(co_links_path, "rb") as f:
+                    links_df = pickle.load(f)
+
+        comp_results = run_comparative_analysis(
+            adata=adata,
+            score_df=score_df,
+            links_df=links_df,
+            hotspot_obj=hotspot_obj,
+            stratification_results=stratification_results,
+            cluster_key=cluster_key,
+            output_dir=output_dir,
+            save_tables=True,
+        )
+
+        generate_all_comparative_plots(
+            comparative_results=comp_results,
+            save_name="default",
+            skip_existing=False,
+        )
+
+        return comp_results
 
     def print_final_summary(self):
         """Print final pipeline summary."""
@@ -869,6 +954,7 @@ class PipelineController:
             FIGURES_DIR_GRN=os.path.join(self.args.output, "figures", "grn"),
             FIGURES_DIR_HOTSPOT=os.path.join(self.args.output, "figures", "hotspot"),
             FIGURES_DIR_COMPARATIVE=os.path.join(self.args.output, "figures", "comparative"),
+        )
 
         if self.adata_stratification_list and not self.args.skip_celloracle:
             from genecircuitry.grn_deep_analysis import (
@@ -900,6 +986,18 @@ class PipelineController:
             total_merged_scores = None
 
         # Cross-stratification comparative analysis
+        if self.adata_stratification_list and self.stratification_results:
+            try:
+                self.run_step_comparative_analysis(
+                    score_df=total_merged_scores,
+                    stratification_results=self.stratification_results,
+                    output_dir=self.args.output,
+                )
+            except Exception as e:
+                log_error("Controller.ComparativeAnalysis.Stratified", e)
+                print(f"  ⚠ Cross-stratification comparative analysis failed ({type(e).__name__}): {e}")
+
+        # Generate unified report with stratification tabs
         if self.adata_stratification_list and self.stratification_results:
             try:
                 log_file = os.path.join(self.args.output, "logs", "pipeline.log")
@@ -948,9 +1046,11 @@ def setup_directories(output_dir, figures_dir, debug=False):
         f"{output_dir}/celloracle",
         f"{output_dir}/hotspot",
         f"{output_dir}/comparative",
+        f"{figures_dir}/qc",
         f"{figures_dir}/grn",
         f"{figures_dir}/hotspot",
         f"{figures_dir}/comparative",
+    ]
 
     if debug:
         for directory in directories:
