@@ -107,6 +107,7 @@ def test_config_types():
         "PCA_N_COMPS",
         "NEIGHBORS_N_NEIGHBORS",
         "NEIGHBORS_N_PCS",
+        "GRN_CELL_DOWNSAMPLE",
     ]
     for param in int_params:
         if cfg[param] is not None:
@@ -184,3 +185,27 @@ def test_enrichment_gene_sets_update():
 
     # Restore
     config.update_config(ENRICHMENT_GENE_SETS=original)
+
+
+def test_grn_cell_downsample_default():
+    """Test that GRN_CELL_DOWNSAMPLE has expected default"""
+    assert config.GRN_CELL_DOWNSAMPLE == 20000
+
+
+def test_grn_cell_downsample_in_get_config():
+    """Test that GRN_CELL_DOWNSAMPLE is present in get_config()"""
+    cfg = config.get_config()
+    assert "GRN_CELL_DOWNSAMPLE" in cfg
+    assert cfg["GRN_CELL_DOWNSAMPLE"] == config.GRN_CELL_DOWNSAMPLE
+
+
+def test_grn_cell_downsample_update():
+    """Test updating GRN_CELL_DOWNSAMPLE via update_config"""
+    original = config.GRN_CELL_DOWNSAMPLE
+
+    config.update_config(GRN_CELL_DOWNSAMPLE=50000)
+    assert config.GRN_CELL_DOWNSAMPLE == 50000
+
+    # Restore
+    config.update_config(GRN_CELL_DOWNSAMPLE=original)
+

@@ -1155,14 +1155,39 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
         key = keys[0]
         categories = adata.obs[key].cat.categories
         if requested_clusters is not None:
-            unique_clusters = [
-                c
-                for c in categories
-                if str(c) in requested_clusters
-                or sanitize_identifier(c) in requested_clusters
-                or str(c).replace(" ", "_") in requested_clusters
-                or any(sanitize_identifier(rc) == sanitize_identifier(c) for rc in requested_clusters)
-            ]
+            unique_clusters = []
+            for c in categories:
+                c_str = str(c)
+                c_san = sanitize_identifier(c)
+                c_sp = c_str.replace(" ", "_")
+                matched = False
+                for rc in requested_clusters:
+                    rc_str = str(rc).strip()
+                    if not rc_str:
+                        continue
+                    rc_san = sanitize_identifier(rc_str)
+                    if (
+                        rc_str == c_str
+                        or rc_san == c_san
+                        or rc_str == c_sp
+                        or rc_san == c_str
+                    ):
+                        matched = True
+                        break
+                    if ":" in rc_str or "=" in rc_str:
+                        sep = ":" if ":" in rc_str else "="
+                        target_key, target_val = rc_str.split(sep, 1)
+                        if target_key.strip() == key:
+                            target_val = target_val.strip()
+                            if (
+                                target_val == c_str
+                                or sanitize_identifier(target_val) == c_san
+                                or target_val == c_sp
+                            ):
+                                matched = True
+                                break
+                if matched:
+                    unique_clusters.append(c)
         else:
             unique_clusters = list(categories)
 
@@ -1193,11 +1218,64 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
             raw_name = "_".join(str(v) for v in comb)
 
             if requested_clusters is not None:
-                if (
-                    comp_name not in requested_clusters
-                    and raw_name not in requested_clusters
-                    and not any(sanitize_identifier(rc) == comp_name for rc in requested_clusters)
-                ):
+                comb_strs = [str(v) for v in comb]
+                comb_sanitized = [sanitize_identifier(v) for v in comb]
+                comb_spaced = [str(v).replace(" ", "_") for v in comb]
+                key_val_map = {k: v for k, v in zip(keys, comb)}
+                key_val_san = {k: sanitize_identifier(v) for k, v in zip(keys, comb)}
+
+                matched = False
+                for rc in requested_clusters:
+                    rc_str = str(rc).strip()
+                    if not rc_str:
+                        continue
+                    rc_san = sanitize_identifier(rc_str)
+
+                    # 1. Exact or sanitized composite name match
+                    if (
+                        rc_str == comp_name
+                        or rc_str == raw_name
+                        or rc_san == comp_name
+                        or rc_san == sanitize_identifier(raw_name)
+                    ):
+                        matched = True
+                        break
+
+                    # 2. Key-value format check, e.g. "col1:clu1" or "col1=clu1"
+                    if ":" in rc_str or "=" in rc_str:
+                        sep = ":" if ":" in rc_str else "="
+                        target_key, target_val = rc_str.split(sep, 1)
+                        target_key = target_key.strip()
+                        target_val = target_val.strip()
+                        if target_key in key_val_map:
+                            v = key_val_map[target_key]
+                            v_san = key_val_san[target_key]
+                            target_val_san = sanitize_identifier(target_val)
+                            if (
+                                target_val == str(v)
+                                or target_val_san == v_san
+                                or target_val == str(v).replace(" ", "_")
+                                or target_val_san == sanitize_identifier(str(v).replace(" ", "_"))
+                            ):
+                                matched = True
+                                break
+                    else:
+                        # 3. Individual value match across any key in the combination
+                        for v_str, v_san_val, v_sp in zip(
+                            comb_strs, comb_sanitized, comb_spaced
+                        ):
+                            if (
+                                rc_str == v_str
+                                or rc_san == v_san_val
+                                or rc_str == v_sp
+                                or rc_san == v_str
+                            ):
+                                matched = True
+                                break
+                        if matched:
+                            break
+
+                if not matched:
                     continue
 
             # Find cells matching this combination
@@ -2032,6 +2110,14 @@ Examples:
         default=False,
         help="Do not use a base GRN (use if already provided)",
     )
+    parser.add_argument(
+        "--cell-downsample",
+        "--grn-cell-downsample",
+        type=int,
+        default=config.GRN_CELL_DOWNSAMPLE,
+        dest="cell_downsample",
+        help=f"Number of cells to downsample to for GRN analysis (default: {config.GRN_CELL_DOWNSAMPLE})",
+    )
 
     # Quality control parameters
     parser.add_argument(
@@ -2206,6 +2292,8 @@ Examples:
         _config_overrides["QC_MIN_COUNTS"] = args.min_counts
     if "force_dim_reduction" in _explicit_args:
         _config_overrides["FORCE_DIM_REDUCTION"] = args.force_dim_reduction
+    if "cell_downsample" in _explicit_args:
+        _config_overrides["GRN_CELL_DOWNSAMPLE"] = args.cell_downsample
     config.update_config(**_config_overrides)
 
     print(f"Random seed: {args.seed}")

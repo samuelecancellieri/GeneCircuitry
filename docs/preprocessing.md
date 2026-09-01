@@ -171,6 +171,7 @@ adata_grn = perform_grn_pre_processing(
     adata,
     cluster_key="leiden",   # required: adata.obs column with cluster labels
     cell_downsample=20000,  # max cells (downsample if larger)
+    cell_downsample=None,   # max cells (config.GRN_CELL_DOWNSAMPLE = 20000)
     top_genes=None,         # HVGs to select (config.HVGS_N_TOP_GENES)
     n_neighbors=None,       # config.NEIGHBORS_N_NEIGHBORS
     n_pcs=None,             # config.NEIGHBORS_N_PCS

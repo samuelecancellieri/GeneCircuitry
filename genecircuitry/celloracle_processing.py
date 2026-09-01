@@ -418,6 +418,7 @@ def perform_grn_pre_processing(
     adata: AnnData,
     cluster_key: Union[str, Sequence[str]] = "leiden",
     cell_downsample: int = 20000,
+    cell_downsample: Optional[int] = None,
     top_genes: Optional[int] = None,
     gene_list: Optional[list] = None,
     n_neighbors: Optional[int] = None,
@@ -441,6 +442,10 @@ def perform_grn_pre_processing(
         a comma-separated string, or a sequence/list of columns.
     cell_downsample : int, default=20000
         Number of cells to downsample to (default: 20000).
+    cell_downsample : int, optional
+        Number of cells to downsample to.
+        If None, uses config.GRN_CELL_DOWNSAMPLE (default: 20000).
+        Set to None, 0, or negative to disable downsampling.
     top_genes : int, optional
         Number of highly variable genes to select.
         If None, uses config.HVGS_N_TOP_GENES (default: 2000).
@@ -491,6 +496,8 @@ def perform_grn_pre_processing(
         cluster_key = "leiden"
 
     # Use config defaults if not specified
+    if cell_downsample is None:
+        cell_downsample = config.GRN_CELL_DOWNSAMPLE
     if top_genes is None:
         top_genes = config.HVGS_N_TOP_GENES
     if n_neighbors is None:
@@ -551,6 +558,7 @@ def perform_grn_pre_processing(
     print(f"  Computed draw_graph for cluster key: {cluster_key}")
 
     if adata_cc.n_obs > cell_downsample:
+    if cell_downsample is not None and cell_downsample > 0 and adata_cc.n_obs > cell_downsample:
         print(f"  Downsampling to {cell_downsample} cells for GRN analysis")
         sc.pp.subsample(adata_cc, n_obs=cell_downsample)
 

@@ -173,6 +173,9 @@ GRN_MIN_TARGETS = 10
 GRN_CONFIDENCE_THRESHOLD = 0.5
 """Minimum confidence score for regulatory interactions"""
 
+GRN_CELL_DOWNSAMPLE = 20000
+"""Number of cells to downsample to for GRN analysis (default: 20000, None or <=0 to disable)"""
+
 # ============================================================================
 # Hotspot Configuration
 # ============================================================================
@@ -397,6 +400,7 @@ def get_config():
         "GRN_N_JOBS": GRN_N_JOBS,
         "GRN_MIN_TARGETS": GRN_MIN_TARGETS,
         "GRN_CONFIDENCE_THRESHOLD": GRN_CONFIDENCE_THRESHOLD,
+        "GRN_CELL_DOWNSAMPLE": GRN_CELL_DOWNSAMPLE,
         # Hotspot
         "HOTSPOT_N_JOBS": HOTSPOT_N_JOBS,
         "HOTSPOT_N_NEIGHBORS": HOTSPOT_N_NEIGHBORS,

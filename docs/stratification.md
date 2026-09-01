@@ -44,6 +44,19 @@ python -m genecircuitry.pipeline \
     --output results/ \
     --cluster-key-stratification cell_type
 
+# Multi-key stratification (e.g. combination of cell_type and condition)
+python -m genecircuitry.pipeline \
+    --input data.h5ad \
+    --output results/ \
+    --cluster-key-stratification cell_type,condition
+
+# Filter to specific clusters / subsets (e.g. analyzing only 'clu1' across all conditions)
+python -m genecircuitry.pipeline \
+    --input data.h5ad \
+    --output results/ \
+    --cluster-key-stratification cell_type,condition \
+    --clusters clu1
+
 # Parallel stratified analysis (all clusters at once)
 python -m genecircuitry.pipeline \
     --input data.h5ad \
@@ -53,7 +66,7 @@ python -m genecircuitry.pipeline \
     --n-jobs 4
 ```
 
-The `--cluster-key-stratification` value must be a column in `adata.obs`. Use `adata.obs.columns.tolist()` to list all available columns.
+The `--cluster-key-stratification` option accepts single columns, comma-separated columns (e.g. `cell_type,condition`), or lists of columns in `adata.obs`. When multiple keys are provided, datasets are stratified by combinations (e.g. `<cell_type>_<condition>`). The `--clusters` option can filter by composite names (e.g. `clu1_Ctrl`), individual component clusters (e.g. `clu1`), or key-value pairs (e.g. `cell_type:clu1`).
 
 ---
 

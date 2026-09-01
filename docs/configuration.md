@@ -76,6 +76,7 @@ All pipeline parameters live in `genecircuitry/config.py`. Import with `from gen
 | `GRN_N_JOBS`               | `8`     | Parallel jobs for GRN computation |
 | `GRN_MIN_TARGETS`          | `5`     | Minimum target genes per TF       |
 | `GRN_CONFIDENCE_THRESHOLD` | `0.5`   | Link confidence filter            |
+| `GRN_CELL_DOWNSAMPLE`      | `20000` | Number of cells to downsample to for GRN |
 
 ---
 

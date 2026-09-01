@@ -102,6 +102,65 @@ class TestCellOracleClusterKey:
                 top_genes=10,
             )
 
+    def test_perform_grn_pre_processing_cell_downsample_explicit(self, dummy_adata):
+        """Test perform_grn_pre_processing with explicit cell_downsample."""
+        result = perform_grn_pre_processing(
+            dummy_adata,
+            cluster_key="cell_type",
+            cell_downsample=20,
+            top_genes=10,
+            n_neighbors=5,
+            n_pcs=5,
+        )
+        assert result is not None
+        assert result.n_obs == 20
+
+    def test_perform_grn_pre_processing_cell_downsample_from_config(self, dummy_adata):
+        """Test perform_grn_pre_processing falls back to config.GRN_CELL_DOWNSAMPLE."""
+        from genecircuitry import config
+
+        orig = config.GRN_CELL_DOWNSAMPLE
+        try:
+            config.update_config(GRN_CELL_DOWNSAMPLE=25)
+            result = perform_grn_pre_processing(
+                dummy_adata,
+                cluster_key="cell_type",
+                cell_downsample=None,
+                top_genes=10,
+                n_neighbors=5,
+                n_pcs=5,
+            )
+            assert result is not None
+            assert result.n_obs == 25
+        finally:
+            config.update_config(GRN_CELL_DOWNSAMPLE=orig)
+
+    def test_perform_grn_pre_processing_cell_downsample_disabled(self, dummy_adata):
+        """Test perform_grn_pre_processing when downsampling is disabled (0 or None in config)."""
+        result = perform_grn_pre_processing(
+            dummy_adata,
+            cluster_key="cell_type",
+            cell_downsample=0,
+            top_genes=10,
+            n_neighbors=5,
+            n_pcs=5,
+        )
+        assert result is not None
+        assert result.n_obs == dummy_adata.n_obs
+
+    def test_perform_grn_pre_processing_cell_downsample_larger_than_data(self, dummy_adata):
+        """Test perform_grn_pre_processing when downsample target exceeds cell count."""
+        result = perform_grn_pre_processing(
+            dummy_adata,
+            cluster_key="cell_type",
+            cell_downsample=1000,
+            top_genes=10,
+            n_neighbors=5,
+            n_pcs=5,
+        )
+        assert result is not None
+        assert result.n_obs == dummy_adata.n_obs
+
     @patch("celloracle.Oracle")
     @patch("celloracle.data.load_human_promoter_base_GRN", return_value=pd.DataFrame())
     def test_create_oracle_object_custom_column_and_clean_names(
@@ -204,6 +263,29 @@ class TestControllerClusterKey:
 
         args3 = parser.parse_args(["--cluster-column-name", "subtypes"])
         assert args3.cluster_key == "subtypes"
+
+    def test_cli_cell_downsample_flags(self):
+        """Test CLI argument parsing for --cell-downsample and --grn-cell-downsample."""
+        from genecircuitry import config
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--cell-downsample",
+            "--grn-cell-downsample",
+            type=int,
+            default=config.GRN_CELL_DOWNSAMPLE,
+            dest="cell_downsample",
+        )
+
+        args_default = parser.parse_args([])
+        assert args_default.cell_downsample == 20000
+
+        args1 = parser.parse_args(["--cell-downsample", "50000"])
+        assert args1.cell_downsample == 50000
+
+        args2 = parser.parse_args(["--grn-cell-downsample", "100000"])
+        assert args2.cell_downsample == 100000
+
 
 
 class TestReportingClusterKey:
@@ -477,6 +559,50 @@ class TestMultiKeyStratification:
         assert len(adata_list_set) == 1
         assert names_set == ["B_cell_Ctrl"]
 
+    def test_stratification_pipeline_filter_by_individual_key_cluster(self, dummy_adata):
+        """Test filtering multi-key combinations using an individual cluster from one key."""
+        dummy_adata.obs["condition"] = ["Ctrl", "Treat"] * (dummy_adata.n_obs // 2)
+        
+        # Select only 'B_cell' -> should get both 'B_cell_Ctrl' and 'B_cell_Treat'
+        adata_list, names = stratification_pipeline(
+            dummy_adata,
+            cluster_key_stratification="cell_type,condition",
+            clusters="B_cell",
+        )
+        assert len(adata_list) == 2
+        assert set(names) == {"B_cell_Ctrl", "B_cell_Treat"}
+        for ad_sub in adata_list:
+            assert set(ad_sub.obs["cell_type"].unique()) == {"B_cell"}
+
+        # Select only 'Treat' from condition -> should get B_cell_Treat, T_cell_Treat, Monocyte_Treat
+        adata_list2, names2 = stratification_pipeline(
+            dummy_adata,
+            cluster_key_stratification=["cell_type", "condition"],
+            clusters=["Treat"],
+        )
+        assert len(adata_list2) == 3
+        assert set(names2) == {"B_cell_Treat", "T_cell_Treat", "Monocyte_Treat"}
+
+    def test_stratification_pipeline_filter_by_key_value_syntax(self, dummy_adata):
+        """Test filtering multi-key combinations using key:val or key=val syntax."""
+        dummy_adata.obs["condition"] = ["Ctrl", "Treat"] * (dummy_adata.n_obs // 2)
+
+        adata_list1, names1 = stratification_pipeline(
+            dummy_adata,
+            cluster_key_stratification="cell_type,condition",
+            clusters="cell_type:B_cell",
+        )
+        assert len(adata_list1) == 2
+        assert set(names1) == {"B_cell_Ctrl", "B_cell_Treat"}
+
+        adata_list2, names2 = stratification_pipeline(
+            dummy_adata,
+            cluster_key_stratification="cell_type,condition",
+            clusters="condition=Ctrl",
+        )
+        assert len(adata_list2) == 3
+        assert set(names2) == {"B_cell_Ctrl", "T_cell_Ctrl", "Monocyte_Ctrl"}
+
     def test_stratification_pipeline_unobserved_combinations_skipped(self, dummy_adata):
         # Create non-overlapping groups
         dummy_adata.obs["group1"] = ["A"] * 30 + ["B"] * 30
@@ -676,6 +802,28 @@ class TestMultiKeyPipelineControllerAndReporting:
         adata_list, names = controller.run_step_stratification()
         assert len(adata_list) == 1
         assert names == ["B_cell_Ctrl"]
+
+    def test_controller_multi_key_stratification_single_cluster_filter(self, dummy_adata, tmp_path):
+        dummy_adata.obs["condition"] = ["Ctrl", "Treat"] * (dummy_adata.n_obs // 2)
+        output_dir = str(tmp_path / "controller_strat_single_cluster_filter")
+        os.makedirs(output_dir, exist_ok=True)
+
+        args = argparse.Namespace(
+            output=output_dir,
+            name="test_strat_filter",
+            cluster_key="leiden",
+            cluster_key_stratification="cell_type,condition",
+            clusters="B_cell",
+            force_dim_reduction=False,
+            skip_celloracle=True,
+            skip_hotspot=True,
+        )
+        controller = PipelineController(args, datetime.now())
+        controller.adata_preprocessed = dummy_adata
+
+        adata_list, names = controller.run_step_stratification()
+        assert len(adata_list) == 2
+        assert set(names) == {"B_cell_Ctrl", "B_cell_Treat"}
 
     def test_reporting_multi_key_clustering_section(self, dummy_adata, tmp_path):
         dummy_adata.obs["condition"] = ["Ctrl", "Treat"] * (dummy_adata.n_obs // 2)

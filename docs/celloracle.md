@@ -55,6 +55,7 @@ adata_grn = perform_grn_pre_processing(
     adata,
     cluster_key="leiden",       # adata.obs column with clusters
     cell_downsample=20000,      # max cells — downsamples if larger
+    cell_downsample=None,       # max cells — config.GRN_CELL_DOWNSAMPLE = 20000
     top_genes=None,             # HVGs to use (config.HVGS_N_TOP_GENES = 2000)
     n_neighbors=None,           # config.NEIGHBORS_N_NEIGHBORS = 15
     n_pcs=None,                 # config.NEIGHBORS_N_PCS = 40
@@ -243,6 +244,7 @@ See [ATAC Peaks Processing](../atac-peaks/) for full documentation.
 | `GRN_N_JOBS`               | `8`                  | Parallel jobs for KNN imputation and link inference |
 | `GRN_MIN_TARGETS`          | `5`                  | Minimum target genes per TF (post-filter)           |
 | `GRN_CONFIDENCE_THRESHOLD` | `0.5`                | Link confidence filter threshold                    |
+| `GRN_CELL_DOWNSAMPLE`      | `20000`              | Number of cells to downsample to for GRN analysis   |
 | `FIGURES_DIR_GRN`          | `output/figures/grn` | Directory for GRN plots                             |
 | `OUTPUT_DIR`               | `output`             | Root directory for all outputs                      |
 
