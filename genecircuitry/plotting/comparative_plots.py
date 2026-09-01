@@ -683,7 +683,7 @@ def plot_module_tf_regulatory_network(
     for i, node in enumerate(sorted(mod_nodes)):
         pos[node] = (1, i / max(1, len(mod_nodes)-1))
         
-    node_sizes = [d['size'] * 10 for n, d in G.nodes(data=True)]
+    node_sizes = [min(3000, max(300, d['size'] * 10)) for n, d in G.nodes(data=True)]
     node_colors = ['#4C72B0' if d['type'] == 'tf' else '#DD8452' for n, d in G.nodes(data=True)]
     
     clusters = df_filtered['cluster'].unique()
@@ -691,7 +691,7 @@ def plot_module_tf_regulatory_network(
     cluster_color_map = {c: cluster_cmap(i % 10) for i, c in enumerate(clusters)}
     
     edge_colors = [cluster_color_map[G[u][v]['cluster']] for u, v in G.edges()]
-    edge_widths = [G[u][v]['weight'] / 5.0 for u, v in G.edges()]
+    edge_widths = [min(8.0, max(0.5, G[u][v]['weight'] / 5.0)) for u, v in G.edges()]
     
     nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=node_sizes, ax=ax)
     nx.draw_networkx_edges(G, pos, width=edge_widths, edge_color=edge_colors, alpha=0.6, ax=ax)
@@ -699,8 +699,10 @@ def plot_module_tf_regulatory_network(
     
     from matplotlib.lines import Line2D
     legend_elements = [Line2D([0], [0], color=c, lw=2, label=str(cl)) for cl, c in cluster_color_map.items()]
-    ax.legend(handles=legend_elements, title='Clusters', loc='best')
-    ax.set_title('TF → Module Regulatory Network')
+    ax.legend(handles=legend_elements, title='Clusters', loc='upper right')
+    ax.set_title('TF → Module Regulatory Network', fontsize=13, fontweight='bold', pad=15)
+    ax.set_xlim(-0.25, 1.25)
+    ax.set_ylim(-0.1, 1.1)
     ax.axis('off')
     
     plt.tight_layout()
@@ -755,58 +757,102 @@ def plot_gene_selection_sankey(
         val_counts = provenance_df[col].value_counts()
         if len(val_counts) > 10:
             top_cats = set(val_counts.head(8).index)
-            return provenance_df[col].apply(lambda x: x if x in top_cats else 'Other').tolist()
-        return provenance_df[col].tolist()
+            return provenance_df[col].apply(lambda x: str(x) if x in top_cats else 'Other').tolist()
+        return provenance_df[col].fillna('Unassigned').astype(str).tolist()
         
-    provenance_df = provenance_df.copy()
-    provenance_df['_stage0'] = get_groups('all')
-    provenance_df['_stage1'] = get_groups('hotspot_module')
-    provenance_df['_stage2'] = get_groups('stage')
-    provenance_df['_stage3'] = get_groups('pathway')
+    df_plot = provenance_df.copy()
+    df_plot['_stage0'] = get_groups('all')
+    df_plot['_stage1'] = get_groups('hotspot_module')
+    df_plot['_stage2'] = get_groups('stage')
+    df_plot['_stage3'] = get_groups('pathway')
     
     cols = ['_stage0', '_stage1', '_stage2', '_stage3']
+    total_genes = len(df_plot)
+    if total_genes == 0:
+        plt.close(fig)
+        return False
+
     node_positions = {}
+    node_heights = {}
+    node_counts = {}
     colors = {}
-    spacing = len(provenance_df) * 0.05
+    
+    bar_width = 0.16
     
     for i, col in enumerate(cols):
-        cats = provenance_df[col].value_counts()
-        y = 0
-        cat_colors = sns.color_palette('husl', len(cats))
+        cats = df_plot[col].value_counts()
+        k = len(cats)
+        spacing = min(0.04, 0.15 / max(1, k - 1)) if k > 1 else 0.0
+        avail_height = 1.0 - spacing * (k - 1)
+        
+        y = 0.0
+        cat_colors = sns.color_palette('husl', k)
         for j, (cat, count) in enumerate(cats.items()):
-            y_top = y + count
+            height = (count / total_genes) * avail_height
+            y_top = y + height
             node_positions[(i, cat)] = (y, y_top)
+            node_heights[(i, cat)] = height
+            node_counts[(i, cat)] = count
             colors[(i, cat)] = cat_colors[j]
-            ax.add_patch(plt.Rectangle((i - 0.05, y), 0.1, count, facecolor=colors[(i, cat)], edgecolor='black'))
-            ax.text(i, y + count/2, f"{cat}\n(n={count})", ha='center', va='center', fontsize=8, color='black')
+            
+            # Draw block
+            rect = plt.Rectangle(
+                (i - bar_width / 2, y), bar_width, height,
+                facecolor=colors[(i, cat)], edgecolor='black', linewidth=0.8
+            )
+            ax.add_patch(rect)
+            
+            # Text label
+            label = f"{cat}\n(n={count})"
+            if height >= 0.04:
+                ax.text(i, y + height / 2, label, ha='center', va='center', fontsize=7.5, color='black', fontweight='semibold')
+            elif height >= 0.02:
+                ax.text(i, y + height / 2, f"{cat} ({count})", ha='center', va='center', fontsize=6.5, color='black')
+            
             y = y_top + spacing
             
     for i in range(len(cols) - 1):
         col1 = cols[i]
-        col2 = cols[i+1]
-        flows = provenance_df.groupby([col1, col2], observed=False).size()
-        y_out = {cat: node_positions[(i, cat)][0] for cat in provenance_df[col1].unique()}
-        y_in = {cat: node_positions[(i+1, cat)][0] for cat in provenance_df[col2].unique()}
+        col2 = cols[i + 1]
+        flows = df_plot.groupby([col1, col2], observed=False).size()
+        y_out = {cat: node_positions[(i, cat)][0] for cat in df_plot[col1].unique()}
+        y_in = {cat: node_positions[(i + 1, cat)][0] for cat in df_plot[col2].unique()}
         
         for (c1, c2), count in flows.items():
-            if count == 0: continue
+            if count == 0:
+                continue
+            h1 = node_heights[(i, c1)]
+            n1 = node_counts[(i, c1)]
+            flow_h1 = (count / n1) * h1
+            
+            h2 = node_heights[(i + 1, c2)]
+            n2 = node_counts[(i + 1, c2)]
+            flow_h2 = (count / n2) * h2
+            
             y0_bot = y_out[c1]
-            y0_top = y0_bot + count
+            y0_top = y0_bot + flow_h1
             y_out[c1] = y0_top
             
             y1_bot = y_in[c2]
-            y1_top = y1_bot + count
+            y1_top = y1_bot + flow_h2
             y_in[c2] = y1_top
             
-            _draw_alluvial_band(ax, i + 0.05, y0_bot, y0_top, i + 1 - 0.05, y1_bot, y1_top, color=colors[(i, c1)], alpha=0.4)
+            _draw_alluvial_band(
+                ax,
+                i + bar_width / 2, y0_bot, y0_top,
+                i + 1 - bar_width / 2, y1_bot, y1_top,
+                color=colors[(i, c1)], alpha=0.35
+            )
             
-    ax.set_xticks(range(4))
-    ax.set_xticklabels(stages, fontweight='bold')
+    ax.set_xlim(-0.35, len(cols) - 0.65)
+    ax.set_ylim(-0.02, 1.02)
+    ax.set_xticks(range(len(cols)))
+    ax.set_xticklabels(stages, fontweight='bold', fontsize=10)
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
         
-    ax.set_title('Gene Selection Provenance: Hotspot → Modules → GRN → Pathways')
+    ax.set_title('Gene Selection Provenance: Hotspot → Modules → GRN → Pathways', fontsize=13, fontweight='bold', pad=15)
     plt.tight_layout()
     return save_plot(
         fig=fig, filepath=filepath, plot_type="comparative",
