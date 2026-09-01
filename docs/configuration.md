@@ -100,6 +100,7 @@ All pipeline parameters live in `genecircuitry/config.py`. Import with `from gen
 | `PLOT_DPI`                   | `200`       | Screen DPI            |
 | `SAVE_DPI`                   | `600`       | File save DPI         |
 | `PLOT_FORMAT`                | `'png'`     | Output format         |
+| `SAVE_PDF`                   | `True`      | Save PDF alongside PNG|
 | `PLOT_FIGSIZE_SMALL`         | `(6, 4)`    | Small figure          |
 | `PLOT_FIGSIZE_MEDIUM`        | `(10, 7)`   | Medium figure         |
 | `PLOT_FIGSIZE_LARGE`         | `(20, 15)`  | Large figure          |

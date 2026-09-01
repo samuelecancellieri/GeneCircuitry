@@ -141,8 +141,7 @@ def test_config_types():
         assert isinstance(cfg[param], str), f"{param} should be string"
 
     # Boolean values
-    bool_params = ["VERBOSE", "LOW_MEMORY", "FORCE_DIM_REDUCTION"]
-    for param in bool_params:
+    bool_params = ["VERBOSE", "LOW_MEMORY", "FORCE_DIM_REDUCTION", "SAVE_PDF"]
         assert isinstance(cfg[param], bool), f"{param} should be boolean"
 
     # List values
@@ -207,4 +206,5 @@ def test_grn_cell_downsample_update():
 
     # Restore
     config.update_config(GRN_CELL_DOWNSAMPLE=original)
+
 

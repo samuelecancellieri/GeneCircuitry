@@ -33,11 +33,9 @@ genecircuitry/plotting/
 
 ## Shared utilities (`plotting/utils.py`)
 
-### `save_plot(fig, filepath, plot_type, metadata, skip_existing)`
+### `save_plot(fig, filepath, plot_type, metadata, skip_existing, save_pdf)`
+Saves a matplotlib figure to disk in PNG and vector PDF formats, creates parent directories automatically, logs the save event, and returns `True` on success.
 
-Saves a matplotlib figure to disk, creates parent directories automatically, logs the save event, and returns `True` on success.
-
-```python
 from genecircuitry.plotting.utils import save_plot
 
 saved = save_plot(
@@ -46,16 +44,14 @@ saved = save_plot(
     plot_type="grn",          # label for logging
     metadata={"cluster": "0"},
     skip_existing=True,       # skip if file already exists
+    save_pdf=True,            # also save .pdf alongside .png (default: config.SAVE_PDF)
 )
-```
 
-### `plot_exists(filepath, skip_existing)`
+### `plot_exists(filepath, skip_existing, check_pdf)`
 
-Returns `True` if the file already exists and `skip_existing=True`. Used internally in every plot function to avoid re-generating expensive plots.
-
+Returns `True` if the file already exists (including its PDF counterpart when `check_pdf=True`) and `skip_existing=True`. Used internally in every plot function to avoid re-generating expensive plots.
 ```python
 from genecircuitry.plotting.utils import plot_exists
-
 if not plot_exists("results/figures/grn/my_plot.png", skip_existing=True):
     # generate and save
 ```
@@ -200,17 +196,16 @@ All plot functions accept a `figsize` parameter; when `None`, they fall back to 
 | `PLOT_DPI`                   | `200`      | Screen rendering DPI                  |
 | `SAVE_DPI`                   | `600`      | File save DPI for publication quality |
 | `PLOT_FORMAT`                | `'png'`    | Output format                         |
+| `SAVE_PDF`                   | `True`     | Automatically save PDF alongside PNG  |
 
 Override globally:
 
-```python
 from genecircuitry import config
-config.update_config(SAVE_DPI=300, PLOT_FORMAT="svg")
+config.update_config(SAVE_DPI=300, SAVE_PDF=True, PLOT_FORMAT="png")
 ```
 
 ---
 
-## Skipping existing plots
 
 All plot functions accept `skip_existing=True` (default). When a file already exists at the target path, the function returns `False` without regenerating the plot. Set `skip_existing=False` to force regeneration:
 

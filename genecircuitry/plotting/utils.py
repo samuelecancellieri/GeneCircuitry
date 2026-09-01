@@ -210,8 +210,7 @@ def plot_exists(
     verbose: bool = True,
 ) -> bool:
     """
-    Check if a plot file already exists.
-
+    Check if a plot file already exists (including PDF counterpart if enabled).
     Parameters
     ----------
     filepath : str
@@ -221,7 +220,7 @@ def plot_exists(
         (allowing overwrite).
     verbose : bool
         If True, print a message when skipping existing plots.
-
+    check_pdf : bool, optional
     Returns
     -------
     bool
@@ -238,9 +237,9 @@ def plot_exists(
     if not skip_existing:
         return False
 
-    exists = os.path.exists(filepath)
+    if check_pdf is None:
 
-    if exists and verbose:
+    if exists and check_pdf:
         print(f"  Skipping existing: {os.path.basename(filepath)}")
 
     return exists
@@ -256,11 +255,10 @@ def save_plot(
     close_fig: bool = True,
     skip_existing: bool = True,
     verbose: bool = True,
-) -> bool:
+    save_pdf: Optional[bool] = None,
     """
-    Save a matplotlib figure with logging and existence checking.
+    Save a matplotlib figure with logging, existence checking, and dual PNG/PDF output.
 
-    Parameters
     ----------
     fig : matplotlib.figure.Figure
         The figure to save.
@@ -280,8 +278,8 @@ def save_plot(
         If True, skip saving if file already exists. Default is True.
     verbose : bool
         If True, print status messages. Default is True.
-
-    Returns
+    save_pdf : bool, optional
+        Whether to also save a PDF version. If None, uses config.SAVE_PDF.
     -------
     bool
         True if plot was saved, False if skipped.
@@ -292,11 +290,10 @@ def save_plot(
     >>> ax.plot([1, 2, 3], [1, 2, 3])
     >>> save_plot(fig, "figures/test.png", "test", metadata={"step": "example"})
     """
-    # Check if plot already exists
-    if plot_exists(filepath, skip_existing=skip_existing, verbose=verbose):
-        if close_fig:
-            plt.close(fig)
-        return False
+    if save_pdf is None:
+        save_pdf = getattr(config, "SAVE_PDF", True)
+        filepath,
+        skip_existing=skip_existing,
 
     # Use config DPI if not specified
     if dpi is None:
@@ -305,19 +302,18 @@ def save_plot(
     # Ensure directory exists
     os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
 
-    # Save the figure
-    fig.savefig(filepath, dpi=dpi, bbox_inches=bbox_inches)
-
-    if verbose:
-        print(f"  Saved: {os.path.basename(filepath)}")
+    base, ext = os.path.splitext(filepath)
+    if not ext:
+        ext = f".{config.PLOT_FORMAT}" if hasattr(config, "PLOT_FORMAT") else ".png"
+        filepath = f"{base}{ext}"
 
     # Register in the logger
     logger = get_plot_logger()
     logger.register_plot(filepath, plot_type, metadata)
-    logger.save()
 
-    # Close figure if requested
-    if close_fig:
+    # Save PDF version if enabled
+    if save_pdf and ext.lower() != ".pdf":
+        pdf_path = f"{base}.pdf"
         plt.close(fig)
 
     return True
