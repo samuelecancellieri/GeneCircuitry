@@ -94,6 +94,9 @@ PLOT_COLOR_PALETTE = "viridis"
 PLOT_CATEGORICAL_PALETTE = "pastel"
 """Default categorical color palette for plots using soft and delicate pastel colors"""
 
+PLOT_DIVERGING_PALETTE = "RdBu_r"
+"""Default diverging color palette for correlation and differential plots (e.g., RdBu_r or vlag)"""
+
 
 # ============================================================================
 # Preprocessing Configuration
@@ -224,6 +227,9 @@ ENRICHMENT_BACKGROUND = None
 
 ENRICHMENT_SPECIES = "human"
 """Default species/organism for gene set enrichment ("human" or "mouse")"""
+
+ENRICHMENT_ONLINE = False
+"""Whether to use the online Enrichr API for enrichment analysis instead of local ORA calculation"""
 
 # ============================================================================
 # ATAC Peaks Processing Configuration
@@ -392,6 +398,8 @@ def get_config():
         "PLOT_FIGSIZE_LARGE": PLOT_FIGSIZE_LARGE,
         "PLOT_FIGSIZE_WIDE": PLOT_FIGSIZE_WIDE,
         "PLOT_COLOR_PALETTE": PLOT_COLOR_PALETTE,
+        "PLOT_CATEGORICAL_PALETTE": PLOT_CATEGORICAL_PALETTE,
+        "PLOT_DIVERGING_PALETTE": PLOT_DIVERGING_PALETTE,
         # Preprocessing
         "NORMALIZE_TARGET_SUM": NORMALIZE_TARGET_SUM,
         "HVGS_N_TOP_GENES": HVGS_N_TOP_GENES,
@@ -429,6 +437,7 @@ def get_config():
         "ENRICHMENT_GENE_SETS": ENRICHMENT_GENE_SETS,
         "ENRICHMENT_BACKGROUND": ENRICHMENT_BACKGROUND,
         "ENRICHMENT_SPECIES": ENRICHMENT_SPECIES,
+        "ENRICHMENT_ONLINE": ENRICHMENT_ONLINE,
         # ATAC Peaks
         "ATAC_MOTIF_SCAN_FPR": ATAC_MOTIF_SCAN_FPR,
         "ATAC_MOTIF_SCORE_THRESHOLD": ATAC_MOTIF_SCORE_THRESHOLD,

@@ -19,6 +19,7 @@ from __future__ import annotations
 import glob
 import os
 from pathlib import Path
+import time
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import numpy as np
@@ -526,6 +527,213 @@ def _calculate_ora_local(
     return df
 
 
+def _run_enrichr_online(
+    gene_list: List[str],
+    gene_sets: Union[str, Path, Dict[str, List[str]], List[Any]],
+    species: str = "human",
+    pval_cutoff: float = 0.05,
+    background: Optional[Union[int, List[str], Set[str]]] = None,
+    top_n_terms: Optional[int] = None,
+    max_retries: int = 3,
+    retry_delay: float = 2.0,
+) -> pd.DataFrame:
+    """
+    Execute Over-Representation Analysis using the online Enrichr web API via gseapy.
+
+    Parameters
+    ----------
+    gene_list : list of str
+        Query gene symbols.
+    gene_sets : str, Path, dict, or list
+        Gene set specification (Enrichr library name(s), GMT file path, or dictionary).
+    species : str, default='human'
+        Target organism for Enrichr.
+    pval_cutoff : float, default=0.05
+        Significance cutoff for Adjusted P-value (FDR).
+    background : int, list, set, optional
+        Background universe (used by gseapy if supported).
+    top_n_terms : int, optional
+        Maximum number of terms to retain per gene set library.
+    max_retries : int, default=3
+        Maximum retry attempts for transient API failures or rate limits (HTTP 429).
+    retry_delay : float, default=2.0
+        Initial backoff delay in seconds.
+
+    Returns
+    -------
+    pd.DataFrame
+        Table of enrichment statistics matching RESULT_COLUMNS.
+    """
+    import gseapy
+
+    query_genes = [str(g).strip() for g in gene_list if g and str(g).strip()]
+    if not query_genes:
+        return pd.DataFrame(columns=RESULT_COLUMNS)
+
+    # Format background argument for gseapy.enrichr
+    bg_arg: Optional[Union[int, List[str], str]] = None
+    if background is not None:
+        if isinstance(background, set):
+            bg_arg = list(background)
+        elif isinstance(background, (int, list, str)):
+            bg_arg = background
+
+    # Normalize gene_sets for gseapy
+    if isinstance(gene_sets, Path):
+        gs_arg: Any = str(gene_sets)
+    elif isinstance(gene_sets, list):
+        gs_arg = [str(x) if isinstance(x, Path) else x for x in gene_sets]
+    else:
+        gs_arg = gene_sets
+
+    sleep_time = retry_delay
+    enr = None
+
+    for attempt in range(max_retries):
+        try:
+            enr = gseapy.enrichr(
+                gene_list=query_genes,
+                gene_sets=gs_arg,
+                organism=species,
+                background=bg_arg,
+                no_plot=True,
+                verbose=False,
+            )
+            break
+        except Exception as e:
+            err_str = str(e).lower()
+            is_retryable = (
+                "429" in err_str
+                or "timeout" in err_str
+                or "connection" in err_str
+                or "503" in err_str
+                or "502" in err_str
+                or "too many requests" in err_str
+            )
+            if is_retryable and attempt < max_retries - 1:
+                log_warning(
+                    "EnrichmentAnalysis.OnlineEnrichr",
+                    f"Enrichr API request failed ({type(e).__name__}: {e}); "
+                    f"retrying in {sleep_time:.1f}s (attempt {attempt + 1}/{max_retries})...",
+                )
+                time.sleep(sleep_time)
+                sleep_time *= 2
+            else:
+                log_error("EnrichmentAnalysis.OnlineEnrichr", e)
+                raise RuntimeError(
+                    f"Online Enrichr API analysis failed ({type(e).__name__}): {e}.\n"
+                    f"To run offline without network access, use online=False or "
+                    f"set config.ENRICHMENT_ONLINE = False."
+                ) from e
+
+    if enr is None or getattr(enr, "results", None) is None or enr.results.empty:
+        return pd.DataFrame(columns=RESULT_COLUMNS)
+
+    df = enr.results.copy()
+
+    # Standardize column names (Enrichr returns 'Adjusted P-value', 'P-value', etc.)
+    for col in RESULT_COLUMNS:
+        if col not in df.columns:
+            alt_col = col.replace(" ", "_")
+            if alt_col in df.columns:
+                df[col] = df[alt_col]
+
+    # Filter by pval_cutoff
+    if "Adjusted P-value" in df.columns:
+        df = df[df["Adjusted P-value"] <= pval_cutoff].reset_index(drop=True)
+
+    # Apply top_n_terms per gene set library if specified
+    if top_n_terms is not None and top_n_terms > 0 and not df.empty:
+        if "Gene_set" in df.columns:
+            filtered_dfs = []
+            for _, group_df in df.groupby("Gene_set", sort=False):
+                filtered_dfs.append(group_df.head(top_n_terms))
+            df = pd.concat(filtered_dfs, ignore_index=True)
+        else:
+            df = df.head(top_n_terms)
+
+    # Sort by Adjusted P-value ascending, P-value ascending
+    sort_cols = [c for c in ["Adjusted P-value", "P-value"] if c in df.columns]
+    if sort_cols:
+        df = df.sort_values(by=sort_cols).reset_index(drop=True)
+
+    # Reorder columns to ensure RESULT_COLUMNS come first
+    ordered_cols = [c for c in RESULT_COLUMNS if c in df.columns] + [
+        c for c in df.columns if c not in RESULT_COLUMNS
+    ]
+    df = df[ordered_cols]
+
+    return df
+
+
+def run_enrichr_online(
+    gene_list: Iterable[str],
+    gene_sets: Optional[
+        Union[
+            str,
+            Path,
+            Dict[str, List[str]],
+            List[Union[str, Dict[str, List[str]]]],
+        ]
+    ] = None,
+    background: Optional[Union[int, List[str], Set[str]]] = None,
+    pval_cutoff: float = 0.05,
+    species: str = "human",
+    top_n_terms: Optional[int] = None,
+    max_retries: int = 3,
+    retry_delay: float = 2.0,
+) -> EnrichmentResult:
+    """
+    Perform online pathway enrichment analysis using the Enrichr web API via gseapy.
+
+    Parameters
+    ----------
+    gene_list : iterable of str
+        List of query gene symbols.
+    gene_sets : str, Path, dict, or list, optional
+        Gene set specification. Defaults to ``config.ENRICHMENT_GENE_SETS``.
+    background : int, list, set, optional
+        Background universe.
+    pval_cutoff : float, default=0.05
+        Significance cutoff for Adjusted P-value.
+    species : str, default='human'
+        Target organism.
+    top_n_terms : int, optional
+        Number of top terms to retain per gene set.
+    max_retries : int, default=3
+        Maximum retries for network or rate limit errors.
+    retry_delay : float, default=2.0
+        Initial backoff sleep time in seconds.
+
+    Returns
+    -------
+    EnrichmentResult
+        Container with results DataFrame.
+    """
+    if gene_sets is None:
+        gene_sets = getattr(config, "ENRICHMENT_GENE_SETS", ["MSigDB_Hallmark_2020"])
+    if species is None:
+        species = getattr(config, "ENRICHMENT_SPECIES", "human")
+
+    query_genes = [str(g).strip() for g in gene_list if g and str(g).strip()]
+    df = _run_enrichr_online(
+        gene_list=query_genes,
+        gene_sets=gene_sets,
+        species=species,
+        pval_cutoff=pval_cutoff,
+        background=background,
+        top_n_terms=top_n_terms,
+        max_retries=max_retries,
+        retry_delay=retry_delay,
+    )
+    return EnrichmentResult(
+        results=df,
+        gene_list=query_genes,
+        gene_sets=gene_sets,
+        organism=species,
+    )
+
+
 def perform_ora_enrichment(
     gene_list: Iterable[str],
     gene_sets: Optional[
@@ -541,13 +749,16 @@ def perform_ora_enrichment(
     species: str = "human",
     top_n_terms: Optional[int] = None,
     cache_dir: Optional[str] = None,
+    online: Optional[bool] = None,
 ) -> EnrichmentResult:
     """
-    Perform local Over-Representation Analysis (ORA) on a gene list.
+    Perform Over-Representation Analysis (ORA) on a gene list.
 
-    Executes statistical hypergeometric enrichment entirely locally on CPU with
-    zero remote network requests. Supports bundled gene sets (e.g. MSigDB Hallmark),
-    custom GMT files, Python dictionaries, or disk-cached libraries.
+    By default, executes statistical hypergeometric enrichment entirely locally
+    on CPU with zero remote network requests. Supports bundled gene sets (e.g.
+    MSigDB Hallmark), custom GMT files, Python dictionaries, or disk-cached libraries.
+    When ``online=True`` (or ``config.ENRICHMENT_ONLINE=True``), performs enrichment
+    via the online Enrichr web API.
 
     Parameters
     ----------
@@ -573,6 +784,9 @@ def perform_ora_enrichment(
         If specified, retains only the top N terms per gene set library.
     cache_dir : str, optional
         Custom cache directory for gene sets.
+    online : bool, optional
+        Whether to use the online Enrichr web API instead of local calculation.
+        Defaults to ``config.ENRICHMENT_ONLINE`` (False).
 
     Returns
     -------
@@ -594,11 +808,8 @@ def perform_ora_enrichment(
     if species is None:
         species = getattr(config, "ENRICHMENT_SPECIES", "human")
 
-    # Normalize gene_sets to a list
-    if isinstance(gene_sets, (str, Path, dict)):
-        gene_sets_list = [gene_sets]
-    else:
-        gene_sets_list = list(gene_sets)
+    if online is None:
+        online = bool(getattr(config, "ENRICHMENT_ONLINE", False))
 
     query_genes = [str(g).strip() for g in gene_list if g and str(g).strip()]
     if not query_genes:
@@ -608,6 +819,29 @@ def perform_ora_enrichment(
             gene_sets=gene_sets,
             organism=species,
         )
+
+    # Online Enrichr web API mode
+    if online:
+        df_online = _run_enrichr_online(
+            gene_list=query_genes,
+            gene_sets=gene_sets,
+            species=species,
+            pval_cutoff=pval_cutoff,
+            background=background,
+            top_n_terms=top_n_terms,
+        )
+        return EnrichmentResult(
+            results=df_online,
+            gene_list=query_genes,
+            gene_sets=gene_sets,
+            organism=species,
+        )
+
+    # Local offline ORA mode
+    if isinstance(gene_sets, (str, Path, dict)):
+        gene_sets_list = [gene_sets]
+    else:
+        gene_sets_list = list(gene_sets)
 
     all_dfs = []
     for gs_spec in gene_sets_list:
@@ -655,12 +889,15 @@ def gseapy_ora_enrichment_analysis(
     pval_cutoff: float = 0.05,
     species: str = "human",
     background: Optional[Union[int, List[str]]] = None,
+    online: Optional[bool] = None,
 ) -> EnrichmentResult:
     """
-    Perform local ORA enrichment analysis.
+    Perform ORA enrichment analysis.
 
     Backward-compatible wrapper for ``perform_ora_enrichment``.
-    Executes local statistical enrichment without remote network calls.
+    By default, executes local statistical enrichment without remote network calls.
+    When ``online=True`` (or ``config.ENRICHMENT_ONLINE=True``), performs enrichment
+    via the online Enrichr web API.
 
     Parameters
     ----------
@@ -674,6 +911,8 @@ def gseapy_ora_enrichment_analysis(
         Target organism.
     background : int or list, optional
         Background gene universe.
+    online : bool, optional
+        Whether to run via online Enrichr API. Defaults to config.ENRICHMENT_ONLINE.
 
     Returns
     -------
@@ -686,4 +925,5 @@ def gseapy_ora_enrichment_analysis(
         background=background,
         pval_cutoff=pval_cutoff,
         species=species,
+        online=online,
     )

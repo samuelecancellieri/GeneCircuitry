@@ -2104,8 +2104,8 @@ def grn_deep_analysis_pipeline(grn_score_path, grn_links_path):
         print("  Continuing with remaining pipeline steps...")
 
 
-def main():
-    """Main pipeline execution."""
+def create_parser() -> argparse.ArgumentParser:
+    """Create and return the ArgumentParser for the GeneCircuitry pipeline."""
     parser = argparse.ArgumentParser(
         description="Run complete GeneCircuitry analysis pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2312,6 +2312,18 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--enrichment-online",
+        "--use-enrichr",
+        "--online-enrichment",
+        action="store_true",
+        default=config.ENRICHMENT_ONLINE,
+        dest="enrichment_online",
+        help=(
+            "Use online Enrichr API for pathway enrichment analysis instead of "
+            "local offline calculation (default: False)"
+        ),
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         default=False,
@@ -2326,6 +2338,12 @@ Examples:
         "celloracle hotspot grn_analysis summary",
     )
 
+    return parser
+
+
+def main():
+    """Main pipeline execution."""
+    parser = create_parser()
     args = parser.parse_args()
 
     # Capture which args were explicitly provided by the user on the command line.
@@ -2424,12 +2442,19 @@ Examples:
         _config_overrides["FORCE_DIM_REDUCTION"] = args.force_dim_reduction
     if "cell_downsample" in _explicit_args:
         _config_overrides["GRN_CELL_DOWNSAMPLE"] = args.cell_downsample
+    if "enrichment_online" in _explicit_args:
+        _config_overrides["ENRICHMENT_ONLINE"] = args.enrichment_online
     config.update_config(**_config_overrides)
 
     print(f"Random seed: {args.seed}")
     print(f"Output directory: {args.output}")
     print(f"Figures directory: {os.path.join(args.output, 'figures')}")
     print(f"Parallel jobs: {args.n_jobs}")
+    if config.ENRICHMENT_ONLINE:
+        print("Enrichment engine: ONLINE (Enrichr web API)")
+    else:
+        print("Enrichment engine: OFFLINE (local ORA hypergeometric test)")
+    log_step("Pipeline", "ENRICHMENT_MODE", {"online": config.ENRICHMENT_ONLINE})
 
     # Print active workflow mode
     if args.use_hvgs:

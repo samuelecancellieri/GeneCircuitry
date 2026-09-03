@@ -34,6 +34,8 @@ from genecircuitry.plotting.qc_plots import (
     generate_all_qc_plots,
 )
 from genecircuitry.plotting.hotspot_plots import (
+    plot_hotspot_local_correlations,
+    plot_hotspot_annotation,
     plot_module_scores_violin,
     generate_all_hotspot_plots,
 )
@@ -308,10 +310,23 @@ class TestParallelHotspotPlots(unittest.TestCase):
 
         # Mock Hotspot object
         self.hotspot_obj = MagicMock()
+        genes = [f"Gene_{i}" for i in range(5)]
         self.hotspot_obj.modules = pd.Series(
             [1, 1, 2, 2, -1],
-            index=[f"Gene_{i}" for i in range(5)],
+            index=genes,
         )
+        self.hotspot_obj.local_correlation_z = pd.DataFrame(
+            np.array([
+                [8.0, 3.5, -1.2, -2.0, 0.1],
+                [3.5, 8.0, -1.0, -2.5, 0.0],
+                [-1.2, -1.0, 8.0, 4.2, -0.3],
+                [-2.0, -2.5, 4.2, 8.0, -0.1],
+                [0.1, 0.0, -0.3, -0.1, 8.0],
+            ]),
+            index=genes,
+            columns=genes,
+        )
+        self.hotspot_obj.linkage = None
         self.hotspot_obj.module_scores = pd.DataFrame(
             {
                 1: np.random.randn(n_cells),
@@ -324,6 +339,59 @@ class TestParallelHotspotPlots(unittest.TestCase):
         config.FIGURES_DIR_HOTSPOT = self.orig_figures_hotspot
         config.OUTPUT_DIR = self.orig_output_dir
         self.temp_dir.cleanup()
+
+    def test_plot_hotspot_local_correlations(self):
+        # Generate plot
+        res = plot_hotspot_local_correlations(
+            self.hotspot_obj,
+            skip_existing=False,
+        )
+        self.assertTrue(res)
+        png_path = os.path.join(
+            config.FIGURES_DIR_HOTSPOT, "hotspot_local_correlations.png"
+        )
+        self.assertTrue(os.path.exists(png_path))
+
+        # Test skip existing
+        res_skip = plot_hotspot_local_correlations(
+            self.hotspot_obj,
+            skip_existing=True,
+        )
+        self.assertFalse(res_skip)
+
+    def test_plot_hotspot_annotation(self):
+        res = plot_hotspot_annotation(
+            self.hotspot_obj,
+            gene_sets=[],
+            skip_existing=False,
+        )
+        self.assertTrue(res)
+        png_path = os.path.join(
+            config.FIGURES_DIR_HOTSPOT,
+            "hotspot_local_correlation_heatmap_with_annotations.png",
+        )
+        self.assertTrue(os.path.exists(png_path))
+
+        # Test skip existing
+        res_skip = plot_hotspot_annotation(
+            self.hotspot_obj,
+            gene_sets=[],
+            skip_existing=True,
+        )
+        self.assertFalse(res_skip)
+
+    def test_generate_all_hotspot_plots(self):
+        results = generate_all_hotspot_plots(
+            self.hotspot_obj,
+            adata=self.adata,
+            cluster_key="leiden",
+            gene_sets=[],
+            skip_existing=False,
+        )
+        self.assertIn("local_correlations", results)
+        self.assertIn("annotated_heatmap", results)
+        self.assertTrue(results["local_correlations"])
+        self.assertTrue(results["annotated_heatmap"])
 
     def test_plot_module_scores_violin_parallel(self):
         results = plot_module_scores_violin(

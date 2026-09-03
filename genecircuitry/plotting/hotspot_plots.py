@@ -28,8 +28,28 @@ except ImportError:
     hs = None
 
 
+def _get_hotspot_linkage(hotspot_obj, local_corr: pd.DataFrame):
+    """Safely get or compute linkage matrix for local correlation clustering."""
+    if hasattr(hotspot_obj, "linkage") and hotspot_obj.linkage is not None:
+        return hotspot_obj.linkage
+    from scipy.cluster.hierarchy import linkage
+    from scipy.spatial.distance import squareform
+
+    dd = local_corr.copy().values
+    np.fill_diagonal(dd, 0)
+    condensed = squareform(dd) * -1
+    offset = condensed.min() * -1
+    condensed += offset
+    return linkage(condensed, method="average")
+
+
 def plot_hotspot_local_correlations(
     hotspot_obj,
+    cmap: Optional[str] = None,
+    vmin: float = -8.0,
+    vmax: float = 8.0,
+    figsize: Tuple[int, int] = (12, 12),
+    show_dendrogram: bool = False,
     skip_existing: bool = True,
 ) -> bool:
     """
@@ -39,7 +59,18 @@ def plot_hotspot_local_correlations(
     ----------
     hotspot_obj : hotspot.Hotspot
         Hotspot object with computed local correlations.
-    skip_existing : bool
+    cmap : str, optional
+        Diverging colormap for correlation Z-scores. Default uses
+        ``config.PLOT_DIVERGING_PALETTE`` (e.g., "RdBu_r").
+    vmin : float, default=-8.0
+        Minimum value for colorscale (Z-scores).
+    vmax : float, default=8.0
+        Maximum value for colorscale (Z-scores).
+    figsize : tuple of int, default=(12, 12)
+        Figure dimensions (width, height).
+    show_dendrogram : bool, default=False
+        Whether to display hierarchical clustering dendrograms.
+    skip_existing : bool, default=True
         If True, skip if file already exists.
 
     Returns
@@ -52,15 +83,110 @@ def plot_hotspot_local_correlations(
     if plot_exists(filepath, skip_existing):
         return False
 
+    if not hasattr(hotspot_obj, "local_correlation_z") or hotspot_obj.local_correlation_z is None:
+        log_warning(
+            "HotspotPlotting.LocalCorrelations",
+            "No local_correlation_z found in hotspot_obj",
+        )
+        return False
+
+    local_corr = hotspot_obj.local_correlation_z
+    if local_corr.empty:
+        log_warning("HotspotPlotting.LocalCorrelations", "local_correlation_z is empty")
+        return False
+
+    if cmap is None:
+        cmap = getattr(config, "PLOT_DIVERGING_PALETTE", "RdBu_r")
+
+    # Module colors
+    has_modules = hasattr(hotspot_obj, "modules") and hotspot_obj.modules is not None
+    row_colors = None
+    legend_elements = []
+
+    if has_modules:
+        modules = hotspot_obj.modules
+        unique_modules = sorted([m for m in modules.unique() if m != -1])
+        n_modules_total = len(unique_modules)
+        palette_name = getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel")
+        colors = sns.color_palette(palette_name, n_colors=max(n_modules_total, 10))
+
+        module_colors = {
+            m: colors[idx % len(colors)] for idx, m in enumerate(unique_modules)
+        }
+        module_colors[-1] = "#ffffff"
+
+        row_colors = pd.Series(
+            [module_colors.get(modules.get(g, -1), "#ffffff") for g in local_corr.index],
+            index=local_corr.index,
+            name="Module",
+        )
+
+        for m in unique_modules:
+            color = module_colors[m]
+            legend_elements.append(
+                Patch(facecolor=color, edgecolor="k", label=f"Module {m}")
+            )
+
+    linkage_matrix = (
+        _get_hotspot_linkage(hotspot_obj, local_corr) if len(local_corr) > 1 else None
+    )
+
     plt.close("all")
-    hotspot_obj.plot_local_correlations()
-    fig = plt.gcf()
+    clustermap_kwargs: Dict[str, Any] = {
+        "data": local_corr,
+        "cmap": cmap,
+        "center": 0,
+        "vmin": vmin,
+        "vmax": vmax,
+        "xticklabels": False,
+        "yticklabels": False,
+        "rasterized": True,
+        "figsize": figsize,
+        "cbar_kws": {"label": "Local Correlation (Z-score)"},
+    }
+    if linkage_matrix is not None:
+        clustermap_kwargs["row_linkage"] = linkage_matrix
+        clustermap_kwargs["col_linkage"] = linkage_matrix
+    else:
+        clustermap_kwargs["row_cluster"] = False
+        clustermap_kwargs["col_cluster"] = False
+
+    if row_colors is not None:
+        clustermap_kwargs["row_colors"] = row_colors
+
+    g = sns.clustermap(**clustermap_kwargs)
+
+    if not show_dendrogram and linkage_matrix is not None:
+        if hasattr(g, "ax_row_dendrogram") and g.ax_row_dendrogram is not None:
+            g.ax_row_dendrogram.set_visible(False)
+        if hasattr(g, "ax_col_dendrogram") and g.ax_col_dendrogram is not None:
+            g.ax_col_dendrogram.set_visible(False)
+
+    if legend_elements:
+        g.ax_heatmap.legend(
+            handles=legend_elements,
+            loc="upper left",
+            bbox_to_anchor=(1.05, 1),
+            title="Modules",
+            frameon=False,
+            fontsize=9,
+        )
+
+    g.ax_heatmap.set_xlabel("")
+    g.ax_heatmap.set_ylabel("")
+
+    fig = g.fig
 
     return save_plot(
         fig=fig,
         filepath=filepath,
         plot_type="hotspot",
-        metadata={"plot_name": "local_correlations"},
+        metadata={
+            "plot_name": "local_correlations",
+            "cmap": cmap,
+            "vmin": vmin,
+            "vmax": vmax,
+        },
         skip_existing=False,
     )
 
@@ -207,6 +333,11 @@ def plot_hotspot_annotation(
     hotspot_obj,
     gene_sets: List[str] = None,
     top_n_annotations: int = 1,
+    cmap: Optional[str] = None,
+    vmin: float = -8.0,
+    vmax: float = 8.0,
+    figsize: Tuple[int, int] = (12, 12),
+    show_dendrogram: bool = False,
     skip_existing: bool = True,
     n_jobs: Optional[int] = None,
 ) -> bool:
@@ -221,6 +352,17 @@ def plot_hotspot_annotation(
         Gene sets for enrichment analysis. Defaults to ``config.ENRICHMENT_GENE_SETS``.
     top_n_annotations : int
         Number of top annotations per module.
+    cmap : str, optional
+        Diverging colormap for correlation Z-scores. Default uses
+        ``config.PLOT_DIVERGING_PALETTE`` (e.g., "RdBu_r").
+    vmin : float, default=-8.0
+        Minimum value for colorscale (Z-scores).
+    vmax : float, default=8.0
+        Maximum value for colorscale (Z-scores).
+    figsize : tuple of int, default=(12, 12)
+        Figure dimensions (width, height).
+    show_dendrogram : bool, default=False
+        Whether to display hierarchical clustering dendrograms.
     skip_existing : bool
         If True, skip if file already exists.
     n_jobs : int, optional
@@ -242,6 +384,21 @@ def plot_hotspot_annotation(
     if plot_exists(filepath, skip_existing):
         return False
 
+    if not hasattr(hotspot_obj, "local_correlation_z") or hotspot_obj.local_correlation_z is None:
+        log_warning(
+            "HotspotPlotting.Annotation",
+            "No local_correlation_z found in hotspot_obj",
+        )
+        return False
+
+    local_corr = hotspot_obj.local_correlation_z
+    if local_corr.empty:
+        log_warning("HotspotPlotting.Annotation", "local_correlation_z is empty")
+        return False
+
+    if cmap is None:
+        cmap = getattr(config, "PLOT_DIVERGING_PALETTE", "RdBu_r")
+
     print("  Generating annotated local correlation heatmap...")
 
     # Import enrichment analysis
@@ -256,7 +413,7 @@ def plot_hotspot_annotation(
         return False
 
     # Perform enrichment analysis for each module in parallel
-    unique_modules = [m for m in hotspot_obj.modules.unique() if m != -1]
+    unique_modules = sorted([m for m in hotspot_obj.modules.unique() if m != -1])
     tasks = [
         {
             "module": module,
@@ -283,26 +440,28 @@ def plot_hotspot_annotation(
             index=False,
         )
 
-    # Create module colors using a delicate pastel color palette
+    # Create module colors using configured categorical palette
     n_modules_total = len(unique_modules)
-    colors = sns.color_palette(getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel"), n_colors=max(n_modules_total, 10))
+    palette_name = getattr(config, "PLOT_CATEGORICAL_PALETTE", "pastel")
+    colors = sns.color_palette(palette_name, n_colors=max(n_modules_total, 10))
 
     module_colors = {
-        i: colors[(i - 1) % len(colors)] for i in hotspot_obj.modules.unique()
+        m: colors[idx % len(colors)] for idx, m in enumerate(unique_modules)
     }
     module_colors[-1] = "#ffffff"
 
     row_colors1 = pd.Series(
-        [module_colors[i] for i in hotspot_obj.modules],
-        index=hotspot_obj.local_correlation_z.index,
+        [
+            module_colors.get(hotspot_obj.modules.get(g, -1), "#ffffff")
+            for g in local_corr.index
+        ],
+        index=local_corr.index,
+        name="Module",
     )
 
     # Get top annotations for each module
     module_annotations = {}
-    for module in hotspot_obj.modules.unique():
-        if module == -1:
-            module_annotations[module] = ""
-            continue
+    for module in unique_modules:
         if not df_enrichment.empty and module in df_enrichment["module"].values:
             module_df = df_enrichment[df_enrichment["module"] == module]
             if not module_df.empty:
@@ -329,30 +488,45 @@ def plot_hotspot_annotation(
         else:
             module_annotations[module] = "No enrichment"
 
-    # Create the clustermap
-    g = sns.clustermap(
-        hotspot_obj.local_correlation_z,
-        row_linkage=hotspot_obj.linkage,
-        col_linkage=hotspot_obj.linkage,
-        row_colors=row_colors1,
-        cmap="viridis",
-        vmin=-8,
-        vmax=8,
-        xticklabels=False,
-        yticklabels=False,
-        rasterized=True,
-        figsize=(12, 12),
+    linkage_matrix = (
+        _get_hotspot_linkage(hotspot_obj, local_corr) if len(local_corr) > 1 else None
     )
 
-    # Remove dendrograms
-    g.ax_row_dendrogram.set_visible(False)
-    g.ax_col_dendrogram.set_visible(False)
+    plt.close("all")
+    clustermap_kwargs: Dict[str, Any] = {
+        "data": local_corr,
+        "row_colors": row_colors1,
+        "cmap": cmap,
+        "center": 0,
+        "vmin": vmin,
+        "vmax": vmax,
+        "xticklabels": False,
+        "yticklabels": False,
+        "rasterized": True,
+        "figsize": figsize,
+        "cbar_kws": {"label": "Local Correlation (Z-score)"},
+    }
+    if linkage_matrix is not None:
+        clustermap_kwargs["row_linkage"] = linkage_matrix
+        clustermap_kwargs["col_linkage"] = linkage_matrix
+    else:
+        clustermap_kwargs["row_cluster"] = False
+        clustermap_kwargs["col_cluster"] = False
+
+    # Create the clustermap
+    g = sns.clustermap(**clustermap_kwargs)
+
+    # Remove dendrograms if requested
+    if not show_dendrogram and linkage_matrix is not None:
+        if hasattr(g, "ax_row_dendrogram") and g.ax_row_dendrogram is not None:
+            g.ax_row_dendrogram.set_visible(False)
+        if hasattr(g, "ax_col_dendrogram") and g.ax_col_dendrogram is not None:
+            g.ax_col_dendrogram.set_visible(False)
 
     # Create legend
     legend_elements = []
-    for module, color in sorted(module_colors.items()):
-        if module == -1:
-            continue
+    for module in unique_modules:
+        color = module_colors[module]
         annotation = module_annotations.get(module, "")
         if annotation and annotation != "No enrichment":
             if len(annotation) > 50:
@@ -362,14 +536,18 @@ def plot_hotspot_annotation(
             label = f"Module {module}"
         legend_elements.append(Patch(facecolor=color, edgecolor="k", label=label))
 
-    g.ax_heatmap.legend(
-        handles=legend_elements,
-        loc="upper left",
-        bbox_to_anchor=(1.05, 1),
-        title="Modules (Enrichment)",
-        frameon=False,
-        fontsize=8,
-    )
+    if legend_elements:
+        g.ax_heatmap.legend(
+            handles=legend_elements,
+            loc="upper left",
+            bbox_to_anchor=(1.05, 1),
+            title="Modules (Enrichment)",
+            frameon=False,
+            fontsize=8,
+        )
+
+    g.ax_heatmap.set_xlabel("")
+    g.ax_heatmap.set_ylabel("")
 
     fig = g.fig
 
@@ -381,6 +559,9 @@ def plot_hotspot_annotation(
             "plot_name": "annotated_heatmap",
             "gene_sets": gene_sets,
             "top_n_annotations": top_n_annotations,
+            "cmap": cmap,
+            "vmin": vmin,
+            "vmax": vmax,
         },
         skip_existing=False,
     )

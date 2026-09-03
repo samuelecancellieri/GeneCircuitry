@@ -547,6 +547,7 @@ def compute_module_pathway_enrichments(
     gene_sets: Optional[List[str]] = None,
     top_n_terms: int = 3,
     pval_cutoff: float = 0.05,
+    online: Optional[bool] = None,
 ) -> pd.DataFrame:
     """
     Compute functional pathway enrichment for co-expression modules.
@@ -561,6 +562,8 @@ def compute_module_pathway_enrichments(
         Number of top enriched terms to retain per module.
     pval_cutoff : float, default=0.05
         Significance cutoff for Adjusted P-value.
+    online : bool, optional
+        Whether to use the online Enrichr API. Defaults to config.ENRICHMENT_ONLINE.
 
     Returns
     -------
@@ -627,6 +630,7 @@ def compute_module_pathway_enrichments(
                     gene_list=genes,
                     gene_sets=gene_sets,
                     pval_cutoff=pval_cutoff,
+                    online=online,
                 )
                 if enr.results is not None and not enr.results.empty:
                     df_res = enr.results.copy()

@@ -130,6 +130,9 @@ def test_config_types():
     # String values
     string_params = [
         "PLOT_FORMAT",
+        "PLOT_COLOR_PALETTE",
+        "PLOT_CATEGORICAL_PALETTE",
+        "PLOT_DIVERGING_PALETTE",
         "NEIGHBORS_METHOD",
         "NEIGHBORS_METRIC",
         "OUTPUT_DIR",
@@ -142,7 +145,13 @@ def test_config_types():
         assert isinstance(cfg[param], str), f"{param} should be string"
 
     # Boolean values
-    bool_params = ["VERBOSE", "LOW_MEMORY", "FORCE_DIM_REDUCTION", "SAVE_PDF"]
+    bool_params = [
+        "VERBOSE",
+        "LOW_MEMORY",
+        "FORCE_DIM_REDUCTION",
+        "SAVE_PDF",
+        "ENRICHMENT_ONLINE",
+    ]
     for param in bool_params:
         assert isinstance(cfg[param], bool), f"{param} should be boolean"
 
@@ -208,5 +217,28 @@ def test_grn_cell_downsample_update():
 
     # Restore
     config.update_config(GRN_CELL_DOWNSAMPLE=original)
+
+
+def test_enrichment_online_default():
+    """Test that ENRICHMENT_ONLINE has expected default False"""
+    assert config.ENRICHMENT_ONLINE is False
+
+
+def test_enrichment_online_in_get_config():
+    """Test that ENRICHMENT_ONLINE is present in get_config()"""
+    cfg = config.get_config()
+    assert "ENRICHMENT_ONLINE" in cfg
+    assert cfg["ENRICHMENT_ONLINE"] == config.ENRICHMENT_ONLINE
+
+
+def test_enrichment_online_update():
+    """Test updating ENRICHMENT_ONLINE via update_config"""
+    original = config.ENRICHMENT_ONLINE
+
+    config.update_config(ENRICHMENT_ONLINE=True)
+    assert config.ENRICHMENT_ONLINE is True
+
+    # Restore
+    config.update_config(ENRICHMENT_ONLINE=original)
 
 

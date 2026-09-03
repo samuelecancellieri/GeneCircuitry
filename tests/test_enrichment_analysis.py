@@ -20,6 +20,7 @@ import pytest
 import pandas as pd
 import numpy as np
 
+from genecircuitry import config
 from genecircuitry.enrichment_analysis import (
     EnrichmentResult,
     get_bundled_gene_sets_dir,
@@ -31,8 +32,10 @@ from genecircuitry.enrichment_analysis import (
     cache_gene_sets,
     perform_ora_enrichment,
     gseapy_ora_enrichment_analysis,
+    run_enrichr_online,
 )
 from genecircuitry.comparative_analysis import compute_module_pathway_enrichments
+from genecircuitry.pipeline.controller import create_parser
 
 
 @pytest.fixture
@@ -281,4 +284,270 @@ def test_integration_comparative_pathway_enrichments(sample_gene_set_dict):
     m1_rows = df_enr[df_enr["module"] == "Module 1"]
     assert not m1_rows.empty
     assert "Apoptosis" in m1_rows["term"].values[0]
+
+
+# =============================================================================
+# Online Enrichr API Tests
+# =============================================================================
+
+
+class DummyEnrichrObj:
+    """Mock object returned by gseapy.enrichr."""
+
+    def __init__(self, df: pd.DataFrame):
+        self.results = df
+        self.res2d = df
+
+
+def test_perform_ora_enrichment_online_mocked(monkeypatch):
+    """Test online ORA enrichment workflow with mocked gseapy.enrichr."""
+    mock_results = pd.DataFrame(
+        [
+            {
+                "Gene_set": "MSigDB_Hallmark_2020",
+                "Term": "Apoptosis",
+                "Overlap": "4/161",
+                "P-value": 0.0001,
+                "Adjusted P-value": 0.001,
+                "Odds Ratio": 50.0,
+                "Combined Score": 350.0,
+                "Genes": "CASP3;CASP8;BAX;TP53",
+            },
+            {
+                "Gene_set": "MSigDB_Hallmark_2020",
+                "Term": "p53 Pathway",
+                "Overlap": "3/200",
+                "P-value": 0.0005,
+                "Adjusted P-value": 0.002,
+                "Odds Ratio": 30.0,
+                "Combined Score": 200.0,
+                "Genes": "TP53;MDM2;BAX",
+            },
+            {
+                "Gene_set": "MSigDB_Hallmark_2020",
+                "Term": "Insignificant Pathway",
+                "Overlap": "1/200",
+                "P-value": 0.2,
+                "Adjusted P-value": 0.4,
+                "Odds Ratio": 1.5,
+                "Combined Score": 2.0,
+                "Genes": "BAX",
+            },
+        ]
+    )
+
+    calls = []
+
+    def mock_enrichr(gene_list, gene_sets, organism, **kwargs):
+        calls.append(
+            {"gene_list": gene_list, "gene_sets": gene_sets, "organism": organism}
+        )
+        return DummyEnrichrObj(mock_results)
+
+    import gseapy
+
+    monkeypatch.setattr(gseapy, "enrichr", mock_enrichr)
+
+    query = ["TP53", "MDM2", "BAX", "CASP3", "CASP8"]
+    res = perform_ora_enrichment(
+        query,
+        gene_sets=["MSigDB_Hallmark_2020"],
+        pval_cutoff=0.05,
+        online=True,
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["organism"] == "human"
+    assert isinstance(res, EnrichmentResult)
+    assert not res.empty
+    # Insignificant pathway should be filtered out by pval_cutoff=0.05
+    assert len(res.results) == 2
+    assert "Apoptosis" in res.results["Term"].values
+    assert "p53 Pathway" in res.results["Term"].values
+    assert "Insignificant Pathway" not in res.results["Term"].values
+
+
+def test_perform_ora_enrichment_online_via_config(monkeypatch):
+    """Test that setting config.ENRICHMENT_ONLINE=True activates online Enrichr by default."""
+    mock_results = pd.DataFrame(
+        [
+            {
+                "Gene_set": "MSigDB_Hallmark_2020",
+                "Term": "Apoptosis",
+                "Overlap": "3/161",
+                "P-value": 0.001,
+                "Adjusted P-value": 0.01,
+                "Odds Ratio": 40.0,
+                "Combined Score": 180.0,
+                "Genes": "CASP3;BAX;TP53",
+            }
+        ]
+    )
+
+    calls = []
+
+    def mock_enrichr(gene_list, gene_sets, organism, **kwargs):
+        calls.append(True)
+        return DummyEnrichrObj(mock_results)
+
+    import gseapy
+
+    monkeypatch.setattr(gseapy, "enrichr", mock_enrichr)
+
+    # Save original setting
+    original = config.ENRICHMENT_ONLINE
+    try:
+        config.ENRICHMENT_ONLINE = True
+        query = ["TP53", "BAX", "CASP3"]
+        res = perform_ora_enrichment(query)
+        assert len(calls) == 1
+        assert not res.empty
+        assert res.results.iloc[0]["Term"] == "Apoptosis"
+
+        # Also test legacy wrapper gseapy_ora_enrichment_analysis
+        res2 = gseapy_ora_enrichment_analysis(query)
+        assert len(calls) == 2
+        assert not res2.empty
+    finally:
+        config.ENRICHMENT_ONLINE = original
+
+
+def test_online_enrichr_retry_on_429(monkeypatch):
+    """Test that _run_enrichr_online retries on HTTP 429 and succeeds."""
+    mock_results = pd.DataFrame(
+        [
+            {
+                "Gene_set": "MSigDB_Hallmark_2020",
+                "Term": "Apoptosis",
+                "Overlap": "3/161",
+                "P-value": 0.001,
+                "Adjusted P-value": 0.01,
+                "Odds Ratio": 40.0,
+                "Combined Score": 180.0,
+                "Genes": "CASP3;BAX;TP53",
+            }
+        ]
+    )
+
+    call_count = [0]
+
+    def mock_enrichr_rate_limited(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise RuntimeError("HTTP 429: Too Many Requests")
+        return DummyEnrichrObj(mock_results)
+
+    import gseapy
+
+    monkeypatch.setattr(gseapy, "enrichr", mock_enrichr_rate_limited)
+
+    query = ["TP53", "BAX", "CASP3"]
+    res = run_enrichr_online(
+        query,
+        gene_sets=["MSigDB_Hallmark_2020"],
+        max_retries=3,
+        retry_delay=0.01,
+    )
+
+    assert call_count[0] == 2
+    assert not res.empty
+    assert res.results.iloc[0]["Term"] == "Apoptosis"
+
+
+def test_online_enrichr_retry_exhausted(monkeypatch):
+    """Test that _run_enrichr_online raises RuntimeError after exhausting retries."""
+
+    def mock_enrichr_fail(*args, **kwargs):
+        raise RuntimeError("HTTP 429: Rate limit exceeded permanently")
+
+    import gseapy
+
+    monkeypatch.setattr(gseapy, "enrichr", mock_enrichr_fail)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        run_enrichr_online(
+            ["TP53", "BAX"],
+            gene_sets=["MSigDB_Hallmark_2020"],
+            max_retries=2,
+            retry_delay=0.01,
+        )
+
+    assert "Online Enrichr API analysis failed" in str(excinfo.value)
+    assert "config.ENRICHMENT_ONLINE = False" in str(excinfo.value)
+
+
+def test_online_enrichr_cli_flags():
+    """Test that controller argument parser recognizes --enrichment-online and its aliases."""
+    parser = create_parser()
+
+    args1 = parser.parse_args(["--enrichment-online"])
+    assert args1.enrichment_online is True
+
+    args2 = parser.parse_args(["--use-enrichr"])
+    assert args2.enrichment_online is True
+
+    args3 = parser.parse_args(["--online-enrichment"])
+    assert args3.enrichment_online is True
+
+    args_default = parser.parse_args([])
+    assert args_default.enrichment_online is False
+
+
+def test_online_enrichr_comparative_integration(monkeypatch):
+    """Test compute_module_pathway_enrichments with online=True."""
+    mock_results = pd.DataFrame(
+        [
+            {
+                "Gene_set": "MSigDB_Hallmark_2020",
+                "Term": "Apoptosis",
+                "Overlap": "3/161",
+                "P-value": 0.001,
+                "Adjusted P-value": 0.01,
+                "Odds Ratio": 40.0,
+                "Combined Score": 180.0,
+                "Genes": "CASP3;BAX;TP53",
+            }
+        ]
+    )
+
+    calls = []
+
+    def mock_enrichr(*args, **kwargs):
+        calls.append(True)
+        return DummyEnrichrObj(mock_results)
+
+    import gseapy
+
+    monkeypatch.setattr(gseapy, "enrichr", mock_enrichr)
+
+    module_dict = {"1": ["TP53", "BAX", "CASP3", "CASP8", "CASP9"]}
+    df_enr = compute_module_pathway_enrichments(
+        module_dict,
+        gene_sets=["MSigDB_Hallmark_2020"],
+        online=True,
+    )
+
+    assert len(calls) == 1
+    assert not df_enr.empty
+    assert "Apoptosis" in df_enr["term"].values[0]
+
+
+def test_online_enrichr_live_call():
+    """Live test of online Enrichr API (skipped gracefully if no network connection)."""
+    import urllib.request
+
+    try:
+        urllib.request.urlopen("https://maayanlab.cloud/Enrichr/", timeout=3)
+    except Exception:
+        pytest.skip("Online Enrichr API is unreachable, skipping live test.")
+
+    res = run_enrichr_online(
+        ["TP53", "MDM2", "BAX", "CASP3", "CASP8", "FAS", "ATM"],
+        gene_sets=["MSigDB_Hallmark_2020"],
+        pval_cutoff=0.05,
+    )
+    assert isinstance(res, EnrichmentResult)
+    assert not res.empty
+    assert "Term" in res.results.columns
+    assert any("Apoptosis" in t or "p53" in t for t in res.results["Term"].values)
 
