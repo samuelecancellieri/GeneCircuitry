@@ -145,7 +145,6 @@ def test_config_types():
         assert isinstance(cfg[param], str), f"{param} should be string"
 
     # Boolean values
-    bool_params = ["VERBOSE", "LOW_MEMORY", "FORCE_DIM_REDUCTION", "SAVE_PDF"]
     bool_params = [
         "VERBOSE",
         "LOW_MEMORY",
