@@ -95,6 +95,7 @@ tf_info_path = process_scatac_data(
 | `scatac_data`           | `str \| AnnData`  | required                            | Path to `.h5ad`/`.h5mu` or in-memory `AnnData` object  |
 | `species`               | `str`             | `"human"`                           | Species: `"human"` → hg38, `"mouse"` → mm10            |
 | `output_dir`            | `str \| None`     | `config.OUTPUT_DIR`                 | Directory for output files                             |
+| `raw_layer_atac`        | `str \| None`     | `None`                              | Layer for raw counts (or `'raw'`). Auto-detects if None |
 | `coaccess_threshold`    | `str \| float`    | `config.SCATAC_COACCESS_THRESHOLD`  | Cutoff for co-accessible links (e.g. `'0.95q'`, `0.8`)  |
 | `compute_metacells`     | `bool`            | `config.SCATAC_COMPUTE_METACELLS`   | Whether to compute CIRCE metacells before network step |
 | `fpr`                   | `float \| None`   | `config.ATAC_MOTIF_SCAN_FPR`        | False positive rate for motif hit calling              |

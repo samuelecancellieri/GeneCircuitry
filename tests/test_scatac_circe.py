@@ -115,6 +115,64 @@ class TestLoadScAtacData:
         with pytest.raises(TypeError, match="Unsupported type"):
             _load_scatac_data(12345)
 
+    def test_auto_detect_raw_layer_counts(self, dummy_scatac_adata):
+        """Test auto-detecting and extracting raw counts from layers['counts']."""
+        raw_counts = np.array([[10, 20, 30]] * dummy_scatac_adata.n_obs)
+        dummy_scatac_adata.layers["counts"] = raw_counts.copy()
+        dummy_scatac_adata.X = np.log1p(raw_counts)
+
+        loaded = _load_scatac_data(dummy_scatac_adata)
+        np.testing.assert_array_equal(loaded.X, raw_counts)
+
+    def test_auto_detect_raw_layer_raw_counts(self, dummy_scatac_adata):
+        """Test auto-detecting and extracting raw counts from layers['raw_counts']."""
+        raw_counts = np.array([[15, 25, 35]] * dummy_scatac_adata.n_obs)
+        dummy_scatac_adata.layers["raw_counts"] = raw_counts.copy()
+        dummy_scatac_adata.X = np.log1p(raw_counts)
+
+        loaded = _load_scatac_data(dummy_scatac_adata)
+        np.testing.assert_array_equal(loaded.X, raw_counts)
+
+    def test_auto_detect_dot_raw(self, dummy_scatac_adata):
+        """Test auto-detecting and extracting raw counts from adata.raw."""
+        raw_counts = np.array([[100, 200, 300]] * dummy_scatac_adata.n_obs)
+        dummy_scatac_adata.X = raw_counts.copy()
+        dummy_scatac_adata.raw = dummy_scatac_adata
+        dummy_scatac_adata.X = np.log1p(raw_counts)
+
+        loaded = _load_scatac_data(dummy_scatac_adata)
+        np.testing.assert_array_equal(loaded.X, raw_counts)
+
+    def test_explicit_raw_layer_atac(self, dummy_scatac_adata):
+        """Test extracting raw counts from explicitly specified raw_layer_atac."""
+        custom_raw = np.array([[50, 60, 70]] * dummy_scatac_adata.n_obs)
+        dummy_scatac_adata.layers["my_raw_layer"] = custom_raw.copy()
+        dummy_scatac_adata.X = np.zeros_like(custom_raw)
+
+        loaded = _load_scatac_data(dummy_scatac_adata, raw_layer_atac="my_raw_layer")
+        np.testing.assert_array_equal(loaded.X, custom_raw)
+
+    def test_explicit_raw_layer_raw_keyword(self, dummy_scatac_adata):
+        """Test specifying raw_layer_atac='raw' explicitly extracts from adata.raw."""
+        raw_counts = np.array([[77, 88, 99]] * dummy_scatac_adata.n_obs)
+        dummy_scatac_adata.X = raw_counts.copy()
+        dummy_scatac_adata.raw = dummy_scatac_adata
+        dummy_scatac_adata.X = np.zeros_like(raw_counts)
+
+        loaded = _load_scatac_data(dummy_scatac_adata, raw_layer_atac="raw")
+        np.testing.assert_array_equal(loaded.X, raw_counts)
+
+    def test_explicit_raw_layer_not_found_raises(self, dummy_scatac_adata):
+        """Test specifying non-existent raw layer raises ValueError."""
+        with pytest.raises(ValueError, match="Specified raw layer 'non_existent' not found"):
+            _load_scatac_data(dummy_scatac_adata, raw_layer_atac="non_existent")
+
+    def test_fallback_to_X_when_no_raw_present(self, dummy_scatac_adata):
+        """Test keeping adata.X when neither raw layer nor .raw is found."""
+        orig_X = dummy_scatac_adata.X.copy()
+        loaded = _load_scatac_data(dummy_scatac_adata)
+        np.testing.assert_array_equal(loaded.X, orig_X)
+
 
 class TestParseThreshold:
     """Test co-accessibility threshold parsing."""
@@ -324,6 +382,8 @@ class TestControllerScAtacIntegration:
             [
                 "--scatac-data",
                 "test.h5ad",
+                "--raw-layer-atac",
+                "counts",
                 "--scatac-coaccess-threshold",
                 "0.90q",
                 "--scatac-metacells",
@@ -331,6 +391,7 @@ class TestControllerScAtacIntegration:
             ]
         )
         assert args.scatac_data == "test.h5ad"
+        assert args.raw_layer_atac == "counts"
         assert args.scatac_coaccess_threshold == "0.90q"
         assert args.scatac_metacells is True
         assert args.keep_promoter_grn is True
@@ -343,6 +404,7 @@ class TestControllerScAtacIntegration:
         parser = create_parser()
         args = parser.parse_args([
             "--scatac-data", "data.h5ad",
+            "--raw-layer-atac", "counts",
             "--output", str(tmp_path),
             "--scatac-coaccess-threshold", "0.95q",
         ])
@@ -357,6 +419,8 @@ class TestControllerScAtacIntegration:
         # Since keep_promoter_grn is False, no_base_grn should be set to True
         assert controller.args.no_base_grn is True
         mock_process_scatac.assert_called_once()
+        _, call_kwargs = mock_process_scatac.call_args
+        assert call_kwargs["raw_layer_atac"] == "counts"
 
     @patch("genecircuitry.atac_peaks_processing.process_scatac_data")
     def test_controller_scatac_with_keep_promoter_grn(self, mock_process_scatac, tmp_path):

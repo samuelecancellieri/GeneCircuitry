@@ -250,6 +250,9 @@ SCATAC_COMPUTE_METACELLS = False
 SCATAC_KEEP_PROMOTER_GRN = False
 """Whether to augment the promoter base GRN rather than replace it when scATAC data is provided"""
 
+SCATAC_RAW_LAYER = None
+"""Layer name in scATAC AnnData to use for raw counts (default None: auto-detects from layers or .raw)"""
+
 
 # ============================================================================
 # File I/O Configuration
@@ -453,6 +456,7 @@ def get_config():
         "SCATAC_COACCESS_THRESHOLD": SCATAC_COACCESS_THRESHOLD,
         "SCATAC_COMPUTE_METACELLS": SCATAC_COMPUTE_METACELLS,
         "SCATAC_KEEP_PROMOTER_GRN": SCATAC_KEEP_PROMOTER_GRN,
+        "SCATAC_RAW_LAYER": SCATAC_RAW_LAYER,
         # File I/O
         "OUTPUT_DIR": OUTPUT_DIR,
         "CACHE_DIR": CACHE_DIR,

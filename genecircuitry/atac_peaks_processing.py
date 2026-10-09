@@ -30,7 +30,112 @@ from anndata import AnnData
 from genecircuitry import config
 
 
-def _load_scatac_data(scatac_input: Union[str, AnnData]) -> AnnData:
+def _extract_raw_counts(
+    adata: AnnData,
+    raw_layer: Optional[str] = None,
+) -> AnnData:
+    """
+    Ensure the scATAC AnnData has raw counts in .X.
+
+    If raw_layer is specified:
+    - If found in adata.layers, copies adata.layers[raw_layer] into adata.X.
+    - If raw_layer in ('raw', '.raw') and adata.raw is not None, extracts counts from adata.raw.
+    - Otherwise raises ValueError.
+
+    If raw_layer is not specified (default None):
+    - Automatically checks adata.layers for standard raw count names
+      ('raw_counts', 'raw_count', 'raw', 'counts', 'count').
+    - If no candidate layer matches, checks if adata.raw is present.
+    - If any other layer contains 'raw' or 'count', falls back to that layer.
+    - If none found, keeps adata.X as is with an informational note.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Loaded scATAC AnnData object.
+    raw_layer : Optional[str], default None
+        Explicit layer name or 'raw' / '.raw'.
+
+    Returns
+    -------
+    AnnData
+        AnnData object with raw counts in .X.
+    """
+    if raw_layer is not None:
+        raw_layer_clean = raw_layer.strip()
+        if raw_layer_clean in adata.layers:
+            print(f"  ✓ Using raw counts from specified layer '{raw_layer_clean}'")
+            adata.X = adata.layers[raw_layer_clean].copy()
+            return adata
+
+        lower_layers = {k.lower(): k for k in adata.layers.keys()}
+        if raw_layer_clean.lower() in lower_layers:
+            matched = lower_layers[raw_layer_clean.lower()]
+            print(f"  ✓ Using raw counts from specified layer '{matched}'")
+            adata.X = adata.layers[matched].copy()
+            return adata
+
+        if raw_layer_clean.lower() in ("raw", ".raw"):
+            if adata.raw is None:
+                raise ValueError(
+                    f"Specified raw layer '{raw_layer_clean}', but scATAC AnnData has no .raw."
+                )
+            if set(adata.var_names).issubset(set(adata.raw.var_names)):
+                adata.X = adata.raw[:, adata.var_names].X.copy()
+            else:
+                raw_ad = adata.raw.to_adata()
+                for k, v in adata.obsm.items():
+                    if k not in raw_ad.obsm:
+                        raw_ad.obsm[k] = v
+                adata = raw_ad
+            print(f"  ✓ Using raw counts from .raw as requested ('{raw_layer_clean}')")
+            return adata
+
+        raise ValueError(
+            f"Specified raw layer '{raw_layer_clean}' not found in scATAC data. "
+            f"Available layers: {list(adata.layers.keys())}, has .raw: {adata.raw is not None}."
+        )
+
+    # Auto-detection mode (raw_layer is None)
+    candidate_layers = ["raw_counts", "raw_count", "raw", "counts", "count"]
+    lower_layers = {k.lower(): k for k in adata.layers.keys()}
+    for cand in candidate_layers:
+        if cand in lower_layers:
+            matched = lower_layers[cand]
+            print(f"  ✓ Auto-detected and using raw counts from layer '{matched}'")
+            adata.X = adata.layers[matched].copy()
+            return adata
+
+    if adata.raw is not None:
+        if set(adata.var_names).issubset(set(adata.raw.var_names)):
+            adata.X = adata.raw[:, adata.var_names].X.copy()
+        else:
+            raw_ad = adata.raw.to_adata()
+            for k, v in adata.obsm.items():
+                if k not in raw_ad.obsm:
+                    raw_ad.obsm[k] = v
+            adata = raw_ad
+        print("  ✓ Auto-detected and using raw counts from .raw")
+        return adata
+
+    partial_matches = [
+        k for k in adata.layers.keys()
+        if "raw" in k.lower() or "count" in k.lower()
+    ]
+    if partial_matches:
+        matched = partial_matches[0]
+        print(f"  ✓ Auto-detected and using raw counts from layer '{matched}'")
+        adata.X = adata.layers[matched].copy()
+        return adata
+
+    print("  ℹ No raw counts layer or .raw detected; using .X as counts")
+    return adata
+
+
+def _load_scatac_data(
+    scatac_input: Union[str, AnnData],
+    raw_layer_atac: Optional[str] = None,
+) -> AnnData:
     """
     Load single-cell ATAC-seq data from file path or AnnData object.
 
@@ -39,19 +144,27 @@ def _load_scatac_data(scatac_input: Union[str, AnnData]) -> AnnData:
     - AnnData .h5ad file
     - MuData .h5mu file (extracting the 'atac' modality)
 
+    Checks for and extracts raw counts from a layer or .raw, or from
+    the explicitly specified `raw_layer_atac`.
+
     Parameters
     ----------
     scatac_input : Union[str, AnnData]
         Path to .h5ad or .h5mu file, or an in-memory AnnData object.
+    raw_layer_atac : Optional[str], default None
+        Name of layer in AnnData to use for raw counts (or 'raw'/'.raw').
+        If None, automatically checks for layers ('raw_counts', 'counts',
+        'raw') or .raw.
 
     Returns
     -------
     AnnData
-        The loaded scATAC AnnData object.
+        The loaded scATAC AnnData object with raw counts in .X.
     """
     if isinstance(scatac_input, AnnData) or hasattr(scatac_input, "var_names"):
         print("  ✓ Using in-memory scATAC AnnData object")
-        return scatac_input.copy()
+        adata = scatac_input.copy()
+        return _extract_raw_counts(adata, raw_layer=raw_layer_atac)
 
     if not isinstance(scatac_input, str):
         raise TypeError(
@@ -74,11 +187,13 @@ def _load_scatac_data(scatac_input: Union[str, AnnData]) -> AnnData:
         mdata = mu.read_h5mu(scatac_input)
         if "atac" in mdata.mod:
             print("  ✓ Extracted 'atac' modality from MuData")
-            return mdata.mod["atac"].copy()
+            adata = mdata.mod["atac"].copy()
+            return _extract_raw_counts(adata, raw_layer=raw_layer_atac)
         elif len(mdata.mod) == 1:
             mod_key = list(mdata.mod.keys())[0]
             print(f"  Note: using sole modality '{mod_key}' from {scatac_input}")
-            return mdata.mod[mod_key].copy()
+            adata = mdata.mod[mod_key].copy()
+            return _extract_raw_counts(adata, raw_layer=raw_layer_atac)
         else:
             raise ValueError(
                 f"Modalities in {scatac_input}: {list(mdata.mod.keys())}, "
@@ -89,7 +204,8 @@ def _load_scatac_data(scatac_input: Union[str, AnnData]) -> AnnData:
     import scanpy as sc
 
     print(f"  Loading AnnData file: {scatac_input}")
-    return sc.read_h5ad(scatac_input)
+    adata = sc.read_h5ad(scatac_input)
+    return _extract_raw_counts(adata, raw_layer=raw_layer_atac)
 
 
 def _parse_threshold(
@@ -467,6 +583,7 @@ def process_scatac_data(
     scatac_data: Union[str, AnnData],
     species: str = "human",
     output_dir: Optional[str] = None,
+    raw_layer_atac: Optional[str] = None,
     coaccess_threshold: Optional[Union[float, str]] = None,
     compute_metacells: Optional[bool] = None,
     fpr: Optional[float] = None,
@@ -481,7 +598,8 @@ def process_scatac_data(
     and CellOracle motif analysis to generate an enriched TF info matrix.
 
     Pipeline workflow:
-    1. Load scATAC AnnData (.h5ad, .h5mu, or AnnData object)
+    1. Load scATAC AnnData (.h5ad, .h5mu, or AnnData object) and extract raw counts
+       from specified layer, auto-detected layer, or .raw.
     2. Standardize peak format (chr_start_end) and add CIRCE region annotations
     3. (Optional) Compute CIRCE metacells
     4. Compute ATAC co-accessibility network and extract links
@@ -498,6 +616,9 @@ def process_scatac_data(
         Species name ('human' -> hg38, 'mouse' -> mm10).
     output_dir : str, optional
         Directory to save output files. Defaults to config.OUTPUT_DIR.
+    raw_layer_atac : str, optional
+        Layer name in scATAC AnnData containing raw counts (or 'raw' / '.raw').
+        If None, automatically detects raw counts from candidate layers or .raw.
     coaccess_threshold : Union[float, str], optional
         Threshold for filtering co-accessible peak connections.
         Defaults to config.SCATAC_COACCESS_THRESHOLD (e.g. '0.95q').
@@ -523,6 +644,8 @@ def process_scatac_data(
     # Resolve defaults from config
     if output_dir is None:
         output_dir = config.OUTPUT_DIR
+    if raw_layer_atac is None:
+        raw_layer_atac = kwargs.get("raw_layer", config.SCATAC_RAW_LAYER)
     if coaccess_threshold is None:
         coaccess_threshold = config.SCATAC_COACCESS_THRESHOLD
     if compute_metacells is None:
@@ -562,6 +685,7 @@ def process_scatac_data(
             threshold=motif_score_threshold,
             coaccess_threshold=str(coaccess_threshold),
             compute_metacells=compute_metacells,
+            raw_layer_atac=str(raw_layer_atac),
         )
 
     if not force:
@@ -583,7 +707,7 @@ def process_scatac_data(
     ref_genome = _get_ref_genome(species)
     _ensure_genome_installed(ref_genome)
 
-    atac = _load_scatac_data(scatac_data)
+    atac = _load_scatac_data(scatac_data, raw_layer_atac=raw_layer_atac)
 
     if not force and os.path.exists(coaccess_csv_path):
         print(f"\n  [scATAC 1/3] Found existing CIRCE co-accessibility links: {coaccess_csv_path}")

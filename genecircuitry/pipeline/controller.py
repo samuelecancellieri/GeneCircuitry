@@ -352,6 +352,11 @@ class PipelineController:
                 print(f"{'='*70}")
                 print(f"  scATAC data: {scatac_data}")
                 print(f"  Species: {self.args.species}")
+                raw_layer_atac = getattr(
+                    self.args, "raw_layer_atac", config.SCATAC_RAW_LAYER
+                )
+                if raw_layer_atac:
+                    print(f"  Raw counts layer: {raw_layer_atac}")
                 coaccess_thresh = getattr(
                     self.args, "scatac_coaccess_threshold", config.SCATAC_COACCESS_THRESHOLD
                 )
@@ -365,6 +370,7 @@ class PipelineController:
                     scatac_data=scatac_data,
                     species=self.args.species,
                     output_dir=output_dir,
+                    raw_layer_atac=raw_layer_atac,
                     coaccess_threshold=coaccess_thresh,
                     compute_metacells=compute_metacells,
                     fpr=config.ATAC_MOTIF_SCAN_FPR,
@@ -2287,6 +2293,12 @@ Examples:
         help="Path to single-cell ATAC-seq data (.h5ad or .h5mu). "
         "When provided, cis-coaccessibility is inferred using CIRCE and "
         "integrated with CellOracle motif analysis to generate a custom base GRN.",
+    )
+    parser.add_argument(
+        "--raw-layer-atac",
+        type=str,
+        default=config.SCATAC_RAW_LAYER,
+        help="Layer name in scATAC AnnData to use for raw counts (or 'raw'/'.raw', default: auto-detect from layers or .raw)",
     )
     parser.add_argument(
         "--scatac-coaccess-threshold",
