@@ -736,7 +736,7 @@ def process_scatac_data(
             print("  Skipping metacell aggregation (using single cells)")
 
         print("  Inferring cis-coaccessibility network with CIRCE...")
-        ci.compute_atac_network(atac)
+        ci.compute_atac_network(atac,n_jobs=config.GRN_N_JOBS)
         circe_network = ci.extract_atac_links(atac)
         circe_network = circe_network.rename(columns={"score": "coaccess"})
         circe_network.to_csv(coaccess_csv_path, index=False)
