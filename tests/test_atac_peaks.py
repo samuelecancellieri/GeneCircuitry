@@ -2,12 +2,25 @@
 
 import os
 import pickle
+import sys
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+
+mock_celloracle = MagicMock()
+mock_ma = MagicMock()
+mock_celloracle.motif_analysis = mock_ma
+sys.modules.setdefault("celloracle", mock_celloracle)
+sys.modules.setdefault("celloracle.motif_analysis", mock_ma)
+
+mock_gimme = MagicMock()
+mock_gimme_motif = MagicMock()
+mock_gimme.motif = mock_gimme_motif
+sys.modules.setdefault("gimmemotifs", mock_gimme)
+sys.modules.setdefault("gimmemotifs.motif", mock_gimme_motif)
 
 from genecircuitry.atac_peaks_processing import process_atac_peaks
 from genecircuitry.pipeline.controller import (

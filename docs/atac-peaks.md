@@ -73,6 +73,58 @@ Path (str) to the saved TF info pickle file (e.g. `output/atac/enriched_motifs.p
 
 ---
 
+## `process_scatac_data()` (CIRCE Co-Accessibility)
+
+Infers cis-regulatory co-accessibility networks directly from single-cell ATAC-seq data using [CIRCE](https://circe.readthedocs.io/en/latest/examples/4_circe_celloracle_tutorial.html) and converts them into a custom base GRN for CellOracle.
+
+```python
+from genecircuitry.atac_peaks_processing import process_scatac_data
+
+tf_info_path = process_scatac_data(
+    scatac_data="data/pbmc_scatac.h5ad",   # path to .h5ad, .h5mu, or AnnData object
+    species="human",                       # "human" (hg38) or "mouse" (mm10)
+    coaccess_threshold="0.95q",           # top 5% quantile (or float score like 0.8)
+    compute_metacells=False,              # whether to compute CIRCE metacells first
+)
+```
+
+### Parameters
+
+| Parameter               | Type              | Default                             | Description                                            |
+| ----------------------- | ----------------- | ----------------------------------- | ------------------------------------------------------ |
+| `scatac_data`           | `str \| AnnData`  | required                            | Path to `.h5ad`/`.h5mu` or in-memory `AnnData` object  |
+| `species`               | `str`             | `"human"`                           | Species: `"human"` → hg38, `"mouse"` → mm10            |
+| `output_dir`            | `str \| None`     | `config.OUTPUT_DIR`                 | Directory for output files                             |
+| `coaccess_threshold`    | `str \| float`    | `config.SCATAC_COACCESS_THRESHOLD`  | Cutoff for co-accessible links (e.g. `'0.95q'`, `0.8`)  |
+| `compute_metacells`     | `bool`            | `config.SCATAC_COMPUTE_METACELLS`   | Whether to compute CIRCE metacells before network step |
+| `fpr`                   | `float \| None`   | `config.ATAC_MOTIF_SCAN_FPR`        | False positive rate for motif hit calling              |
+| `motif_score_threshold` | `int \| None`     | `config.ATAC_MOTIF_SCORE_THRESHOLD` | Minimum motif score to keep                            |
+
+### CIRCE scATAC Workflow
+
+```
+scATAC AnnData (.h5ad / .h5mu)
+    │
+    ▼ (1) Standardize peak format (chr_start_end) & add region infos
+CIRCE region annotations
+    │
+    ▼ (2) (Optional) compute_metacells()
+    │
+    ▼ (3) compute_atac_network() & extract_atac_links()
+Cis-coaccessibility network (Peak1, Peak2, coaccess)
+    │
+    ▼ (4) Integrate TSS peaks & filter by coaccess_threshold (default 0.95q)
+TSS-connected regulatory peaks (peak_id, gene_short_name)
+    │
+    ▼ (5) TFinfo scanning & score filtering
+Enriched TF motif matrix
+    │
+    ▼ (6) Save as PKL
+tf_info.pkl → CellOracle base GRN (replaces promoter base GRN by default)
+```
+
+---
+
 ## Full pipeline workflow
 
 ```

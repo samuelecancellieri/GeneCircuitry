@@ -231,8 +231,8 @@ class PipelineController:
             "PipelineController",
             "INITIALIZED",
             {
-                "output_dir": args.output,
-                "stratification_key": args.cluster_key_stratification,
+                "output_dir": getattr(args, "output", config.OUTPUT_DIR),
+                "stratification_key": getattr(args, "cluster_key_stratification", None),
             },
         )
 
@@ -321,11 +321,15 @@ class PipelineController:
             raise
 
     def run_step_atac_peaks(self, log_dir=None):
-        """Execute ATAC Peaks Processing step.
+        """Execute ATAC Peaks / scATAC Processing step.
 
-        Processes a BED file with pre-called ATAC peaks through CellOracle
-        motif analysis to generate an enriched TF info matrix (PKL). The
-        resulting PKL path is stored so CellOracle can use it as a custom
+        Processes either:
+        1. A single-cell ATAC-seq AnnData/MuData file (--scatac-data) via CIRCE
+           co-accessibility inference and CellOracle motif scanning.
+        2. A BED file with pre-called ATAC peaks (--atac-peaks) through CellOracle
+           motif analysis.
+
+        The resulting PKL path is stored so CellOracle can use it as a custom
         base GRN instead of the default promoter-based one.
         """
         log_step("Controller.ATACPeaks", "STARTED")
@@ -333,12 +337,56 @@ class PipelineController:
             if log_dir is None:
                 log_dir = self.log_dir
 
-            bed_path = self.args.atac_peaks
-            if not bed_path:
-                log_step("Controller.ATACPeaks", "SKIPPED", {"reason": "no BED file"})
+            scatac_data = getattr(self.args, "scatac_data", None)
+            bed_path = getattr(self.args, "atac_peaks", None)
+
+            if not bed_path and not scatac_data:
+                log_step("Controller.ATACPeaks", "SKIPPED", {"reason": "no BED file or scATAC data"})
                 return None
 
             output_dir = getattr(self.args, "output", config.OUTPUT_DIR)
+
+            if scatac_data:
+                print(f"\n{'='*70}")
+                print("STEP 3.5: scATAC-seq CIRCE Processing")
+                print(f"{'='*70}")
+                print(f"  scATAC data: {scatac_data}")
+                print(f"  Species: {self.args.species}")
+                coaccess_thresh = getattr(
+                    self.args, "scatac_coaccess_threshold", config.SCATAC_COACCESS_THRESHOLD
+                )
+                print(f"  Co-accessibility threshold: {coaccess_thresh}")
+                compute_metacells = getattr(self.args, "scatac_metacells", False)
+                print(f"  Compute metacells: {compute_metacells}")
+
+                from genecircuitry.atac_peaks_processing import process_scatac_data
+
+                dict_pkl_path = process_scatac_data(
+                    scatac_data=scatac_data,
+                    species=self.args.species,
+                    output_dir=output_dir,
+                    coaccess_threshold=coaccess_thresh,
+                    compute_metacells=compute_metacells,
+                    fpr=config.ATAC_MOTIF_SCAN_FPR,
+                    motif_score_threshold=config.ATAC_MOTIF_SCORE_THRESHOLD,
+                    log_dir=log_dir,
+                    n_jobs=getattr(self.args, "n_jobs", config.N_JOBS),
+                )
+
+                # Set no_base_grn=True by default unless user asked to keep promoter GRN
+                if not getattr(self.args, "keep_promoter_grn", False):
+                    self.args.no_base_grn = True
+                    print("  ℹ CIRCE scATAC base GRN will replace default promoter base GRN in CellOracle.")
+                else:
+                    print("  ℹ CIRCE scATAC base GRN will augment promoter base GRN (--keep-promoter-grn).")
+
+                self.atac_peaks_pkl = dict_pkl_path
+                log_step(
+                    "Controller.ATACPeaks",
+                    "COMPLETED_SCATAC",
+                    {"pkl_path": dict_pkl_path},
+                )
+                return dict_pkl_path
 
             print(f"\n{'='*70}")
             print("STEP 3.5: ATAC Peaks Processing")
@@ -767,8 +815,10 @@ class PipelineController:
         if "stratification" in steps:
             self.run_step_stratification()
 
-        # Process ATAC peaks (before CellOracle, applies to all modes)
-        if "atac_peaks" in steps and self.args.atac_peaks:
+        # Process ATAC peaks or scATAC data (before CellOracle, applies to all modes)
+        if "atac_peaks" in steps and (
+            self.args.atac_peaks or getattr(self.args, "scatac_data", None)
+        ):
             self.run_step_atac_peaks()
 
         # Process stratified or non-stratified
@@ -2229,6 +2279,34 @@ Examples:
         help="Path to BED file with pre-called ATAC peaks. "
         "When provided, peaks are processed through CellOracle motif analysis "
         "to generate an enriched TF info matrix used as custom base GRN.",
+    )
+    parser.add_argument(
+        "--scatac-data",
+        type=str,
+        default=None,
+        help="Path to single-cell ATAC-seq data (.h5ad or .h5mu). "
+        "When provided, cis-coaccessibility is inferred using CIRCE and "
+        "integrated with CellOracle motif analysis to generate a custom base GRN.",
+    )
+    parser.add_argument(
+        "--scatac-coaccess-threshold",
+        type=str,
+        default=config.SCATAC_COACCESS_THRESHOLD,
+        help="Co-accessibility filtering threshold for CIRCE peak connections "
+        f"(e.g. '0.95q' for top 5%% quantile or absolute float score, default: {config.SCATAC_COACCESS_THRESHOLD})",
+    )
+    parser.add_argument(
+        "--scatac-metacells",
+        action="store_true",
+        default=False,
+        help="Compute CIRCE metacells before network inference to handle sparsity (default: False)",
+    )
+    parser.add_argument(
+        "--keep-promoter-grn",
+        action="store_true",
+        default=False,
+        help="When --scatac-data is supplied, augment the default promoter base GRN "
+        "rather than replacing it entirely (default: False, scATAC replaces promoter base GRN)",
     )
     parser.add_argument(
         "--no-base-grn",

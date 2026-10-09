@@ -129,6 +129,7 @@ __all__ = [
     "preprocessing",
     "celloracle_processing",
     "hotspot_processing",
+    "atac_peaks_processing",
     "grn_deep_analysis",
     "config",
     "reporting",

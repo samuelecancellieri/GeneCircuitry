@@ -185,13 +185,12 @@ def create_oracle_object(
             f"Loading TG to TF dictionary from: {TG_to_TF_dictionary} and "
             "importing as TF data since --no-base-grn is set"
         )
-        TG_to_TF_dictionary_open = pickle.load(
-            open(
-                TG_to_TF_dictionary,
-                "rb",
-            )
-        )
-        oracle.import_TF_data(TFdict=TG_to_TF_dictionary_open)
+        with open(TG_to_TF_dictionary, "rb") as f:
+            TG_to_TF_dictionary_open = pickle.load(f)
+        if isinstance(TG_to_TF_dictionary_open, pd.DataFrame):
+            oracle.import_TF_data(TF_info_matrix=TG_to_TF_dictionary_open)
+        else:
+            oracle.import_TF_data(TFdict=TG_to_TF_dictionary_open)
     elif no_base_grn and TG_to_TF_dictionary is None:
         print(
             "⚠ Warning: --no-base-grn is set but no TG_to_TF_dictionary "
@@ -202,15 +201,16 @@ def create_oracle_object(
         print(
             f"Loading TG to TF dictionary from: {TG_to_TF_dictionary} to enhance base GRN"
         )
-        # Load the TG to TF dictionary
-        TG_to_TF_dictionary = pickle.load(
-            open(
-                TG_to_TF_dictionary,
-                "rb",
-            )
-        )
-        # Add the TG to TF dictionary to the oracle object
-        oracle.addTFinfo_dictionary(TG_to_TF_dictionary)
+        with open(TG_to_TF_dictionary, "rb") as f:
+            loaded_tf_info = pickle.load(f)
+        if isinstance(loaded_tf_info, pd.DataFrame):
+            if hasattr(oracle, "addTFinfo_dataframe"):
+                oracle.addTFinfo_dataframe(loaded_tf_info)
+            else:
+                # Fallback if method doesn't exist
+                oracle.import_TF_data(TF_info_matrix=loaded_tf_info)
+        else:
+            oracle.addTFinfo_dictionary(loaded_tf_info)
 
     return oracle
 

@@ -232,7 +232,7 @@ ENRICHMENT_ONLINE = False
 """Whether to use the online Enrichr API for enrichment analysis instead of local ORA calculation"""
 
 # ============================================================================
-# ATAC Peaks Processing Configuration
+# ATAC Peaks & scATAC (CIRCE) Processing Configuration
 # ============================================================================
 
 ATAC_MOTIF_SCAN_FPR = 0.02
@@ -240,6 +240,15 @@ ATAC_MOTIF_SCAN_FPR = 0.02
 
 ATAC_MOTIF_SCORE_THRESHOLD = 10
 """Minimum motif score threshold for filtering enriched motifs"""
+
+SCATAC_COACCESS_THRESHOLD = "0.95q"
+"""Default co-accessibility threshold for CIRCE peak connections (quantile like '0.95q' or absolute float)"""
+
+SCATAC_COMPUTE_METACELLS = False
+"""Whether to compute CIRCE metacells before network inference"""
+
+SCATAC_KEEP_PROMOTER_GRN = False
+"""Whether to augment the promoter base GRN rather than replace it when scATAC data is provided"""
 
 
 # ============================================================================
@@ -438,9 +447,12 @@ def get_config():
         "ENRICHMENT_BACKGROUND": ENRICHMENT_BACKGROUND,
         "ENRICHMENT_SPECIES": ENRICHMENT_SPECIES,
         "ENRICHMENT_ONLINE": ENRICHMENT_ONLINE,
-        # ATAC Peaks
+        # ATAC Peaks & scATAC
         "ATAC_MOTIF_SCAN_FPR": ATAC_MOTIF_SCAN_FPR,
         "ATAC_MOTIF_SCORE_THRESHOLD": ATAC_MOTIF_SCORE_THRESHOLD,
+        "SCATAC_COACCESS_THRESHOLD": SCATAC_COACCESS_THRESHOLD,
+        "SCATAC_COMPUTE_METACELLS": SCATAC_COMPUTE_METACELLS,
+        "SCATAC_KEEP_PROMOTER_GRN": SCATAC_KEEP_PROMOTER_GRN,
         # File I/O
         "OUTPUT_DIR": OUTPUT_DIR,
         "CACHE_DIR": CACHE_DIR,
