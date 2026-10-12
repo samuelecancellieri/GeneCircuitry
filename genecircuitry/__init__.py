@@ -29,14 +29,33 @@ except _PkgNotFound:
     __version__ = "0.2.2"  # fallback for editable / source installs
 __author__ = "Samuele Cancellieri"
 
+import os as _os
 import warnings as _warnings
 
-# Suppress deprecated pkg_resources warning emitted by upstream dependencies (e.g., louvain)
+# Suppress deprecated pkg_resources warning and pandas/scanpy deprecations
+# emitted by upstream dependencies (e.g., louvain, celloracle, gimmemotifs)
 _warnings.filterwarnings(
     "ignore",
     message=".*pkg_resources is deprecated as an API.*",
     category=UserWarning,
 )
+_warnings.filterwarnings(
+    "ignore",
+    message=".*is_categorical_dtype is deprecated.*",
+    category=FutureWarning,
+)
+
+# Propagate warning suppression to child worker processes (multiprocessing, joblib/loky)
+_curr_pw = _os.environ.get("PYTHONWARNINGS", "")
+_new_filters = [
+    "ignore:.*pkg_resources is deprecated as an API.*:UserWarning",
+    "ignore:.*is_categorical_dtype is deprecated.*:FutureWarning",
+]
+_active_filters = [f for f in _curr_pw.split(",") if f]
+for _f in _new_filters:
+    if _f not in _active_filters:
+        _active_filters.append(_f)
+_os.environ["PYTHONWARNINGS"] = ",".join(_active_filters)
 
 # Import core modules
 from . import config

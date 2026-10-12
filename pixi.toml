@@ -63,7 +63,7 @@ genecircuitry = { path = ".", editable = true }
 # resolve against the env's libstdc++ rather than the (older) system one.
 # Fixes: GLIBCXX_3.4.30 not found on RHEL/CentOS 7/8 hosts.
 [activation]
-env = { LD_LIBRARY_PATH = "$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" }
+env = { LD_LIBRARY_PATH = "$CONDA_PREFIX/lib:$LD_LIBRARY_PATH", PYTHONWARNINGS = "ignore:.*pkg_resources is deprecated as an API.*:UserWarning" }
 
 # ── Development feature (pytest, linting, type checking) ─────────────────────
 [feature.dev.dependencies]

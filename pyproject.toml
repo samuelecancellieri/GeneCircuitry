@@ -96,4 +96,6 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 filterwarnings = [
     "ignore:.*pkg_resources is deprecated as an API.*:UserWarning",
+    "ignore:.*is_categorical_dtype is deprecated.*:FutureWarning",
+    "ignore:.*Series.__getitem__ treating keys as a position is deprecated.*:FutureWarning",
 ]
