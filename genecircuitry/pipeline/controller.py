@@ -226,6 +226,8 @@ class PipelineController:
         self.adata_stratification_list = []
         self.stratification_results = []
         self.atac_peaks_pkl = None
+        self.scatac = None
+        self.scatac_list = []
 
         log_step(
             "PipelineController",
@@ -271,15 +273,46 @@ class PipelineController:
         try:
             if self.adata_preprocessed is None:
                 raise ValueError("Data not preprocessed. Run step_preprocessing first.")
-            self.adata_list, self.adata_stratification_list = stratification_pipeline(
-                self.adata_preprocessed,
-                self.args.cluster_key_stratification,
-                self.args.clusters,
-            )
+
+            scatac_data = getattr(self.args, "scatac_data", None)
+            raw_layer_atac = getattr(self.args, "raw_layer_atac", None)
+
+            if scatac_data:
+                strat_res = stratification_pipeline(
+                    self.adata_preprocessed,
+                    self.args.cluster_key_stratification,
+                    self.args.clusters,
+                    scatac=scatac_data,
+                    raw_layer_atac=raw_layer_atac,
+                )
+                self.adata_list, self.adata_stratification_list, scatac_list = strat_res
+                if scatac_list:
+                    self.scatac_list = scatac_list
+                    # Update preprocessed data with common cells that were retained
+                    common_cells = [
+                        c
+                        for c in self.adata_preprocessed.obs_names
+                        if any(c in sub.obs_names for sub in self.adata_list)
+                    ]
+                    if common_cells and len(common_cells) < self.adata_preprocessed.n_obs:
+                        self.adata_preprocessed = self.adata_preprocessed[common_cells].copy()
+                else:
+                    self.scatac_list = []
+            else:
+                self.adata_list, self.adata_stratification_list = stratification_pipeline(
+                    self.adata_preprocessed,
+                    self.args.cluster_key_stratification,
+                    self.args.clusters,
+                )
+                self.scatac_list = []
+
             log_step(
                 "Controller.Stratification",
                 "COMPLETED",
-                {"n_stratifications": len(self.adata_list)},
+                {
+                    "n_stratifications": len(self.adata_list),
+                    "is_multiome_paired": bool(self.scatac_list),
+                },
             )
             return self.adata_list, self.adata_stratification_list
         except Exception as e:
@@ -342,6 +375,15 @@ class PipelineController:
 
             if not bed_path and not scatac_data:
                 log_step("Controller.ATACPeaks", "SKIPPED", {"reason": "no BED file or scATAC data"})
+                return None
+
+            # If stratified scATAC is active (paired multiome), skip global CIRCE in favor of per-stratification base GRNs
+            if scatac_data and getattr(self, "scatac_list", None) and len(self.scatac_list) > 0:
+                print(
+                    "\n  ℹ Stratified scATAC analysis is enabled (paired multiome); "
+                    "skipping global CIRCE processing in favor of per-stratification base GRNs."
+                )
+                log_step("Controller.ATACPeaks", "SKIPPED", {"reason": "stratified scATAC active"})
                 return None
 
             output_dir = getattr(self.args, "output", config.OUTPUT_DIR)
@@ -462,7 +504,12 @@ class PipelineController:
             raise
 
     def run_step_celloracle(
-        self, adata, log_dir=None, hotspot_genes_path=None, cluster_key=None
+        self,
+        adata,
+        log_dir=None,
+        hotspot_genes_path=None,
+        cluster_key=None,
+        tf_dictionary=None,
     ):
         """Execute Step 4: CellOracle."""
         log_step("Controller.CellOracle", "STARTED")
@@ -476,16 +523,17 @@ class PipelineController:
             if len(parsed) > 1 and all(k in adata.obs.columns for k in parsed):
                 adata, cluster_key = resolve_cluster_key(adata, cluster_key)
 
-            # Determine TF dictionary: ATAC peaks PKL takes
+            # Determine TF dictionary: explicit argument or ATAC peaks PKL takes
             # priority over --tf-dictionary CLI argument
-            tf_dictionary = self.args.tf_dictionary
-            if hasattr(self, "atac_peaks_pkl") and self.atac_peaks_pkl:
-                tf_dictionary = self.atac_peaks_pkl
-                log_step(
-                    "Controller.CellOracle",
-                    "USING_ATAC_PEAKS_AS_TF_DICT",
-                    {"tf_dictionary": tf_dictionary},
-                )
+            if tf_dictionary is None:
+                tf_dictionary = self.args.tf_dictionary
+                if hasattr(self, "atac_peaks_pkl") and self.atac_peaks_pkl:
+                    tf_dictionary = self.atac_peaks_pkl
+                    log_step(
+                        "Controller.CellOracle",
+                        "USING_ATAC_PEAKS_AS_TF_DICT",
+                        {"tf_dictionary": tf_dictionary},
+                    )
 
             result = celloracle_pipeline(
                 adata,
@@ -597,7 +645,9 @@ class PipelineController:
             print(f"  ⚠ Report generation failed ({type(e).__name__}): {e}")
             return {}
 
-    def process_single_stratification(self, adata_cluster, stratification_name):
+    def process_single_stratification(
+        self, adata_cluster, stratification_name, scatac_cluster=None
+    ):
         """Process a single stratified dataset."""
         log_step(
             "Controller.Stratification.Process",
@@ -606,7 +656,7 @@ class PipelineController:
         )
         try:
             return self._process_single_stratification_impl(
-                adata_cluster, stratification_name
+                adata_cluster, stratification_name, scatac_cluster=scatac_cluster
             )
         except Exception as e:
             log_error(f"Controller.Stratification.Process({stratification_name})", e)
@@ -626,7 +676,9 @@ class PipelineController:
             print("  Continuing with remaining stratifications...")
             return None
 
-    def _process_single_stratification_impl(self, adata_cluster, stratification_name):
+    def _process_single_stratification_impl(
+        self, adata_cluster, stratification_name, scatac_cluster=None
+    ):
         """Internal implementation for processing a single stratified dataset."""
         # Create stratified folder INSIDE the main output directory
         stratified_output_dir = os.path.join(
@@ -651,6 +703,42 @@ class PipelineController:
             FIGURES_DIR_GRN=os.path.join(stratified_figures_dir, "grn"),
             FIGURES_DIR_HOTSPOT=os.path.join(stratified_figures_dir, "hotspot"),
         )
+
+        # Process stratified scATAC if provided
+        strat_tf_dict = None
+        if scatac_cluster is not None:
+            print(f"\n{'='*70}")
+            print(
+                f"Stratification '{stratification_name}': Processing scATAC subset "
+                f"({scatac_cluster.n_obs} cells)"
+            )
+            print(f"{'='*70}")
+            from genecircuitry.atac_peaks_processing import process_scatac_data
+
+            raw_layer_atac = getattr(
+                self.args, "raw_layer_atac", config.SCATAC_RAW_LAYER
+            )
+            coaccess_thresh = getattr(
+                self.args,
+                "scatac_coaccess_threshold",
+                config.SCATAC_COACCESS_THRESHOLD,
+            )
+            compute_metacells = getattr(self.args, "scatac_metacells", False)
+
+            strat_tf_dict = process_scatac_data(
+                scatac_data=scatac_cluster,
+                species=self.args.species,
+                output_dir=stratified_output_dir,
+                raw_layer_atac=raw_layer_atac,
+                coaccess_threshold=coaccess_thresh,
+                compute_metacells=compute_metacells,
+                fpr=config.ATAC_MOTIF_SCAN_FPR,
+                motif_score_threshold=config.ATAC_MOTIF_SCORE_THRESHOLD,
+                log_dir=stratified_log_dir,
+                n_jobs=getattr(self.args, "n_jobs", config.N_JOBS),
+            )
+            if not getattr(self.args, "keep_promoter_grn", False):
+                self.args.no_base_grn = True
 
         # Resolve cluster key on adata_cluster if multi-key
         parsed = parse_cluster_keys(self.args.cluster_key)
@@ -677,6 +765,7 @@ class PipelineController:
                 adata_clustered,
                 log_dir=stratified_log_dir,
                 cluster_key=resolved_cluster_key,
+                tf_dictionary=strat_tf_dict,
             )
             hotspot_result = self.run_step_hotspot(
                 adata_clustered,
@@ -700,6 +789,7 @@ class PipelineController:
                 log_dir=stratified_log_dir,
                 hotspot_genes_path=hotspot_genes_path,
                 cluster_key=resolved_cluster_key,
+                tf_dictionary=strat_tf_dict,
             )
 
         # Generate summary
@@ -749,11 +839,16 @@ class PipelineController:
         )
         results = []
         failed = []
-        for adata_cluster, stratification_name in zip(
-            self.adata_list, self.adata_stratification_list
+        has_strat_scatac = bool(
+            getattr(self, "scatac_list", None)
+            and len(self.scatac_list) == len(self.adata_list)
+        )
+        for idx, (adata_cluster, stratification_name) in enumerate(
+            zip(self.adata_list, self.adata_stratification_list)
         ):
+            scatac_cluster = self.scatac_list[idx] if has_strat_scatac else None
             result = self.process_single_stratification(
-                adata_cluster, stratification_name
+                adata_cluster, stratification_name, scatac_cluster=scatac_cluster
             )
             if result is not None:
                 results.append(result)
@@ -1265,15 +1360,33 @@ def preprocessing_pipeline(adata, name=None, skip_qc=False, log_dir=None):
         raise
 
 
-def stratification_pipeline(adata, cluster_key_stratification=None, clusters="all"):
+def stratification_pipeline(
+    adata,
+    cluster_key_stratification=None,
+    clusters="all",
+    scatac=None,
+    raw_layer_atac=None,
+):
     """Perform stratification based on specified clustering key(s).
 
     Supports single keys, comma-separated key strings (e.g. 'key1,key2'),
     or sequences/lists of keys (e.g. ['key1', 'key2']).
+
+    When a scATAC dataset (scatac) is provided:
+    - If cell barcodes overlap with adata: both modalities are filtered to the
+      exact intersection of cell barcodes, and each stratification group yields
+      both the scRNA AnnData and the corresponding scATAC AnnData subset.
+      Returns (adata_list, adata_stratification_list, scatac_list).
+    - If 0 cell barcodes overlap: datasets are treated as unpaired / non-multiome,
+      a prominent notice is logged, adata is stratified normally, and scatac is
+      not stratified. Returns (adata_list, adata_stratification_list, None).
+    - If scatac is None: returns (adata_list, adata_stratification_list).
     """
     keys = parse_cluster_keys(cluster_key_stratification)
     if not keys:
         print("\nNo stratification performed (no valid clustering key provided).")
+        if scatac is not None:
+            return [], [], None
         return [], []
 
     missing = [k for k in keys if k not in adata.obs.columns]
@@ -1281,6 +1394,8 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
         print(
             f"\nNo stratification performed (stratification key(s) {missing} not found in adata.obs)."
         )
+        if scatac is not None:
+            return [], [], None
         return [], []
 
     print(f"\n{'='*70}")
@@ -1289,6 +1404,46 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
 
     if adata.is_view:
         adata = adata.copy()
+
+    # Multi-modal handling when scatac dataset is supplied
+    has_paired_scatac = False
+    scatac_ad = None
+    if scatac is not None:
+        from genecircuitry.atac_peaks_processing import _load_scatac_data
+
+        scatac_ad = _load_scatac_data(scatac, raw_layer_atac=raw_layer_atac)
+
+        # Check cell barcode overlap
+        rna_barcodes = set(adata.obs_names)
+        atac_barcodes = set(scatac_ad.obs_names)
+        common_barcodes = rna_barcodes.intersection(atac_barcodes)
+        common_cells = [c for c in adata.obs_names if c in common_barcodes]
+
+        if len(common_cells) > 0:
+            has_paired_scatac = True
+            print(
+                f"  ✓ Multi-modal cell intersection: {len(common_cells)} common cells "
+                f"found across scRNA ({adata.n_obs} cells) and scATAC ({scatac_ad.n_obs} cells)."
+            )
+            if len(common_cells) < adata.n_obs:
+                print(
+                    f"    Filtered scRNA dataset: {adata.n_obs} → {len(common_cells)} cells "
+                    f"(dropped {adata.n_obs - len(common_cells)} cells absent in scATAC)."
+                )
+            if len(common_cells) < scatac_ad.n_obs:
+                print(
+                    f"    Filtered scATAC dataset: {scatac_ad.n_obs} → {len(common_cells)} cells "
+                    f"(dropped {scatac_ad.n_obs - len(common_cells)} cells absent in scRNA)."
+                )
+            adata = adata[common_cells].copy()
+            scatac_ad = scatac_ad[common_cells].copy()
+        else:
+            print(
+                f"\n  ℹ Notice: 0 common cell barcodes found between scRNA ({adata.n_obs} cells) "
+                f"and scATAC ({scatac_ad.n_obs} cells).\n"
+                "    This indicates the datasets are not from a multiome assay, but from independent/unpaired experiments.\n"
+                "    scATAC dataset will not be stratified; the entire scATAC dataset will be used globally for CIRCE co-accessibility."
+            )
 
     # Ensure all stratification columns are categorical to avoid str/numeric conflicts
     for k in keys:
@@ -1368,6 +1523,7 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
         else:
             unique_clusters = list(categories)
 
+        scatac_list = list() if has_paired_scatac else None
         for cluster in unique_clusters:
             mask = (adata.obs[key] == cluster).values
             if not mask.any():
@@ -1377,10 +1533,21 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
             # Convert to string for folder naming (handles numeric cluster IDs)
             strat_name = str(cluster).replace(" ", "_")
             adata_stratification_list.append(strat_name)
+
+            if has_paired_scatac:
+                scatac_cluster = scatac_ad[adata_cluster.obs_names].copy()
+                if scatac_cluster.n_obs < 10:
+                    print(
+                        f"    ⚠ Warning: scATAC subset for cluster '{cluster}' has very few cells ({scatac_cluster.n_obs} cells)."
+                    )
+                scatac_list.append(scatac_cluster)
+
             print(
                 f"  ✓ Cluster '{cluster}': {adata_cluster.n_obs} cells × {adata_cluster.n_vars} genes"
             )
 
+        if scatac is not None:
+            return adata_list, adata_stratification_list, scatac_list
         return adata_list, adata_stratification_list
     else:
         # Multi-key stratification: Cartesian combinations of categories
@@ -1389,6 +1556,7 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
         key_categories = [list(adata.obs[k].cat.categories) for k in keys]
         combinations = itertools.product(*key_categories)
 
+        scatac_list = list() if has_paired_scatac else None
         for comb in combinations:
             # Composite subgroup identifier joined with underscore
             comp_name = "_".join(sanitize_identifier(v) for v in comb)
@@ -1467,10 +1635,21 @@ def stratification_pipeline(adata, cluster_key_stratification=None, clusters="al
             adata_cluster = adata[mask].copy()
             adata_list.append(adata_cluster)
             adata_stratification_list.append(comp_name)
+
+            if has_paired_scatac:
+                scatac_cluster = scatac_ad[adata_cluster.obs_names].copy()
+                if scatac_cluster.n_obs < 10:
+                    print(
+                        f"    ⚠ Warning: scATAC subset for subgroup '{comp_name}' has very few cells ({scatac_cluster.n_obs} cells)."
+                    )
+                scatac_list.append(scatac_cluster)
+
             print(
                 f"  ✓ Subgroup '{comp_name}': {adata_cluster.n_obs} cells × {adata_cluster.n_vars} genes"
             )
 
+        if scatac is not None:
+            return adata_list, adata_stratification_list, scatac_list
         return adata_list, adata_stratification_list
 
 
@@ -1554,6 +1733,7 @@ def dimensionality_reduction_clustering(
         # Save checkpoint
         if log_dir:
             log_step("DimReduction_Clustering.Checkpoint", "SAVING")
+            os.makedirs(os.path.dirname(checkpoint_file), exist_ok=True)
             adata.write(checkpoint_file)
             write_checkpoint(
                 log_dir,
