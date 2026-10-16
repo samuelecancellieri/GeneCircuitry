@@ -123,6 +123,16 @@ except ImportError as _hs_err:
     )
     hotspot_processing = None  # type: ignore[assignment]
 
+try:
+    from . import perturbation
+except ImportError as _pert_err:
+    _warnings.warn(
+        f"Perturbation dependencies could not be loaded ({type(_pert_err).__name__}): {_pert_err}",
+        ImportWarning,
+        stacklevel=2,
+    )
+    perturbation = None  # type: ignore[assignment]
+
 
 # Import commonly used functions
 from .config import set_random_seed, set_scanpy_settings, get_config, print_config
@@ -150,6 +160,7 @@ __all__ = [
     "hotspot_processing",
     "atac_peaks_processing",
     "grn_deep_analysis",
+    "perturbation",
     "config",
     "reporting",
     "plotting",
