@@ -63,6 +63,16 @@ from .comparative_plots import (
     generate_all_comparative_plots,
 )
 
+from .perturbation_plots import (
+    plot_tf_selection_rationale,
+    plot_perturbation_vector_field,
+    plot_cluster_shift_magnitude,
+    plot_target_gene_shifts,
+    plot_perturbation_developmental_flow,
+    plot_comparative_perturbation_dashboard,
+    generate_all_perturbation_plots,
+)
+
 __all__ = [
     # Utilities
     "PlotLogger",
@@ -106,5 +116,14 @@ __all__ = [
     "plot_cross_stratification_module_overlap",
     "plot_integrated_regulatory_dashboard",
     "generate_all_comparative_plots",
+    # Perturbation plots
+    "plot_tf_selection_rationale",
+    "plot_perturbation_vector_field",
+    "plot_cluster_shift_magnitude",
+    "plot_target_gene_shifts",
+    "plot_perturbation_developmental_flow",
+    "plot_comparative_perturbation_dashboard",
+    "generate_all_perturbation_plots",
 ]
+
 

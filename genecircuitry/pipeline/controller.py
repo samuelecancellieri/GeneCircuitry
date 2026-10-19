@@ -812,7 +812,25 @@ class PipelineController:
         if os.path.exists(grn_score_file) and os.path.exists(grn_links_file):
             grn_deep_analysis_pipeline(grn_score_file, grn_links_file)
 
+        # Run in-silico perturbation if requested
+        if (
+            getattr(self.args, "run_perturbation", False)
+        ) and not self.args.skip_celloracle:
+            try:
+                self.run_step_perturbation(
+                    adata=adata_clustered,
+                    oracle=celloracle_result[0] if (celloracle_result and isinstance(celloracle_result, tuple)) else None,
+                    links=celloracle_result[1] if (celloracle_result and isinstance(celloracle_result, tuple)) else None,
+                    cluster_key=resolved_cluster_key,
+                    output_dir=stratified_output_dir,
+                    log_dir=stratified_log_dir,
+                )
+            except Exception as e:
+                log_error("Controller.Stratification.Perturbation", e)
+                print(f"  ⚠ Perturbation analysis failed for {stratification_name} ({type(e).__name__}): {e}")
+
         # Collect results for unified tabbed report
+
         self.stratification_results.append(
             {
                 "name": str(stratification_name),
@@ -996,6 +1014,22 @@ class PipelineController:
                     log_error("Controller.ComparativeAnalysis", e)
                     print(f"  ⚠ Comparative analysis failed ({type(e).__name__}): {e}")
 
+            # Step: In-silico Perturbation analysis
+            if (
+                "perturbation" in steps
+                or getattr(self.args, "run_perturbation", False)
+            ) and not getattr(self.args, "skip_celloracle", False):
+                try:
+                    self.run_step_perturbation(
+                        adata=adata_clustered,
+                        oracle=celloracle_result[0] if (celloracle_result and isinstance(celloracle_result, tuple)) else None,
+                        links=celloracle_result[1] if (celloracle_result and isinstance(celloracle_result, tuple)) else None,
+                        output_dir=self.args.output,
+                    )
+                except Exception as e:
+                    log_error("Controller.Perturbation", e)
+                    print(f"  ⚠ Perturbation analysis failed ({type(e).__name__}): {e}")
+
             if "report" in steps:
                 self.run_step_report(
                     output_dir=self.args.output,
@@ -1090,6 +1124,219 @@ class PipelineController:
         )
 
         return comp_results
+
+    @staticmethod
+    def parse_compare_clusters(compare_clusters_arg):
+        """
+        Parse cluster comparison pairs from string or list format.
+
+        Parameters
+        ----------
+        compare_clusters_arg : str, list, or None
+            Specification of cluster pairs (e.g. 'C1,C2;C3,C4' or [('C1', 'C2')]).
+
+        Returns
+        -------
+        list of tuple or None
+            Parsed list of (cluster_a, cluster_b) tuples, or None.
+        """
+        if not compare_clusters_arg:
+            return None
+        if isinstance(compare_clusters_arg, list):
+            return compare_clusters_arg
+        if not isinstance(compare_clusters_arg, str):
+            return None
+
+        clean_str = compare_clusters_arg.strip()
+        if not clean_str:
+            return None
+
+        pairs = []
+        delimiter = ";" if ";" in clean_str else ("|" if "|" in clean_str else None)
+        raw_pairs = clean_str.split(delimiter) if delimiter else [clean_str]
+        for p in raw_pairs:
+            p = p.strip()
+            if not p:
+                continue
+            parts = [x.strip() for x in p.split(",") if x.strip()]
+            if len(parts) >= 2:
+                pairs.append((parts[0], parts[1]))
+        return pairs if pairs else None
+
+    def run_step_perturbation(
+        self,
+        adata=None,
+        oracle=None,
+        links=None,
+        score_df=None,
+        links_df=None,
+        hotspot_genes=None,
+        cluster_key=None,
+        output_dir=None,
+        log_dir=None,
+    ):
+        """
+        Execute in-silico TF perturbation analysis using CellOracle.
+
+        Parameters
+        ----------
+        adata : AnnData, optional
+            Input AnnData object.
+        oracle : co.Oracle, optional
+            Fitted CellOracle Oracle object.
+        links : co.Links, optional
+            Fitted CellOracle Links object.
+        score_df : pd.DataFrame, optional
+            Centrality score DataFrame.
+        links_df : dict or pd.DataFrame, optional
+            Filtered links dictionary or DataFrame.
+        hotspot_genes : pd.DataFrame or list, optional
+            Hotspot module genes.
+        cluster_key : str, optional
+            Clustering column name.
+        output_dir : str, optional
+            Base output directory.
+        log_dir : str, optional
+            Log directory for checkpoints.
+
+        Returns
+        -------
+        dict or None
+            Perturbation results dictionary if successful, or None.
+        """
+        from genecircuitry.perturbation import run_perturbation_analysis
+
+        if output_dir is None:
+            output_dir = getattr(self.args, "output", config.OUTPUT_DIR)
+        if log_dir is None:
+            log_dir = getattr(self, "log_dir", None)
+        if cluster_key is None:
+            cluster_key = getattr(self.args, "cluster_key", "leiden")
+
+        log_step("Controller.Perturbation", "STARTED")
+        print(f"\n{'='*70}")
+        print("CELLORACLE IN-SILICO PERTURBATION ANALYSIS")
+        print(f"{'='*70}")
+
+        # Resolve oracle and links if not provided
+        if oracle is None or links is None:
+            co_oracle_path = os.path.join(
+                output_dir, "celloracle", "oracle_object.celloracle.oracle"
+            )
+            co_links_path = os.path.join(
+                output_dir, "celloracle", "oracle_object.celloracle.links"
+            )
+            if os.path.exists(co_oracle_path) and os.path.exists(co_links_path):
+                try:
+                    from genecircuitry.celloracle_processing import (
+                        load_celloracle_results,
+                    )
+                    print("  Loading CellOracle Oracle and Links objects...")
+                    oracle, links = load_celloracle_results(
+                        oracle_path=co_oracle_path, links_path=co_links_path
+                    )
+                except Exception as e:
+                    log_error("Controller.Perturbation.LoadOracle", e)
+                    print(f"  ⚠ Failed to load CellOracle results ({type(e).__name__}): {e}")
+
+        if oracle is None:
+            log_step(
+                "Controller.Perturbation",
+                "SKIPPED",
+                {"reason": "CellOracle oracle object not available"},
+            )
+            print("  ⚠ CellOracle Oracle object not found. Skipping perturbation analysis.")
+            return None
+
+        # Resolve scores and links_df if not provided
+        if score_df is None:
+            co_score_path = os.path.join(
+                output_dir, "celloracle", "grn_merged_scores.csv"
+            )
+            if os.path.exists(co_score_path):
+                score_df = pd.read_csv(co_score_path)
+            elif hasattr(links, "merged_score") and links.merged_score is not None:
+                score_df = links.merged_score
+
+        if links_df is None:
+            co_links_pkl = os.path.join(
+                output_dir, "celloracle", "grn_filtered_links.pkl"
+            )
+            if os.path.exists(co_links_pkl):
+                with open(co_links_pkl, "rb") as f:
+                    links_df = pickle.load(f)
+            elif hasattr(links, "filtered_links") and links.filtered_links is not None:
+                links_df = links.filtered_links
+
+        # Resolve hotspot genes if not provided
+        if hotspot_genes is None:
+            hotspot_genes_path = os.path.join(
+                output_dir, "hotspot", "significant_genes.csv"
+            )
+            if os.path.exists(hotspot_genes_path):
+                try:
+                    hotspot_genes = pd.read_csv(hotspot_genes_path)
+                except Exception:
+                    pass
+            elif adata is not None and "hotspot_modules" in getattr(adata, "var", {}):
+                hotspot_genes = adata.var[["hotspot_modules"]]
+
+        # Parse comparison pairs
+        compare_clusters_arg = getattr(self.args, "compare_clusters", None)
+        compare_pairs = self.parse_compare_clusters(compare_clusters_arg)
+
+        top_n = getattr(self.args, "top_n_perturbed_tfs", 3)
+        perturbation_mode = getattr(self.args, "perturbation_mode", "directional")
+        n_propagation = getattr(self.args, "n_propagation", 3)
+        pseudotime_key = getattr(self.args, "pseudotime_key", "pseudotime")
+
+        # Checkpoint check
+        step_hash = hashlib.md5(
+            f"perturbation_{cluster_key}_{compare_clusters_arg}_{top_n}_{perturbation_mode}_{n_propagation}".encode()
+        ).hexdigest()
+        summary_file = os.path.join(output_dir, "perturbation", "perturbation_summary.csv")
+        if log_dir and check_checkpoint(log_dir, "perturbation", step_hash):
+            if os.path.exists(summary_file):
+                log_step("Controller.Perturbation.Checkpoint", "LOADED")
+                print("  ✓ Loading perturbation results from checkpoint...")
+                return {
+                    "summary_df": pd.read_csv(summary_file),
+                    "checkpoint_loaded": True,
+                }
+
+        try:
+            perturbation_results = run_perturbation_analysis(
+                oracle=oracle,
+                links=links,
+                score_df=score_df,
+                links_df=links_df,
+                hotspot_genes=hotspot_genes,
+                compare_clusters=compare_pairs,
+                top_n=top_n,
+                perturbation_mode=perturbation_mode,
+                n_propagation=n_propagation,
+                cluster_key=cluster_key,
+                pseudotime_key=pseudotime_key,
+                output_dir=output_dir,
+                save_figures=True,
+            )
+
+            if log_dir:
+                n_comps = len(perturbation_results.get("comparisons", {}))
+                write_checkpoint(
+                    log_dir,
+                    "perturbation",
+                    step_hash,
+                    n_comparisons=n_comps,
+                )
+
+            log_step("Controller.Perturbation", "COMPLETED")
+            print("  ✓ In-silico perturbation analysis completed successfully")
+            return perturbation_results
+        except Exception as e:
+            log_error("Controller.Perturbation", e)
+            print(f"  ⚠ Perturbation analysis failed ({type(e).__name__}): {e}")
+            raise
 
     def print_final_summary(self):
         """Print final pipeline summary."""
@@ -2594,6 +2841,46 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--run-perturbation",
+        action="store_true",
+        default=False,
+        help="Run CellOracle in-silico perturbation analysis on top TFs",
+    )
+    parser.add_argument(
+        "--compare-clusters",
+        type=str,
+        default=None,
+        help=(
+            "Cluster pairs to compare for perturbation analysis (e.g. 'C1,C2;C3,C4' or 'C1,C2'). "
+            "If not provided, automatically compares all cluster pairs or top differing clusters."
+        ),
+    )
+    parser.add_argument(
+        "--top-n-perturbed-tfs",
+        type=int,
+        default=3,
+        help="Number of top TFs to perturb per cluster comparison (default: 3)",
+    )
+    parser.add_argument(
+        "--perturbation-mode",
+        type=str,
+        default="directional",
+        choices=["directional", "ko", "oe", "both"],
+        help="Perturbation mode: directional (KO or OE depending on shift direction), ko, oe, or both (default: directional)",
+    )
+    parser.add_argument(
+        "--n-propagation",
+        type=int,
+        default=3,
+        help="Number of propagation steps in CellOracle signal simulation (default: 3)",
+    )
+    parser.add_argument(
+        "--pseudotime-key",
+        type=str,
+        default="pseudotime",
+        help="Pseudotime column in adata.obs for developmental flow inner product analysis (default: pseudotime)",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         default=False,
@@ -2605,7 +2892,7 @@ Examples:
         default=None,
         help="Specific pipeline steps to run (space-separated): "
         "load preprocessing stratification clustering atac_peaks "
-        "celloracle hotspot grn_analysis summary",
+        "celloracle hotspot grn_analysis comparative perturbation report summary",
     )
 
     return parser
